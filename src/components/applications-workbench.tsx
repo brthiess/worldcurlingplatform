@@ -647,7 +647,7 @@ export function ApplicationsWorkbench() {
                         <div>
                           {(!detail || detail.canEdit) && (
                             <button type="submit">
-                              {busy
+                              {working
                                 ? "Saving…"
                                 : detail
                                   ? "Save changes"

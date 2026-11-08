@@ -3,6 +3,7 @@ import { test, after } from "node:test";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import pg from "pg";
+import { hashPassword } from "better-auth/crypto";
 const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
 after(() => pool.end());
 const base = process.env.BETTER_AUTH_URL!;
@@ -780,6 +781,15 @@ test("staff assignment receipts replay exact grant/revocation, reject conflictin
       201,
     );
     assert.equal(
+      (
+        await request("/api/v1/role-grants", organizer, {
+          ...grant,
+          reason: "Conflicting grant reason",
+        })
+      ).status,
+      409,
+    );
+    assert.equal(
       (await request("/api/v1/role-grants", organizer, grant)).status,
       201,
     );
@@ -839,5 +849,84 @@ test("staff assignment receipts replay exact grant/revocation, reject conflictin
         id,
         reason: "Receipt test cleanup",
       });
+  }
+});
+test("revoked organizer authority cannot replay an earlier successful staff revocation receipt", async () => {
+  const admin = await login("administrator"),
+    persona = `recover-organizer-${randomUUID()}`,
+    organizerGrantId = randomUUID(),
+    staffId = randomUUID();
+  await pool.query(
+    "INSERT INTO auth_user(id,name,email,email_verified) VALUES($1,$2,$3,true)",
+    [persona, "Revoked recovery organizer", `${persona}@demo.invalid`],
+  );
+  await pool.query(
+    "INSERT INTO auth_account(id,account_id,provider_id,user_id,password,created_at,updated_at) VALUES($1,$2,'credential',$2,$3,now(),now())",
+    [randomUUID(), persona, await hashPassword(process.env.DEMO_PASSWORD!)],
+  );
+  try {
+    assert.equal(
+      (
+        await request("/api/v1/role-grants", admin, {
+          id: organizerGrantId,
+          userId: persona,
+          role: "organizer",
+          eventId: "prairie-2026",
+          gameId: null,
+          reason: "Temporary recovery organizer",
+        })
+      ).status,
+      201,
+    );
+    const organizer = await login(persona);
+    assert.equal(
+      (
+        await request("/api/v1/role-grants", organizer, {
+          id: staffId,
+          userId: "demo-ungranted",
+          role: "scorekeeper",
+          eventId: "prairie-2026",
+          gameId: "game-3",
+          reason: "Temporary recovery scoring duty",
+        })
+      ).status,
+      201,
+    );
+    const revoke = {
+      action: "revoke",
+      id: staffId,
+      reason: "Recovery duty ended",
+    };
+    assert.equal(
+      (await request("/api/v1/role-grants", organizer, revoke)).status,
+      200,
+    );
+    assert.equal(
+      (await request("/api/v1/role-grants", organizer, revoke)).status,
+      200,
+    );
+    assert.equal(
+      (
+        await request("/api/v1/role-grants", admin, {
+          action: "revoke",
+          id: organizerGrantId,
+          reason: "Organizer authority revoked",
+        })
+      ).status,
+      200,
+    );
+    assert.equal(
+      (await request("/api/v1/role-grants", organizer, revoke)).status,
+      403,
+    );
+  } finally {
+    const current = await (await request("/api/v1/role-grants", admin)).json();
+    for (const id of [staffId, organizerGrantId])
+      if (current.grants.some((g: { id: string }) => g.id === id))
+        await request("/api/v1/role-grants", admin, {
+          action: "revoke",
+          id,
+          reason: "Receipt authority fixture cleanup",
+        });
   }
 });

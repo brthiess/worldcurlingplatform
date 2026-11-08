@@ -193,6 +193,7 @@ export function AuthorityRecovery({
   state: ReturnType<typeof useAuthorityCommand>;
   label?: string;
 }) {
+  const body = state.pending ? JSON.parse(state.pending.body) : null;
   return (
     <>
       {state.error && (
@@ -212,6 +213,74 @@ export function AuthorityRecovery({
               ? "Saved command retained until its current view is refreshed."
               : "Unconfirmed command retained for this signed-in account in this browser tab. Editing is locked; reloading retains the original command."}
           </p>
+          <details>
+            <summary>Review retained command</summary>
+            <dl style={{ overflowWrap: "anywhere" }}>
+              <dt>Action</dt>
+              <dd>{body.action ?? "Assign scoring access"}</dd>
+              {body.authorityName && (
+                <>
+                  <dt>Authority</dt>
+                  <dd>{body.authorityName}</dd>
+                </>
+              )}
+              {(body.reviewerId || body.delegationId) && (
+                <>
+                  <dt>Reviewer / delegation identifier</dt>
+                  <dd style={{ overflowWrap: "anywhere" }}>
+                    {body.delegationId ?? body.reviewerId}
+                  </dd>
+                </>
+              )}
+              {body.recipientEmail && (
+                <>
+                  <dt>Account</dt>
+                  <dd>{body.recipientEmail}</dd>
+                </>
+              )}
+              {body.eventId && (
+                <>
+                  <dt>Event / game</dt>
+                  <dd>
+                    {body.eventId} · {body.gameId}
+                  </dd>
+                </>
+              )}
+              {body.scope && (
+                <>
+                  <dt>Approval scope</dt>
+                  <dd>
+                    {Object.entries(body.scope).map(([dimension, values]) => (
+                      <p key={dimension}>
+                        {(
+                          {
+                            countries: "Countries",
+                            organizationIds: "Organizations",
+                            disciplines: "Disciplines",
+                            categories: "Categories",
+                            includeEventIds: "Named inclusions",
+                            excludeEventIds: "Named exclusions",
+                          } as Record<string, string>
+                        )[dimension] ?? dimension}
+                        :{" "}
+                        {(values as string[]).join(", ") ||
+                          (dimension === "includeEventIds" ||
+                          dimension === "excludeEventIds"
+                            ? "None"
+                            : "All")}
+                      </p>
+                    ))}
+                  </dd>
+                </>
+              )}
+              <dt>Reason</dt>
+              <dd>{body.reason}</dd>
+              <dt>Original command identifier</dt>
+              <dd style={{ overflowWrap: "anywhere" }}>
+                {body.requestId ?? body.id}
+              </dd>
+            </dl>
+          </details>
           <div className="application-actions">
             <button disabled={state.busy} onClick={() => void state.retry()}>
               Retry exact {label} command
