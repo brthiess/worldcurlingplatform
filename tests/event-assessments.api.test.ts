@@ -48,11 +48,16 @@ async function waitForJob(
     );
     assert.equal(r.status, 200, await r.clone().text());
     view = await r.json();
-    if (view.selected?.state === state) return view;
+    if (
+      view.selected?.state === state ||
+      (state === "terminal" &&
+        ["completed", "blocked"].includes(view.selected?.state))
+    )
+      return view;
     await new Promise((r) => setTimeout(r, 100));
   }
   throw new Error(
-    `Job did not reach ${state}: ${JSON.stringify(view?.selected)}`,
+    `Job ${view?.selected?.id} did not reach ${state}: observed ${view?.selected?.state}; ${view?.selected?.error ?? ""}`,
   );
 }
 async function waitingCalculation(exceptPid?: number) {
@@ -603,5 +608,58 @@ test("women's special event consumes every completed unscheduled game from accep
   assert.equal(
     result.awards.find((a: any) => a.entryId === f.entries[0]).points,
     "189/4",
+  );
+});
+test("published immutable single-knockout profile overrides a misleading legacy label and rejects a missing reduction", async () => {
+  const cookie = await login(),
+    send = (path: string, body?: unknown) => request(cookie, path, body),
+    f = await assessmentFixture(db, send, { platformSingle: true });
+  const view = await (
+    await send(
+      `/api/v1/event-assessments?division=${f.divisionId}&rules=${f.rulesId}`,
+    )
+  ).json();
+  const wrong = structuredClone(f.evidence);
+  wrong.event.singleKnockout = false;
+  const cmd = {
+    action: "calculate",
+    divisionId: f.divisionId,
+    version: 0,
+    requestId: randomUUID(),
+    sourceDigest: view.review.sourceDigest,
+    evidence: wrong,
+  };
+  assert.equal((await send("/api/v1/event-assessments", cmd)).status, 200);
+  const blocked = (await waitForJob(send, f, "terminal")).selected;
+  assert.equal(blocked.state, "blocked");
+  assert.match(blocked.resultContents, /format\/stages/);
+  assert.equal(
+    (
+      await send("/api/v1/event-assessments", {
+        ...cmd,
+        version: 1,
+        requestId: randomUUID(),
+        evidence: f.evidence,
+      })
+    ).status,
+    200,
+  );
+  const completed = (await waitForJob(send, f)).selected,
+    input = JSON.parse(completed.contents),
+    result = JSON.parse(completed.resultContents).result;
+  assert.equal(
+    input.source.publishedProfile.definition.family,
+    "single_knockout",
+  );
+  assert.equal(input.source.publishedProfile.revision, 2);
+  assert.equal(input.source.publishedProfile.nodes.length, 7);
+  assert.equal(
+    input.source.current.division.format,
+    "Round robin and playoffs",
+  );
+  assert.equal(result.sfm, "27/10");
+  assert.equal(
+    result.awards.find((a: any) => a.entryId === f.entries[0]).points,
+    "81/4",
   );
 });

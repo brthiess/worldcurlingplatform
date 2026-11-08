@@ -23,6 +23,7 @@ export async function assessmentFixture(
   options: {
     discipline?: "men_four" | "women_four";
     unscheduled?: boolean;
+    platformSingle?: boolean;
   } = {},
 ) {
   const eventId = randomUUID(),
@@ -132,22 +133,50 @@ export async function assessmentFixture(
     winner: number;
     playoff: boolean;
   }[] = [];
-  for (let i = 0; i < 8; i++)
-    games.push({
-      id: randomUUID(),
-      a: i,
-      b: (i + 1) % 8,
-      winner: i,
-      playoff: false,
+  if (options.platformSingle) {
+    await accepted(send, `/api/v1/divisions/${divisionId}/draw`, {
+      action: "preview",
+      requestId: randomUUID(),
+      expectedVersion: 0,
+      seedEntryIds: entries,
+      reason:
+        "Fictional actual single-knockout profile; display label deliberately remains legacy.",
     });
-  games.push(
-    { id: randomUUID(), a: 0, b: 3, winner: 0, playoff: true },
-    { id: randomUUID(), a: 1, b: 2, winner: 1, playoff: true },
-    { id: randomUUID(), a: 0, b: 1, winner: 0, playoff: true },
-  );
+    const published = await accepted(
+      send,
+      `/api/v1/divisions/${divisionId}/draw`,
+      {
+        action: "publish",
+        requestId: randomUUID(),
+        expectedVersion: 1,
+        reason:
+          "Publish independently seeded fictional single-knockout fixture",
+      },
+    );
+    await db.query(
+      "UPDATE division SET format='Round robin and playoffs' WHERE id=$1",
+      [divisionId],
+    );
+    for (const g of published.graph.games)
+      games.push({ id: g.id, a: -1, b: -1, winner: -1, playoff: true });
+  } else {
+    for (let i = 0; i < 8; i++)
+      games.push({
+        id: randomUUID(),
+        a: i,
+        b: (i + 1) % 8,
+        winner: i,
+        playoff: false,
+      });
+    games.push(
+      { id: randomUUID(), a: 0, b: 3, winner: 0, playoff: true },
+      { id: randomUUID(), a: 1, b: 2, winner: 1, playoff: true },
+      { id: randomUUID(), a: 0, b: 1, winner: 0, playoff: true },
+    );
+  }
   for (const [i, g] of games.entries()) {
     const drawId = randomUUID();
-    if (!options.unscheduled)
+    if (!options.unscheduled && !options.platformSingle)
       await db.query(
         "INSERT INTO draw_session(id,division_id,number,starts_at,state) VALUES($1,$2,$3,$4,'completed')",
         [
@@ -157,26 +186,49 @@ export async function assessmentFixture(
           `2026-11-${i < 8 ? "20" : "21"}T${String(1 + i).padStart(2, "0")}:00:00Z`,
         ],
       );
-    await db.query(
-      "INSERT INTO game(id,draw_id,sheet,phase,state,entry_a,entry_b,slot_a,slot_b,division_id) VALUES($1,$2,'A',$3,'scheduled',$4,$5,'A','B',$6)",
-      [
-        g.id,
-        options.unscheduled ? null : drawId,
-        g.playoff ? "Playoff" : "Qualification",
-        entries[g.a],
-        entries[g.b],
-        divisionId,
-      ],
-    );
+    if (!options.platformSingle)
+      await db.query(
+        "INSERT INTO game(id,draw_id,sheet,phase,state,entry_a,entry_b,slot_a,slot_b,division_id) VALUES($1,$2,'A',$3,'scheduled',$4,$5,'A','B',$6)",
+        [
+          g.id,
+          options.unscheduled ? null : drawId,
+          g.playoff ? "Playoff" : "Qualification",
+          entries[g.a],
+          entries[g.b],
+          divisionId,
+        ],
+      );
+    if (options.platformSingle) {
+      const actual = (
+        await db.query("SELECT entry_a,entry_b FROM game WHERE id=$1", [g.id])
+      ).rows[0];
+      g.a = entries.indexOf(actual.entry_a);
+      g.b = entries.indexOf(actual.entry_b);
+      g.winner = g.a;
+      if (g.a < 0 || g.b < 0)
+        throw new Error(
+          "Actual published winner routes did not resolve this game",
+        );
+    }
     await accepted(send, `/api/v1/games/${g.id}/scoring`, {
       requestId: randomUUID(),
-      expectedVersion: 0,
+      expectedVersion: options.platformSingle
+        ? Number(
+            (await db.query("SELECT version FROM game WHERE id=$1", [g.id]))
+              .rows[0].version,
+          )
+        : 0,
       action: "start",
       hammer: null,
     });
     await accepted(send, `/api/v1/games/${g.id}/scoring`, {
       requestId: randomUUID(),
-      expectedVersion: 1,
+      expectedVersion: options.platformSingle
+        ? Number(
+            (await db.query("SELECT version FROM game WHERE id=$1", [g.id]))
+              .rows[0].version,
+          )
+        : 1,
       action: "confirm",
       hammer: null,
       outcome: "conceded",
@@ -227,7 +279,14 @@ export async function assessmentFixture(
       complianceNote:
         "Fictional timely registered compliant event; published roster/draw/end-score evidence reviewed.",
       resultsUrl: "https://example.com/wcp033-fictional-results",
-      singleKnockout: false,
+      singleKnockout: options.platformSingle === true,
+      formatReview: {
+        family: options.platformSingle
+          ? "single_knockout"
+          : "not_single_knockout",
+        sourceId: "official",
+        note: "Fictional reviewed actual competition terms; the display label is not ranking proof.",
+      },
       qualificationGameIds: games.filter((g) => !g.playoff).map((g) => g.id),
       playoffGameIds: games.filter((g) => g.playoff).map((g) => g.id),
       bronzeGameId: null,

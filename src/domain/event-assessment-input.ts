@@ -21,6 +21,8 @@ export const assessmentPolicy = {
     "All competing entries remain in N; only eligible entries contribute strength or receive points. Explicit exclusions do not silently decide a season deduction. Penalty/exemption and forfeit branches remain blocked.",
   split:
     "Shared last qualifier group receives remaining placement slots divided equally; top four entitlement is retained. Only actual losing-record playoff qualifiers receive the first-game reduction.",
+  formatAuthority:
+    "A supported immutable published profile, matched to every frozen game and entry, supplies actual format authority. Legacy competitions require an explicit sourced actual-format review; display text never decides the reduction.",
 } as const;
 export type AssessmentEvidence = {
   rulesId: string;
@@ -50,6 +52,11 @@ export type AssessmentEvidence = {
     complianceNote: string;
     resultsUrl: string;
     singleKnockout: boolean;
+    formatReview: {
+      family: "unknown" | "single_knockout" | "not_single_knockout";
+      sourceId: string;
+      note: string;
+    };
     qualificationGameIds: string[];
     playoffGameIds: string[];
     bronzeGameId: string | null;
@@ -125,6 +132,15 @@ export function assessmentEvidence(raw: unknown): AssessmentEvidence {
       "Select the event category, edition linkage and knockout profile.",
     );
   const previous = e.previous == null ? null : obj(e.previous);
+  const format = obj(
+    e.formatReview ?? { family: "unknown", sourceId: "", note: "" },
+  );
+  if (
+    !["unknown", "single_knockout", "not_single_knockout"].includes(
+      String(format.family),
+    )
+  )
+    throw new EntryError("Select a sourced calculation-format classification.");
   const digest = (v: unknown) => {
     if (typeof v !== "string" || !/^[a-f0-9]{64}$/.test(v))
       throw new EntryError("Retain the exact source digest.");
@@ -235,6 +251,14 @@ export function assessmentEvidence(raw: unknown): AssessmentEvidence {
       complianceNote: text(e.complianceNote),
       resultsUrl,
       singleKnockout: e.singleKnockout,
+      formatReview: {
+        family: format.family as
+          | "unknown"
+          | "single_knockout"
+          | "not_single_knockout",
+        sourceId: reference(format.sourceId),
+        note: text(format.note),
+      },
       qualificationGameIds: ids(e.qualificationGameIds),
       playoffGameIds: ids(e.playoffGameIds),
       bronzeGameId: e.bronzeGameId ? identifier(e.bronzeGameId) : null,

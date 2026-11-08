@@ -9,6 +9,12 @@ import {
 import { AssessmentEvidenceEditor } from "./assessment-evidence-editor";
 import type { AssessmentResult } from "@/domain/event-assessments";
 export type Review = {
+  publishedProfile: {
+    revision: number;
+    templateId: string;
+    templateVersion: number;
+    definition: { family: string };
+  } | null;
   priorEditions?: { id: string; name: string; starts_on: string }[];
   sourceDigest: string;
   current: {
@@ -122,7 +128,9 @@ function fresh(r: Review): AssessmentEvidence {
       eligibilitySourceId: "",
       complianceNote: "",
       resultsUrl: "",
-      singleKnockout: false,
+      singleKnockout:
+        r.publishedProfile?.definition.family === "single_knockout",
+      formatReview: { family: "unknown", sourceId: "", note: "" },
       qualificationGameIds: [],
       playoffGameIds: [],
       bronzeGameId: null,
@@ -143,6 +151,19 @@ function amount(value: string) {
   if (!d) return n;
   const decimal = Number(n) / Number(d);
   return `${decimal.toLocaleString("en", { maximumFractionDigits: 8 })} (${value})`;
+}
+function editableEvidence(value: AssessmentEvidence): AssessmentEvidence {
+  return {
+    ...value,
+    event: {
+      ...value.event,
+      formatReview: value.event.formatReview ?? {
+        family: "unknown",
+        sourceId: "",
+        note: "",
+      },
+    },
+  };
 }
 export function EventAssessmentsWorkbench() {
   const [workspace, setWorkspace] = useState<Workspace | null>(null),
@@ -170,7 +191,7 @@ export function EventAssessmentsWorkbench() {
           const saved = next.selected
             ? JSON.parse(next.selected.contents).evidence
             : null;
-          setEvidence(saved ?? fresh(next.review));
+          setEvidence(saved ? editableEvidence(saved) : fresh(next.review));
         }
       } catch (e) {
         setError((e as Error).message);
@@ -201,7 +222,9 @@ export function EventAssessmentsWorkbench() {
       setError("");
       setStale(false);
       if (next.selected)
-        setEvidence(JSON.parse(next.selected.contents).evidence);
+        setEvidence(
+          editableEvidence(JSON.parse(next.selected.contents).evidence),
+        );
     },
     async (pending) => {
       const original = JSON.parse(pending.body),

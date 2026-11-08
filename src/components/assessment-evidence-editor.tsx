@@ -300,14 +300,83 @@ export function AssessmentEvidenceEditor({
         Classify frozen games from their sourced competition terms. Phase names
         and planned times do not establish the first playoff game.
       </p>
-      <label>
-        <input
-          type="checkbox"
-          checked={v.event.singleKnockout}
-          onChange={(e) => event({ singleKnockout: e.target.checked })}
-        />{" "}
-        Single knockout format with no qualification phase
-      </label>
+      {review.publishedProfile ? (
+        <div className="notice">
+          <p>
+            Published competition profile: {review.publishedProfile.templateId}{" "}
+            revision {review.publishedProfile.templateVersion}; draw revision{" "}
+            {review.publishedProfile.revision}; family{" "}
+            {review.publishedProfile.definition.family}. This immutable profile
+            must match the frozen field and every game.
+          </p>
+          <button
+            type="button"
+            className="secondary"
+            onClick={() =>
+              event({
+                singleKnockout:
+                  review.publishedProfile!.definition.family ===
+                  "single_knockout",
+              })
+            }
+          >
+            Use the published competition format
+          </button>
+        </div>
+      ) : (
+        <fieldset>
+          <legend>Sourced actual competition format</legend>
+          <p>
+            Legacy display text does not establish a ranking format. Review the
+            actual event terms; keep unknown format unresolved.
+          </p>
+          <label>
+            Actual calculation format
+            <select
+              value={v.event.formatReview.family}
+              onChange={(e) =>
+                event({
+                  singleKnockout: e.target.value === "single_knockout",
+                  formatReview: {
+                    ...v.event.formatReview,
+                    family: e.target
+                      .value as typeof v.event.formatReview.family,
+                  },
+                })
+              }
+            >
+              <option value="unknown">Unresolved actual format</option>
+              <option value="single_knockout">
+                Single knockout with no qualification phase
+              </option>
+              <option value="not_single_knockout">
+                Reviewed format with qualification or another non-single
+                structure
+              </option>
+            </select>
+          </label>
+          {sourcePicker(
+            "Actual format evidence source",
+            v.event.formatReview.sourceId,
+            (sourceId) =>
+              event({ formatReview: { ...v.event.formatReview, sourceId } }),
+          )}
+          <label>
+            Actual format review rationale
+            <textarea
+              value={v.event.formatReview.note}
+              onChange={(e) =>
+                event({
+                  formatReview: {
+                    ...v.event.formatReview,
+                    note: e.target.value,
+                  },
+                })
+              }
+            />
+          </label>
+        </fieldset>
+      )}
       {review.current.games.map((g, i) => (
         <label key={g.id}>
           Game {i + 1} · {g.phase}

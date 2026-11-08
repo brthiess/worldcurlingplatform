@@ -52,6 +52,16 @@ export type StartingEvidence = {
     effectiveTo: string;
   };
 };
+export type PublishedFormat = {
+  divisionId: string;
+  revision: number;
+  templateId: string;
+  templateVersion: number;
+  definition: { family: string };
+  graph: { games: { id: string; key: string }[] };
+  nodes: { key: string; gameId: string }[];
+  seeds: { entryId: string; version: number }[];
+};
 /** Preparation uses only frozen sporting and evidence bytes. Worker never reads later mutable rosters or ranks. */
 export function prepareEventCalculation(
   e: AssessmentEvidence,
@@ -59,6 +69,7 @@ export function prepareEventCalculation(
   starting: StartingEvidence[],
   initialIssues: string[] = [],
   timezone = "UTC",
+  publishedFormat: PublishedFormat | null = null,
 ): CalculationField {
   const issues = [...initialIssues],
     d = s.source.division,
@@ -124,10 +135,51 @@ export function prepareEventCalculation(
     issues.push(
       "Classify every frozen game once as qualification or playoff; game phase labels alone do not establish ranking stages.",
     );
-  const singleFormat = /single[ _-]*(knockout|elimination)/i.test(d.format);
+  let singleFormat: boolean | null = null;
+  if (publishedFormat) {
+    if (
+      publishedFormat.divisionId !== d.id ||
+      publishedFormat.nodes.length !== allGames.length ||
+      new Set(publishedFormat.nodes.map((n) => n.gameId)).size !==
+        allGames.length ||
+      publishedFormat.nodes.some(
+        (n) => !allGames.some((g) => g.id === n.gameId),
+      ) ||
+      publishedFormat.graph.games.length !== publishedFormat.nodes.length ||
+      publishedFormat.graph.games.some(
+        (g) =>
+          !publishedFormat.nodes.some(
+            (n) => n.gameId === g.id && n.key === g.key,
+          ),
+      ) ||
+      publishedFormat.seeds.length !== entryIds.length ||
+      publishedFormat.seeds.some((seed) => !entryIds.includes(seed.entryId))
+    )
+      issues.push(
+        "Published competition profile does not match every frozen game and competing entry; resolve the association before assessment.",
+      );
+    if (
+      publishedFormat.templateId === "application-single8-seeded-v1" &&
+      publishedFormat.templateVersion === 1 &&
+      publishedFormat.definition.family === "single_knockout"
+    )
+      singleFormat = true;
+    else
+      issues.push(
+        "Published competition profile needs a supported explicit calculation-format mapping.",
+      );
+  } else {
+    const f = event.formatReview;
+    if (!f || f.family === "unknown" || !f.sourceId || !f.note)
+      issues.push(
+        "Legacy competition needs an explicit sourced and reviewed actual format; display text is not format proof.",
+      );
+    else singleFormat = f.family === "single_knockout";
+  }
   if (
-    event.singleKnockout !== singleFormat ||
-    (event.singleKnockout && event.qualificationGameIds.length > 0)
+    singleFormat !== null &&
+    (event.singleKnockout !== singleFormat ||
+      (singleFormat && event.qualificationGameIds.length > 0))
   )
     issues.push(
       "Single knockout designation disagrees with the frozen format/stages.",

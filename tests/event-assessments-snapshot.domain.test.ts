@@ -10,6 +10,7 @@ import {
   prepareEventCalculation,
   type SportingSnapshot,
   type StartingEvidence,
+  type PublishedFormat,
 } from "../src/domain/event-assessment-snapshot";
 import { assessFourPlayer } from "../src/domain/event-assessments";
 import { source } from "./ranking-inputs-fixtures";
@@ -103,6 +104,11 @@ function fixture() {
       complianceNote: "Fictional complete compliance evidence",
       resultsUrl: "https://example.com/fictional",
       singleKnockout: false,
+      formatReview: {
+        family: "not_single_knockout",
+        sourceId: "official",
+        note: "Fictional actual qualification-format source review",
+      },
       qualificationGameIds: games.map((g) => g.id),
       playoffGameIds: [],
       bronzeGameId: null,
@@ -257,7 +263,7 @@ test("forfeit, unclassified game, incomplete field, malformed provenance and uns
   );
   assert.equal(assessmentEvidence(f.evidence).entries.length, 8);
 });
-test("single knockout reduction cannot be selected for a triple format or omitted for an explicit single format", () => {
+test("actual format needs explicit sourced review; free-text display labels do not decide the factor", () => {
   const f = fixture();
   f.snapshot.source.division.format = "Triple knockout";
   f.evidence.event.singleKnockout = true;
@@ -270,15 +276,110 @@ test("single knockout reduction cannot be selected for a triple format or omitte
   );
   const x = fixture();
   x.snapshot.source.division.format = "single_knockout";
+  x.evidence.event.formatReview.family = "unknown";
   assert.equal(
     assessFourPlayer(prepareEventCalculation(x.evidence, x.snapshot, x.roster))
       .state,
     "blocked",
   );
   x.snapshot.source.division.format = "Triple knockout";
+  x.evidence.event.formatReview.family = "not_single_knockout";
   assert.equal(
     assessFourPlayer(prepareEventCalculation(x.evidence, x.snapshot, x.roster))
       .state,
     "completed",
   );
+});
+test("immutable published profile and exact game/entry associations establish the single-knockout factor", () => {
+  const f = fixture(),
+    pairs = [
+      [0, 7, 0, "Q1"],
+      [3, 4, 3, "Q2"],
+      [1, 6, 1, "Q3"],
+      [2, 5, 2, "Q4"],
+      [0, 3, 0, "S1"],
+      [1, 2, 1, "S2"],
+      [0, 1, 0, "F"],
+    ] as const;
+  f.snapshot.source.games = pairs.map(([a, b, w, key]) => ({
+    id: `knockout-${key}`,
+    drawId: null,
+    entryA: `entry-${a}`,
+    entryB: `entry-${b}`,
+    result: {
+      winnerEntryId: `entry-${w}`,
+      outcome: "conceded",
+      lineupA: {
+        members: f.players[a].map((playerId) => ({
+          playerId,
+          identityStatus: "identified",
+        })),
+      },
+      lineupB: {
+        members: f.players[b].map((playerId) => ({
+          playerId,
+          identityStatus: "identified",
+        })),
+      },
+    },
+  }));
+  f.snapshot.placements = f.snapshot.source.entries.map((e, i) => ({
+    entryId: e.id,
+    place: [1, 2, 3, 3, 5, 5, 5, 5][i],
+  }));
+  f.evidence.event.singleKnockout = true;
+  f.evidence.event.qualificationGameIds = [];
+  f.evidence.event.playoffGameIds = f.snapshot.source.games.map((g) => g.id);
+  f.evidence.event.formatReview = { family: "unknown", sourceId: "", note: "" };
+  f.evidence.entries.forEach((e, i) => {
+    e.games = f.snapshot.source.games
+      .filter((g) => g.entryA === e.entryId || g.entryB === e.entryId)
+      .map((g) => ({ gameId: g.id, segments: [f.players[i]] }));
+    e.firstPlayoffGameId = e.games[0]?.gameId ?? null;
+  });
+  const profile: PublishedFormat = {
+    divisionId: "division",
+    revision: 2,
+    templateId: "application-single8-seeded-v1",
+    templateVersion: 1,
+    definition: { family: "single_knockout" },
+    graph: { games: pairs.map((p) => ({ id: `knockout-${p[3]}`, key: p[3] })) },
+    nodes: pairs.map((p) => ({ gameId: `knockout-${p[3]}`, key: p[3] })),
+    seeds: f.snapshot.source.entries.map((e) => ({
+      entryId: e.id,
+      version: 1,
+    })),
+  };
+  const r = assessFourPlayer(
+    prepareEventCalculation(
+      f.evidence,
+      f.snapshot,
+      f.roster,
+      [],
+      "UTC",
+      profile,
+    ),
+  );
+  assert.equal(r.state, "completed");
+  assert.equal(r.sfm, "27/10");
+  assert.equal(r.awards.find((a) => a.entryId === "entry-0")!.points, "81/4");
+  for (const bad of [
+    { ...profile, templateId: "unknown-template" },
+    { ...profile, divisionId: "different" },
+    { ...profile, nodes: profile.nodes.slice(1) },
+    { ...profile, seeds: profile.seeds.slice(1) },
+  ])
+    assert.equal(
+      assessFourPlayer(
+        prepareEventCalculation(
+          f.evidence,
+          f.snapshot,
+          f.roster,
+          [],
+          "UTC",
+          bad,
+        ),
+      ).state,
+      "blocked",
+    );
 });

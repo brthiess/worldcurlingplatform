@@ -108,6 +108,27 @@ async function review(c: PoolClient, id: string, rulesId: string) {
       [current.division.eventId],
     )
   ).rows;
+  const publishedProfile =
+    (
+      await c.query(
+        'SELECT c.division_id AS "divisionId",c.version AS revision,r.template_id AS "templateId",r.template_version AS "templateVersion",r.graph,r.audit_id AS "auditId",r.actor_id AS "actorId",r.created_at AS "createdAt",t.definition FROM competition_draw c JOIN draw_revision r ON r.division_id=c.division_id AND r.version=c.version JOIN draw_template_version t ON t.id=r.template_id AND t.version=r.template_version WHERE c.division_id=$1 AND c.state=\'published\' AND r.state=\'published\'',
+        [id],
+      )
+    ).rows[0] ?? null;
+  if (publishedProfile) {
+    publishedProfile.nodes = (
+      await c.query(
+        'SELECT key,game_id AS "gameId" FROM draw_node WHERE division_id=$1 AND revision=$2 ORDER BY key',
+        [id, publishedProfile.revision],
+      )
+    ).rows;
+    publishedProfile.seeds = (
+      await c.query(
+        'SELECT seed,entry_id AS "entryId",entry_version AS version FROM draw_seed WHERE division_id=$1 AND revision=$2 ORDER BY seed',
+        [id, publishedProfile.revision],
+      )
+    ).rows;
+  }
   const state = {
     current,
     finalization: latest,
@@ -115,6 +136,7 @@ async function review(c: PoolClient, id: string, rulesId: string) {
     starting,
     eligibility,
     priorEditions,
+    publishedProfile,
   };
   return { ...state, sourceDigest: freezeContents(state).digest };
 }
@@ -262,6 +284,7 @@ function fieldFor(
       .map((s) => ({ entryId: s.entryId, ...s.evidence! })),
     issues,
     r.eligibility.timezone,
+    r.publishedProfile,
   );
 }
 export async function queueEventAssessment(userId: string, raw: unknown) {

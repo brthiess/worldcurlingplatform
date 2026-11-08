@@ -75,6 +75,7 @@ test("staff complete ordinary sourced controls, queue real awards and review res
     "Category designation source",
     "Event eligibility and compliance source",
     "Exact pre-event ranking snapshot source",
+    "Actual format evidence source",
   ])
     await page
       .getByRole("combobox", { name: new RegExp(`^${name}`) })
@@ -82,6 +83,15 @@ test("staff complete ordinary sourced controls, queue real awards and review res
   await page
     .getByRole("combobox", { name: /^Tour edition status/ })
     .selectOption("true");
+  await page
+    .getByRole("combobox", { name: /^Actual calculation format/ })
+    .selectOption("not_single_knockout");
+  await page
+    .getByRole("textbox", {
+      name: "Actual format review rationale",
+      exact: true,
+    })
+    .fill(f.evidence.event.formatReview.note);
   await page
     .getByLabel("WCTRS registration date", { exact: true })
     .fill("2026-09-01");
