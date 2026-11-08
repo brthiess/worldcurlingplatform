@@ -1,6 +1,7 @@
 """Validate and coordinate the published local task graph; never use drafts."""
 import argparse
 from datetime import datetime, timezone
+import hashlib
 import json
 from pathlib import Path
 import re
@@ -14,6 +15,8 @@ STATE = TRACKER / 'execution-state.json'
 
 def read_graph():
     graph = json.loads(GRAPH.read_text(encoding='utf-8-sig'))
+    if hashlib.sha256((TRACKER / 'spec.md').read_bytes()).hexdigest().upper() != graph['source_spec_sha256']:
+        raise ValueError('Authoritative specification differs from the published task graph source')
     tickets = {t['id']: t for t in graph['tickets']}
     if len(tickets) != 47:
         raise ValueError('Expected 47 approved published tickets')
@@ -93,6 +96,8 @@ def main():
         text = issue.read_text(encoding='utf-8-sig')
         text = re.sub(r'^status: .+$', f'status: {status}', text, count=1, flags=re.M)
         text = re.sub(r'^\*\*Status:\*\* .+$', f'**Status:** {status}', text, count=1, flags=re.M)
+        if status == 'completed':
+            text = text.replace('- [ ] ', '- [x] ')
         issue.write_bytes(text.encode('utf-8'))
         ticket['status'] = status
         GRAPH.write_bytes((json.dumps(graph, indent=2, ensure_ascii=False) + '\n').encode('utf-8'))
