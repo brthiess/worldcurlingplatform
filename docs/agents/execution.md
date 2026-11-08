@@ -6,6 +6,7 @@ Started 2026-11-08 under the user's explicit implementation authorization.
 - Authoritative requirements: `.scratch/world-curling-platform/spec.md`.
 - Task graph: `.scratch/world-curling-platform/tickets.json`; execute published `issues/`, never archived drafts.
 - Integration branch: `integration/world-curling-platform`.
+- Remote (supplied by user during implementation): `https://github.com/brthiess/worldcurlingplatform.git`. Commit and push work as it progresses; verify remote ref SHAs. The initially empty remote now has the planning baseline on `main` and the integration branch. Local published issues remain the execution tracker.
 - Concurrency: at most three implementers, each a fresh-context agent on a separate branch/worktree based on the current integration tip. A separate merger verifies and integrates each completed slice.
 - Closure: mark a published issue and graph entry completed only after acceptance evidence is reviewed and its commit integrated. Unverified implementations remain in progress. External-input blockers affect only dependent work.
 - Evidence: `docs/verification/WCP-NNN.md`, plus machine-readable execution state. Preserve commands, outcomes, failures, limitations and browser artifact paths. Never commit credentials.
@@ -17,4 +18,4 @@ The parent specification's Testing Decisions already authorizes domain public in
 
 ## Environment observations
 
-The starting folder contained planning/tracker documents and no application or Git repository. Git was initialized after read-only review. Sandboxed Git/npm fail on parent-directory access; reviewed escalated shell commands work. Node is 20.19.0; PostgreSQL 13 binaries/service are installed; Docker's daemon was unavailable at preflight. Prefer a dedicated project-local PostgreSQL cluster/database rather than modifying unrelated databases. No hosted domain, provider credentials, repository remote or reviewed hosting quote has been supplied.
+The starting folder contained planning/tracker documents and no application or Git repository. Git was initialized after read-only review. Sandboxed Git/npm fail on parent-directory access; reviewed escalated shell commands work. Node is 20.19.0; PostgreSQL 13 binaries/service are installed; Docker's daemon was unavailable at preflight. Prefer a dedicated project-local PostgreSQL cluster/database rather than modifying unrelated databases. No hosted domain, provider credentials or reviewed hosting quote has been supplied.
