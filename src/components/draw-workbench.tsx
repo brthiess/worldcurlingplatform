@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import type { drawWorkspace } from "@/modules/draws/draws";
 import { DrawPanel } from "./draw-panel";
 import type { RetainedAuthorityCommand } from "./authority-command";
+import { SINGLE_TEMPLATE, TRIPLE_TEMPLATE } from "@/domain/draws";
 type Data = Awaited<ReturnType<typeof drawWorkspace>>;
 type Choice = { id: string; name: string; eventId: string; eventName: string };
 export function DrawWorkbench() {
@@ -12,6 +13,7 @@ export function DrawWorkbench() {
     [data, setData] = useState<Data | null>(null),
     [seeds, setSeeds] = useState<string[]>(Array(6).fill("")),
     [count, setCount] = useState(6),
+    [template, setTemplate] = useState(SINGLE_TEMPLATE),
     [reason, setReason] = useState(""),
     [error, setError] = useState(""),
     [status, setStatus] = useState(""),
@@ -50,6 +52,7 @@ export function DrawWorkbench() {
       } else setPending(null);
       setError("");
       setCount(next.seeds.length || 6);
+      setTemplate(next.template);
       setSeeds(
         next.seeds.length
           ? next.seeds.map((s: { entryId: string }) => s.entryId)
@@ -175,7 +178,7 @@ export function DrawWorkbench() {
       expectedVersion: data.version,
       action,
       reason,
-      ...(action === "preview" ? { seedEntryIds: seeds } : {}),
+      ...(action === "preview" ? { seedEntryIds: seeds, template } : {}),
     });
   }
   const locked =
@@ -183,15 +186,14 @@ export function DrawWorkbench() {
   return (
     <main id="main" className="workspace draw-workspace">
       <p className="eyebrow">Organizer operations</p>
-      <h1>Single knockout draw</h1>
+      <h1>Competition draw</h1>
       <p>
         <a href="/admin">← Workspace</a> ·{" "}
         <a href="/admin/schedule">Draw scheduling</a>
       </p>
       <p>
-        Eight slots; choose six or eight distinct entries in seed order. With
-        six entries, seeds 1 and 2 enter the semifinals directly. No bronze
-        game. Publish the reviewed preview before scoring.
+        Choose a documented profile and distinct entries in seed order. Review
+        every stored route before publication. Schedule actual games separately.
       </p>
       {error && (
         <p className="error" role="alert">
@@ -270,6 +272,32 @@ export function DrawWorkbench() {
                   place in this field.
                 </p>
                 <label htmlFor="field-count">Field size</label>
+                <label htmlFor="competition-profile">Competition profile</label>
+                <select
+                  id="competition-profile"
+                  value={template}
+                  onChange={(e) => {
+                    const value = e.target.value,
+                      n = value === TRIPLE_TEMPLATE ? 16 : 6;
+                    setTemplate(value);
+                    setCount(n);
+                    setSeeds((old) =>
+                      Array.from({ length: n }, (_, i) => old[i] ?? ""),
+                    );
+                  }}
+                >
+                  <option value={SINGLE_TEMPLATE}>
+                    Single knockout · six or eight entries
+                  </option>
+                  <option value={TRIPLE_TEMPLATE}>
+                    Triple knockout · sixteen entries · 2 A / 3 B / 3 C
+                  </option>
+                </select>
+                <p>
+                  {template === TRIPLE_TEMPLATE
+                    ? "Exactly sixteen teams, no byes. Eight qualifiers enter seven fixed playoff games. A first loss follows B, a second follows C; C losers leave qualification. Playoff losses end championship participation."
+                    : "Eight slots. With six entries, seeds 1 and 2 enter the semifinals directly; byes create no physical game or win. No bronze game."}
+                </p>
                 <select
                   id="field-count"
                   value={count}
@@ -281,8 +309,16 @@ export function DrawWorkbench() {
                     );
                   }}
                 >
-                  <option value={6}>Six entries · two structural byes</option>
-                  <option value={8}>Eight entries · no byes</option>
+                  {template === TRIPLE_TEMPLATE ? (
+                    <option value={16}>Sixteen entries · no byes</option>
+                  ) : (
+                    <>
+                      <option value={6}>
+                        Six entries · two structural byes
+                      </option>
+                      <option value={8}>Eight entries · no byes</option>
+                    </>
+                  )}
                 </select>
                 {Array.from({ length: count }, (_, i) => (
                   <div key={i}>

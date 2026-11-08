@@ -2,7 +2,8 @@ import { randomUUID } from "node:crypto";
 import { hashPassword } from "better-auth/crypto";
 import { pool } from "../src/db";
 import { seedRankingInputs } from "./seed-ranking-inputs";
-import {seedDraws} from './seed-draws';
+import { seedDraws } from "./seed-draws";
+import { seedTripleDraw } from "./seed-triple-draw";
 if (
   process.env.ALLOW_DEMO_SEED !== "true" ||
   !process.env.DEMO_PASSWORD ||
@@ -147,6 +148,7 @@ try {
   await seedRankingInputs(client);
   await seedDraws(client);
   await client.query("COMMIT");
+  await seedTripleDraw();
   console.log(
     "Fictional scenario seeded (repeatable, preserves later changes). Demo persona emails: administrator/organizer/scorekeeper/reviewer @demo.invalid. Password comes only from local environment.",
   );

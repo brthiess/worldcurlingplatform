@@ -81,7 +81,10 @@ P03 2 16 16
 P04 8 5 5
 P05 1 3 1
 P06 16 5 16
-P07 1 16 16`.trim().split("\n").map(row => {
-  const [key,a,b,w] = row.split(" ");
-  return {key, a:Number(a), b:Number(b), winner:Number(w)};
-});
+P07 1 16 16`
+  .trim()
+  .split("\n")
+  .map((row) => {
+    const [key, a, b, w] = row.split(" ");
+    return { key, a: Number(a), b: Number(b), winner: Number(w) };
+  });

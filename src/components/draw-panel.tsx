@@ -1,11 +1,12 @@
 import type { PublicDraw } from "@/modules/draws/draws";
-import { selectedDrawPath, sourceLabel } from "@/domain/draws";
+import { selectedDrawPath, sourceLabel, TRIPLE_TEMPLATE } from "@/domain/draws";
 type Props = {
   data: Pick<PublicDraw, "graph" | "seeds">;
   games?: PublicDraw["games"];
   selected?: string;
   view?: string;
   timezone?: string;
+  onlySelected?: boolean;
 };
 export function DrawPanel({
   data,
@@ -13,16 +14,41 @@ export function DrawPanel({
   selected = "",
   view = "bracket",
   timezone = "UTC",
+  onlySelected = false,
 }: Props) {
   const graph = data.graph;
   if (!graph) return null;
   const seed = data.seeds.find((s) => s.entryId === selected);
   const path = new Set(selectedDrawPath(graph, seed?.seed, selected, games));
+  const triple = graph.template === TRIPLE_TEMPLATE;
+  const visible = graph.games.filter(
+    (g) => !onlySelected || !selected || path.has(g.key),
+  );
+  const routeHref = (id: string) =>
+    visible.some((g) => g.id === id) ? `#draw-node-${id}` : `/games/${id}`;
+  const groups = (triple ? ["A", "B", "C", "P"] : ["1", "2", "3"]).filter(
+    (group) =>
+      visible.some((g) =>
+        triple ? g.stage === group : g.round === Number(group),
+      ),
+  );
+  const title = (group: string) =>
+    triple
+      ? {
+          A: "A path · unbeaten",
+          B: "B path · one loss",
+          C: "C path · last qualification chance",
+          P: "Playoffs · single knockout",
+        }[group]
+      : { 1: "Quarterfinals", 2: "Semifinals", 3: "Final" }[group];
   return (
     <>
       <p className="legend">
-        Winner routes connect each round. A highlighted possible route depends
-        on future results. Time is shown only after a session is assigned.
+        {triple
+          ? "Winner and loser route links connect A, B, C and playoffs. Qualification and elimination are separate destinations."
+          : "Winner routes connect each round."}{" "}
+        A highlighted possible route depends on future results. Time is shown
+        only after a session is assigned.
       </p>
       {graph.byes.length > 0 && (
         <section className="notice" aria-label="Structural byes">
@@ -48,28 +74,18 @@ export function DrawPanel({
         }
         tabIndex={view === "list" ? undefined : 0}
       >
-        <div className="draw-rounds">
-          {[1, 2, 3].map((round) => (
+        <div className={`draw-rounds ${triple ? "triple-rounds" : ""}`}>
+          {groups.map((group) => (
             <section
               className="draw-round"
-              key={round}
-              aria-label={
-                round === 1
-                  ? "Quarterfinals"
-                  : round === 2
-                    ? "Semifinals"
-                    : "Final"
-              }
+              key={group}
+              aria-label={title(group)}
             >
-              <h3>
-                {round === 1
-                  ? "Quarterfinals"
-                  : round === 2
-                    ? "Semifinals"
-                    : "Final"}
-              </h3>
-              {graph.games
-                .filter((g) => g.round === round)
+              <h3>{title(group)}</h3>
+              {visible
+                .filter((g) =>
+                  triple ? g.stage === group : g.round === Number(group),
+                )
                 .map((node) => {
                   const game = games.find((g) => g.id === node.id);
                   const actual =
@@ -80,6 +96,7 @@ export function DrawPanel({
                     <article
                       className={`bracket-game ${active ? "path-game" : ""}`}
                       key={node.id}
+                      id={`draw-node-${node.id}`}
                       aria-label={`${node.key}${active ? (actual ? " · selected team" : " · possible route") : ""}`}
                     >
                       <p className="game-meta">
@@ -124,7 +141,7 @@ export function DrawPanel({
                               ) : (
                                 <span>{name}</span>
                               )}
-                            {entryId && game?.winnerEntryId === entryId && (
+                              {entryId && game?.winnerEntryId === entryId && (
                                 <span className="winner-label"> · Winner</span>
                               )}
                             </span>
@@ -158,16 +175,73 @@ export function DrawPanel({
                           </a>
                         </p>
                       ) : null}
-                      <p className="legend">
-                        {graph.games
-                          .filter((g) =>
-                            [g.a, g.b].some(
-                              (s) => "winner" in s && s.winner === node.key,
-                            ),
-                          )
-                          .map((g) => (
-                            <span key={g.key}>Winner → {g.key} </span>
-                          ))}
+                      {triple && (
+                        <p className="route-sources">
+                          {(["a", "b"] as const).map((side) => {
+                            const s = node[side];
+                            if ("seed" in s)
+                              return (
+                                <span key={side}>
+                                  {side.toUpperCase()} ← Seed {s.seed}{" "}
+                                </span>
+                              );
+                            const upstream = graph.games.find(
+                              (g) =>
+                                g.key === ("winner" in s ? s.winner : s.loser),
+                            )!;
+                            return (
+                              <a key={side} href={routeHref(upstream.id)}>
+                                {side.toUpperCase()} ← {sourceLabel(s)}{" "}
+                              </a>
+                            );
+                          })}
+                        </p>
+                      )}
+                      <p
+                        className="legend route-connectors"
+                        aria-label={`${node.key} outcome routes`}
+                      >
+                        {graph.games.flatMap((g) =>
+                          (["a", "b"] as const).flatMap((side) => {
+                            const s = g[side];
+                            const route =
+                              "winner" in s && s.winner === node.key
+                                ? "Winner"
+                                : "loser" in s && s.loser === node.key
+                                  ? "Loser"
+                                  : null;
+                            return route
+                              ? [
+                                  <a key={g.key + side} href={routeHref(g.id)}>
+                                    {route} →{" "}
+                                    {"winner" in s && s.qualifier
+                                      ? `${s.qualifier} → `
+                                      : ""}
+                                    {g.key}.{side.toUpperCase()}
+                                  </a>,
+                                ]
+                              : [];
+                          }),
+                        )}
+                        {node.terminals?.loser && (
+                          <span
+                            className={
+                              node.terminals.loser.kind === "eliminated"
+                                ? "elimination-route"
+                                : "placement-route"
+                            }
+                          >
+                            Loser → {node.terminals.loser.label}
+                            {node.terminals.loser.place
+                              ? ` · Place ${node.terminals.loser.place}`
+                              : ""}
+                          </span>
+                        )}
+                        {node.terminals?.winner?.kind === "placed" && (
+                          <span className="qualification-route">
+                            Winner → Champion · Place 1
+                          </span>
+                        )}
                         {node.key === "F" ? "Winner → champion" : ""}
                       </p>
                     </article>
