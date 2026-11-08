@@ -8,7 +8,7 @@ Execution began 2026-11-08. This file describes the bounded acceptance inventory
 | Fan follows main event (D-01) | 16-team four-player triple knockout; stored A/B/C routes, qualifiers, phone list/bracket | 002,003,017–020,046 | Planned |
 | Event admission (D-02) | Dated editions/divisions, responsible approver, explicit delegation; registration/ranking separate | 004,005,046 | Edition/application locally verified (004); delegation pending |
 | Mobile scoring (D-03) | Assigned scorekeeper starts/scores/confirms/corrects; stale/idempotent commands and honest save status | 002,003,026,046 | Live scoring locally verified (002); confirmation/lineups and mixed doubles pending |
-| Entry/payment (D-04) | Existing/assembled/provisional lineups, team-season authority, holds/withdrawal, sandbox checkout/refunds | 006–011,028,029,046 | Planned |
+| Entry/payment (D-04) | Existing/assembled/provisional lineups, team-season authority, holds/withdrawal, sandbox checkout/refunds | 006–011,028,029,046 | Manual identity/season/event lineups locally verified (006); representation/capacity/payments pending |
 | Profile/media (D-05) | Staff-approved claims; biography/handedness; reviewed immutable private photo replacement | 012,013,047 | Accounts/claims/photos locally verified (012,013); hosted demonstration pending |
 | Ranking review (D-06) | Sourced history and complete 2026-27 drafts, contribution/replay evidence and explicit publication gates | 014–016,032–039,047 | Planned |
 | Finalization/revision (D-07) | Frozen result snapshots, direct replacement ranking publication, retained originals | 027,038,039,047 | Planned |
