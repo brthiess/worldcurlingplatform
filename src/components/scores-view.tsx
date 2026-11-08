@@ -37,12 +37,22 @@ export function ScoreTable({ game }: { game: PublicGame }) {
           <tr key={side}>
             <th scope="row">
               {side === "a" ? game.nameA : game.nameB}
-              {game.hammer === side && <span className="hammer">Hammer</span>}
+              {game.hammer === side && (
+                <span className="hammer">Hammer · end {game.hammerEnd}</span>
+              )}
             </th>
             {(side === "a" ? game.endsA : game.endsB).map((score, i) => {
               const cell = scoreCell(score);
               return (
-                <td key={i} aria-label={`End ${i + 1}: ${cell.label}`}>
+                <td
+                  key={i}
+                  aria-label={`End ${i + 1}: ${cell.label}`}
+                  title={
+                    game.endHammer[i]
+                      ? `Hammer in end ${i + 1}: ${game.endHammer[i] === "a" ? game.nameA : game.nameB}`
+                      : undefined
+                  }
+                >
                   {cell.text}
                 </td>
               );
@@ -306,6 +316,22 @@ export function ScoresView({
                       {venueTime(game.updatedAt, data.event.timezone)}.
                     </p>
                   )}
+                  {gameId && (
+                    <p className="legend">
+                      Recorded hammer:{" "}
+                      {game.endHammer.some(Boolean)
+                        ? game.endHammer
+                            .map((side, i) =>
+                              side
+                                ? `End ${i + 1}: ${side === "a" ? game.nameA : game.nameB}`
+                                : null,
+                            )
+                            .filter(Boolean)
+                            .join(" · ")
+                        : "No end-specific hammer recorded"}
+                      .
+                    </p>
+                  )}
                 </article>
               ))}
             </div>
@@ -355,8 +381,10 @@ export function ScoresView({
             </span>
             <button
               className="secondary"
-              onClick={() => void load()}
-              disabled={refreshing}
+              onClick={() => {
+                if (!refreshing) void load();
+              }}
+              aria-disabled={refreshing}
             >
               {refreshing ? "Refreshing…" : "Refresh scores"}
             </button>
