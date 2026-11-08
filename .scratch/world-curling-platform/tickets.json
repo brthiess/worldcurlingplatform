@@ -205,13 +205,17 @@
       "file": "04-submit-and-approve-next-year-s-event-onto-the-calendar.md",
       "id": "WCP-004",
       "path": "issues/04-submit-and-approve-next-year-s-event-onto-the-calendar.md",
-      "status": "in-progress",
+      "status": "completed",
       "labels": [
         "ready-for-agent"
       ],
       "blocked_by": [
         "WCP-001"
-      ]
+      ],
+      "completion": {
+        "commit": "fe6812a",
+        "evidence": "docs/verification/WCP-004.md"
+      }
     },
     {
       "n": 5,

@@ -13,3 +13,6 @@ Read-only exploration completed 2026-11-08. These notes are inputs for future ti
   - The coordinator independently reviewed the literal qualification graph/fixture using `review-draw.py` beside the notes; `draw-review.json` records passing source/destination, record-depth, terminal and qualifier checks. This adopts the candidate for future WCP-020 implementation, subject to its actual stored-graph/API/browser acceptance. It is not application test evidence. Preserve literal expected edges independently of generator code and inspect remaining result/correction branches during implementation.
 
 The canonical specification and published ticket acceptance always take precedence over research suggestions. Preserve required checks and the approved bounded scope.
+
+- Scoring/measurements: `C:/Users/brthi/.codex/visualizations/2026/11/08/01a1bbca-a597-7480-aa34-dc89e3b680c3/discipline-research.md` contains current official R17/C8/C9 pointers and bounded independent fixtures for future WCP-026. It does not implement or verify that ticket.
+- Hosting preflight: `C:/Users/brthi/.codex/visualizations/2026/11/08/01a1bbca-a597-7480-aa34-dc89e3b680c3/hosting-preflight.md`. The user explicitly left hosting and domain pending; do not select a Render workspace, provision or repeat hosting questions. Local work continues.
