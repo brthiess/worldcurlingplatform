@@ -1,0 +1,48 @@
+{
+  "name": "world-curling-platform",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20.19.0",
+    "npm": ">=10.8.0"
+  },
+  "scripts": {
+    "dev": "node scripts/run-next.mjs dev",
+    "build": "node scripts/run-next.mjs build",
+    "start": "node scripts/run-next.mjs start",
+    "test": "tsx --test tests/domain.test.ts",
+    "test:coverage": "node --experimental-test-coverage --import tsx --test tests/domain.test.ts",
+    "format": "prettier --write src scripts tests package.json tsconfig.json playwright.config.ts",
+    "test:api": "tsx --test tests/api.test.ts",
+    "test:browser": "playwright test",
+    "typecheck": "tsc --noEmit",
+    "db:migrate": "tsx scripts/migrate.ts",
+    "db:seed": "tsx scripts/seed.ts",
+    "worker": "tsx src/worker/index.ts",
+    "worker:probe": "tsx scripts/worker-probe.ts"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "4.11.0",
+    "@playwright/test": "1.57.0",
+    "@types/node": "22.19.3",
+    "@types/pg": "8.16.0",
+    "@types/react": "19.2.7",
+    "@types/react-dom": "19.2.3",
+    "playwright-core": "1.57.0",
+    "prettier": "3.6.2",
+    "tsx": "4.23.15",
+    "typescript": "5.9.3"
+  },
+  "dependencies": {
+    "@better-auth/drizzle-adapter": "1.7.18",
+    "better-auth": "1.7.18",
+    "dotenv": "17.2.3",
+    "drizzle-orm": "0.45.4",
+    "next": "16.4.5",
+    "pg": "8.16.3",
+    "pg-boss": "10.1.6",
+    "react": "19.2.4",
+    "react-dom": "19.2.4"
+  }
+}
