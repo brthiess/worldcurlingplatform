@@ -4,7 +4,7 @@ number: 12
 title: "Create accounts, approve player claims and edit profiles"
 parent: WCP-SPEC-001
 type: implementation
-status: in-progress
+status: completed
 labels: [ready-for-agent]
 blocked_by: [WCP-001]
 source_spec_sha256: 045B46988225B6C8C0020B23C8C5D4EAA8E2E1916256148A0FDA26B5DA8673FD
@@ -18,7 +18,7 @@ published: 2026-11-07
 
 **Blocked by:** [01: Open a persisted event and sign in with scoped demo roles](01-open-a-persisted-event-and-sign-in-with-scoped-demo-roles.md).
 
-**Status:** in-progress
+**Status:** completed
 
 ## Parent and scope
 
@@ -31,13 +31,13 @@ published: 2026-11-07
 
 ## Acceptance criteria
 
-- [ ] Provide configured account verification/recovery integration and safe local email fixtures; account creation alone links no player or team authority.
-- [ ] Let administrators approve/reject a claim and retain the decision; sport records remain independent of login accounts.
-- [ ] Limit player-controlled text fields to short biography and handedness and preserve other role boundaries.
-- [ ] **Unit testing:** Test claim/link transitions, permitted field changes, validated profile input and denial before approval or for another player.
-- [ ] **Database/API verification:** Use real application sessions and PostgreSQL to prove ownership/link uniqueness and public projection boundaries; verify email/recovery adapters without exposing tokens.
-- [ ] **Frontend quality:** Deliver complete register/sign-in/claim/status/profile forms and public profile reads with concise errors, keyboard access and no invented biography.
-- [ ] Record actual verification commands/results and relevant browser/screenshots or API evidence. Report meaningful uncovered branches or limitations; do not claim checks that were not run.
+- [x] Provide configured account verification/recovery integration and safe local email fixtures; account creation alone links no player or team authority.
+- [x] Let administrators approve/reject a claim and retain the decision; sport records remain independent of login accounts.
+- [x] Limit player-controlled text fields to short biography and handedness and preserve other role boundaries.
+- [x] **Unit testing:** Test claim/link transitions, permitted field changes, validated profile input and denial before approval or for another player.
+- [x] **Database/API verification:** Use real application sessions and PostgreSQL to prove ownership/link uniqueness and public projection boundaries; verify email/recovery adapters without exposing tokens.
+- [x] **Frontend quality:** Deliver complete register/sign-in/claim/status/profile forms and public profile reads with concise errors, keyboard access and no invented biography.
+- [x] Record actual verification commands/results and relevant browser/screenshots or API evidence. Report meaningful uncovered branches or limitations; do not claim checks that were not run.
 
 ## Slice boundary
 
