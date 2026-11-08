@@ -29,3 +29,4 @@ Standalone curling platform and its authoritative planning package. The initial 
 Local application setup and migrations are available. A hosted service and validated ranking implementation are not yet delivered. Accepted interview decisions are the user's direction for an offer, not World Curling endorsement.
 - [Run the application, seed demo personas, and verify it](docs/setup.md)
 - [Individual verification and independent review records](docs/verification/)
+- [Division finalization, correction history and public digest contract](docs/api/division-finalizations.md)

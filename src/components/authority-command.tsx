@@ -38,7 +38,7 @@ function valid(value: unknown): value is RetainedAuthorityCommand {
     typeof c.path !== "string" ||
     typeof c.actorId !== "string" ||
     !(
-      /^\/api\/v1\/(approval-delegations|role-grants|team-representation|entries)$/.test(
+      /^\/api\/v1\/(approval-delegations|role-grants|team-representation|entries|division-finalizations)$/.test(
         c.path,
       ) ||
       /^\/api\/v1\/entries\/[-\w]{1,80}$/.test(c.path) ||
@@ -228,7 +228,9 @@ export function AuthorityRecovery({
                 {body.action ??
                   (state.pending.path.includes("/entries")
                     ? "Save entry"
-                    : "Assign scoring access")}
+                    : body.divisionId
+                      ? "Finalize division results"
+                      : "Assign scoring access")}
               </dd>
               {body.entry && (
                 <>
@@ -312,7 +314,13 @@ export function AuthorityRecovery({
                 </>
               )}
               <dt>Reason</dt>
-              <dd>{body.reason}</dd>
+              <dd>{body.reason ?? body.note}</dd>
+              {body.divisionId && (
+                <>
+                  <dt>Division</dt>
+                  <dd>{body.divisionId}</dd>
+                </>
+              )}
               <dt>Original command identifier</dt>
               <dd style={{ overflowWrap: "anywhere" }}>
                 {body.requestId ?? body.id}

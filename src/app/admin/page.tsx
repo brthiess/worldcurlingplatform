@@ -128,6 +128,9 @@ export default function Admin() {
             <a href="/admin/representatives">Team-season representatives</a>
           </p>
           <p>
+            <a href="/admin/finalizations">Finalize division results</a>
+          </p>
+          <p>
             <a href="/admin/schedule">Draw scheduling</a>
           </p>
           <p>
