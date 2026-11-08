@@ -280,7 +280,13 @@ export function AuthorityRecovery({
                 </>
               )}
               <dt>Reason</dt>
-              <dd>{body.reason}</dd>
+              <dd>{body.reason ?? body.note}</dd>
+              {body.divisionId && (
+                <>
+                  <dt>Division</dt>
+                  <dd>{body.divisionId}</dd>
+                </>
+              )}
               <dt>Original command identifier</dt>
               <dd style={{ overflowWrap: "anywhere" }}>
                 {body.requestId ?? body.id}

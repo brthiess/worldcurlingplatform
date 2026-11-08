@@ -1,0 +1,26 @@
+# Division sporting finalization
+
+`/admin/finalizations` is the organizer review screen. An organizer for the edition or a current global administrator can use `/api/v1/division-finalizations`. An assigned scorekeeper can continue to confirm/correct their games through the accepted scoring command; finalization adds no approval gate.
+
+- `GET` lists permitted divisions and the current actor ID.
+- `GET ?division=<id>` returns current sporting source, its SHA-256 `sourceDigest`, latest finalization `version` (zero if absent), `dirty`, prerequisites, immutable history, selected latest snapshot, and separate scoped ranking issues.
+- `GET ?division=<id>&version=<positive integer>` selects an earlier snapshot. Current source/dirty status still describe the latest sporting records; selected frozen contents never change.
+- `POST` accepts `{divisionId, version, sourceDigest, requestId, placements: [{entryId, place}], rulesReference, note}`. `version` and `sourceDigest` must match the reviewed current division. `rulesReference` is the exact sporting rules edition/event terms reference used by the organizer; it does not certify ranking sources. The plain-text review note and sporting rule reference are public, each up to2000 characters.
+
+Every recorded game needs an explicitly confirmed outcome from accepted003. Legacy totals alone cannot establish an outcome or winner. Actual assigned participants must belong to this division and agree with the immutable result participants. Place each distinct recorded game participant once. Unused entry declarations/submissions receive no inferred admission or final place. Competition places can share ranks, e.g.1,2,2,4; record the decision in the note. There is no automatic playoff tiebreak or draw/repair engine.
+
+Division/source locks serialize finalization with participating entry/game changes. The command stores its exact canonical UTF-8 JSON contents, SHA-256, current-source digest, actor/attribution/time, audit link, expected revision, request/content digest and direct predecessor atomically. Database triggers reject updates/deletes of finalizations. A correction changes current source, marks `dirty`, and permits a direct replacement; neither old snapshot nor another division changes. Accepted003 preserves actual played participants and downstream-attention evidence.
+
+Identical current-actor/request deliveries replay their recorded version/digest; conflicting reuse or stale reviewed source/version returns409. Current authority is checked before replay. Same-origin session writes are required; an optional `X-WCP-Actor` must match the current account. The UI reuses accepted005’s actor-bound, tab-local retained-command journal. Lost acknowledgements and reloads retain the exact serialized request and lock editing until retry/history reconciliation. A first definite rejection releases its command; reload/review the division after409.
+
+## Separate ranking evidence
+
+Sporting finalization grants no eligibility waiver or ranking approval. Organizer review returns only division-scoped issue summaries: division eligibility, provisional lineup/identity, missing season reference, or missing/incomplete/stale World Curling starting-input review. A complete draft remains unreviewed; consumption requires accepted032 `state='reviewed'` plus current completeness. No private global entitlements, exact allocations, individual starting values, source records or staff rationale are included. Even zero scoped issues would not establish event assessment or ranking-publication approval. No calculation, publication, job or transitive historical reassessment is implemented here.
+
+## Public history and digest contract
+
+`GET /api/v1/public/divisions/<id>/results[?version=<positive integer>]` and `/divisions/<id>/results` expose only published, approved editions. The public response is an explicit recursive allowlist of sporting event/entry/game/result/lineup data, attribution names/time/reason, places, public organizer note and sporting rules reference. It excludes actor/account IDs, audit IDs, request/receipt/content digests, scoring-source details, season-registration internals and private ranking evidence, including inside the nested serialized contents. History navigation identifies originals and direct revisions; changed current records and earlier selected revisions are labeled honestly.
+
+The staff-only `contents` and `digest` remain exact immutable full-snapshot evidence. Public `selected.contents` is a separately canonicalized **public sporting projection** (`schema='wcp.division-results-public.v1'`), and public `selected.digest` hashes precisely those public bytes. `selected.visibility='public-sporting-projection'`; `selected.snapshotDigest` identifies the original private snapshot’s digest. Public history metadata also names that opaque reference `snapshotDigest`. The UI labels these two distinct digests; it never claims the sanitized bytes reproduce the full private snapshot hash.
+
+401 sign-in required;403 current organizer/Origin/actor scope required;404 absent public division or revision;400 malformed command/places/rule reference;409 stale/conflicting command;422 incomplete sporting outcome/participants;503 acknowledgement or read uncertain. Public responses and staff reads use `Cache-Control: no-store`.
