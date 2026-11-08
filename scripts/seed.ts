@@ -131,6 +131,9 @@ try {
   await client.query(
     "UPDATE event_edition SET organization_id='prairie-club',city='Regina',country='Canada',responsible_administrator_id='demo-administrator' WHERE id='prairie-2026' AND organization_id IS NULL",
   );
+  await client.query(
+    "INSERT INTO player(id,name,origin) VALUES('demo-player','Alex Demo','fictional_demo'),('demo-player-other','Morgan Demo','fictional_demo') ON CONFLICT DO NOTHING",
+  );
   await client.query("COMMIT");
   console.log(
     "Fictional scenario seeded (repeatable, preserves later changes). Demo persona emails: administrator/organizer/scorekeeper/reviewer @demo.invalid. Password comes only from local environment.",

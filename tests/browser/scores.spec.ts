@@ -32,7 +32,7 @@ for (const [name, width, height] of [
     ).toBe(true);
     await page.keyboard.press("Tab");
     await expect(
-      page.getByRole("link", { name: "Skip to scores" }),
+      page.getByRole("link", { name: "Skip to content" }),
     ).toBeFocused();
     await page.keyboard.press("Enter");
     await page.getByLabel("Draw", { exact: true }).selectOption("draw-1");
