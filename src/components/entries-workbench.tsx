@@ -344,6 +344,11 @@ export function EntriesWorkbench() {
         ← Your workspace
       </a>
       <p className="eyebrow">Team entry operations</p>
+      <p>
+        <a href="/admin/registration">
+          Review division entry terms & request a place →
+        </a>
+      </p>
       <h1>
         {workspace?.divisions.some((d) => d.manual)
           ? "Manual entries"
