@@ -2,6 +2,38 @@ import { sql } from "drizzle-orm";
 import { db } from "@/db";
 import { selectDraws, type Score } from "@/domain/scores";
 export type PublicGame = {
+  lineupA: import("@/modules/scoring/lineups").GameLineup | null;
+  lineupB: import("@/modules/scoring/lineups").GameLineup | null;
+  results: {
+    version: number;
+    confirmedBy: string;
+    createdAt: string;
+    result: {
+      endHammer?: (string | null)[];
+      correction?: boolean;
+      legacyBefore?: {
+        nameA: string;
+        nameB: string;
+        totalA: number | null;
+        totalB: number | null;
+        attribution: string;
+        ends: import("@/domain/scoring").End[];
+      };
+      outcome: string;
+      winnerEntryId: string;
+      entryA: string;
+      entryB: string;
+      nameA: string;
+      nameB: string;
+      reason: string;
+      totalA: number | null;
+      totalB: number | null;
+      lineupA: import("@/modules/scoring/lineups").GameLineup;
+      lineupB: import("@/modules/scoring/lineups").GameLineup;
+      ends: import("@/domain/scoring").End[];
+    };
+  }[];
+  attention: { downstreamGameId: string; resultVersion: number }[];
   id: string;
   drawId: string;
   sheet: string;
@@ -90,12 +122,12 @@ async function projectEvent(
     state: String(d.state),
   }));
   const gamesResult = await connection.execute(
-    sql`SELECT g.id,g.draw_id AS "drawId",g.sheet,g.phase,g.state,coalesce(a.display_name,g.slot_a) AS "nameA",coalesce(b.display_name,g.slot_b) AS "nameB",g.total_a AS "totalA",g.total_b AS "totalB",g.hammer,g.hammer_end AS "hammerEnd",g.updated_at AS "updatedAt" FROM game g JOIN draw_session ds ON ds.id=g.draw_id LEFT JOIN event_entry a ON a.id=g.entry_a LEFT JOIN event_entry b ON b.id=g.entry_b WHERE ds.division_id=${row.divisionId} ORDER BY ds.starts_at,g.sheet,g.id`,
+    sql`SELECT g.id,g.draw_id AS "drawId",g.sheet,g.phase,g.state,g.entry_a AS "entryA",g.entry_b AS "entryB",coalesce(a.display_name,g.slot_a) AS "nameA",coalesce(b.display_name,g.slot_b) AS "nameB",g.total_a AS "totalA",g.total_b AS "totalB",g.hammer,g.hammer_end AS "hammerEnd",g.updated_at AS "updatedAt" FROM game g JOIN draw_session ds ON ds.id=g.draw_id LEFT JOIN event_entry a ON a.id=g.entry_a LEFT JOIN event_entry b ON b.id=g.entry_b WHERE ds.division_id=${row.divisionId} ORDER BY ds.starts_at,g.sheet,g.id`,
   );
   const endsResult = await connection.execute(
     sql`SELECT s.game_id,s.side,s.end_number,s.state,s.points FROM game_end_score s JOIN game g ON g.id=s.game_id JOIN draw_session ds ON ds.id=g.draw_id WHERE ds.division_id=${row.divisionId} ORDER BY s.end_number`,
   );
-  function ends(id: unknown, side: string): Score[] {
+  function ends(id: unknown, side: string, gameState: string): Score[] {
     const gameRows = endsResult.rows.filter((e) => e.game_id === id);
     const rows = gameRows.filter((e) => e.side === side);
     const length = Math.max(8, ...gameRows.map((e) => Number(e.end_number)));
@@ -106,7 +138,8 @@ async function projectEvent(
       const e = rows.find((e) => Number(e.end_number) === i + 1);
       return {
         state:
-          (!e || e.state === "upcoming") && i + 1 <= last
+          (!e || e.state === "upcoming") &&
+          (i + 1 <= last || gameState === "confirmed")
             ? "unknown"
             : e
               ? String(e.state)
@@ -122,9 +155,46 @@ async function projectEvent(
     ...g,
     updatedAt: new Date(g.updatedAt as string).toISOString(),
     endHammer: [] as (string | null)[],
-    endsA: ends(g.id, "a"),
-    endsB: ends(g.id, "b"),
-  })) as PublicGame[];
+    results: [],
+    attention: [],
+    lineupA: null,
+    lineupB: null,
+    endsA: ends(g.id, "a", String(g.state)),
+    endsB: ends(g.id, "b", String(g.state)),
+  })) as unknown as PublicGame[];
+  const results = await connection.execute(
+    sql`SELECT r.game_id,r.version,r.confirmed_by AS "confirmedBy",r.created_at AS "createdAt",r.result FROM game_result_version r JOIN game g ON g.id=r.game_id JOIN draw_session ds ON ds.id=g.draw_id WHERE ds.division_id=${row.divisionId} ORDER BY r.version DESC`,
+  );
+  const lineups = await connection.execute(
+    sql`SELECT DISTINCT ON(l.game_id,l.side) l.game_id,l.side,l.entry_id AS "entryId",l.event_lineup_version AS "eventLineupVersion",l.mode,l.members FROM game_lineup_version l JOIN game g ON g.id=l.game_id JOIN draw_session ds ON ds.id=g.draw_id WHERE ds.division_id=${row.divisionId} AND l.entry_id=CASE l.side WHEN 'a' THEN g.entry_a ELSE g.entry_b END ORDER BY l.game_id,l.side,l.version DESC`,
+  );
+  const attention = await connection.execute(
+    sql`SELECT a.upstream_game_id,a.downstream_game_id AS "downstreamGameId",a.result_version AS "resultVersion" FROM game_assignment_attention a JOIN game g ON g.id=a.upstream_game_id JOIN draw_session ds ON ds.id=g.draw_id WHERE ds.division_id=${row.divisionId}`,
+  );
+  for (const game of games) {
+    game.lineupA =
+      (lineups.rows.find(
+        (l) => l.game_id === game.id && l.side === "a",
+      ) as PublicGame["lineupA"]) ?? null;
+    game.lineupB =
+      (lineups.rows.find(
+        (l) => l.game_id === game.id && l.side === "b",
+      ) as PublicGame["lineupB"]) ?? null;
+    game.results = results.rows
+      .filter((r) => r.game_id === game.id)
+      .map(({ game_id: _, ...r }) => ({
+        ...r,
+        createdAt: new Date(r.createdAt as string).toISOString(),
+      })) as PublicGame["results"];
+    game.attention = attention.rows
+      .filter(
+        (a) => a.upstream_game_id === game.id || a.downstreamGameId === game.id,
+      )
+      .map((a) => ({
+        downstreamGameId: String(a.downstreamGameId),
+        resultVersion: Number(a.resultVersion),
+      }));
+  }
   for (const game of games)
     if (
       game.state === "live" &&

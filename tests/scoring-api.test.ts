@@ -1,5 +1,6 @@
 import "dotenv/config";
 import { authRequest } from "./auth-request";
+import { scoringFixtureDraw } from "./scoring-fixture";
 import { test, after } from "node:test";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
@@ -51,8 +52,9 @@ test("real PostgreSQL scoring: start, scores, concurrency, retries, scope, sourc
     hammer: "b",
     ...extra,
   });
+  await scoringFixtureDraw(pool);
   await pool.query(
-    "INSERT INTO game(id,draw_id,sheet,phase,state,entry_a,entry_b,slot_a,slot_b) VALUES($1,'draw-2','T','API test','scheduled','entry-1','entry-3','Team North','Team Prairie')",
+    "INSERT INTO game(id,draw_id,sheet,phase,state,entry_a,entry_b,slot_a,slot_b) VALUES($1,'scoring-test-draw','T','API test','scheduled','entry-1','entry-3','Team North','Team Prairie')",
     [id],
   );
   await pool.query(
@@ -397,9 +399,7 @@ test("real PostgreSQL scoring: start, scores, concurrency, retries, scope, sourc
       },
     );
   } finally {
-    await pool.query("DELETE FROM scoring_command WHERE game_id=$1", [id]);
-    await pool.query("DELETE FROM audit_record WHERE resource_id=$1", [id]);
     await pool.query("DELETE FROM role_grant WHERE game_id=$1", [id]);
-    await pool.query("DELETE FROM game WHERE id=$1", [id]);
+    // Retain immutable lineup evidence and its actual audit/receipt history.
   }
 });

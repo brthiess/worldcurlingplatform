@@ -58,7 +58,9 @@ test("real database sessions expose only assigned games and deny other event acc
   assert.equal(response.status, 200);
   const workspace = await response.json();
   assert.deepEqual(
-    workspace.games.map((g: { id: string }) => g.id),
+    workspace.games
+      .filter((g: { id: string }) => /^game-[1-4]$|^other-game$/.test(g.id))
+      .map((g: { id: string }) => g.id),
     ["game-2"],
   );
   assert.equal(
@@ -100,7 +102,14 @@ test("all demo personas get server-derived scope and nonadministrators cannot gr
     const workspace = await (
       await fetch(`${base}/api/v1/workspace`, { headers: { cookie } })
     ).json();
-    assert.equal(workspace.games.length, count);
+    // Other suites retain immutable fictional scoring history. These assertions
+    // concern the five seeded scope fixtures, including the unrelated event.
+    assert.equal(
+      workspace.games.filter((g: { id: string }) =>
+        /^game-[1-4]$|^other-game$/.test(g.id),
+      ).length,
+      count,
+    );
     assert.equal(workspace.games[0].canScore, role !== "reviewer");
     const response = await fetch(`${base}/api/v1/role-grants`, {
       method: "POST",

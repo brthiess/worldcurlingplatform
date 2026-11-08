@@ -159,13 +159,17 @@
       "file": "03-confirm-results-and-make-ordinary-auditable-corrections.md",
       "id": "WCP-003",
       "path": "issues/03-confirm-results-and-make-ordinary-auditable-corrections.md",
-      "status": "in-progress",
+      "status": "completed",
       "labels": [
         "ready-for-agent"
       ],
       "blocked_by": [
         "WCP-002"
-      ]
+      ],
+      "completion": {
+        "commit": "97e02bae25b1ba71d1f1e9de50cae756f4512afb",
+        "evidence": "docs/verification/WCP-003.md"
+      }
     },
     {
       "n": 4,
@@ -914,7 +918,7 @@
       "file": "18-schedule-draw-sessions-and-show-known-conflicts.md",
       "id": "WCP-018",
       "path": "issues/18-schedule-draw-sessions-and-show-known-conflicts.md",
-      "status": "ready-for-agent",
+      "status": "in-progress",
       "labels": [
         "ready-for-agent"
       ],

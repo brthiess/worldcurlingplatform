@@ -780,6 +780,35 @@ button {
   padding: 0;
   min-width: 0;
 }
+.result-editor fieldset {
+  min-width: 0;
+  border: 1px solid #cad5da;
+  border-radius: 6px;
+  padding: 16px;
+  margin: 12px 0;
+}
+.result-editor legend {
+  font-weight: 700;
+}
+.result-editor summary,
+.result-record summary {
+  cursor: pointer;
+  padding: 12px 0;
+  min-height: 44px;
+}
+.result-editor button {
+  min-height: 44px;
+  max-width: 100%;
+}
+.result-record {
+  overflow-wrap: anywhere;
+  padding: 14px 0;
+  border-bottom: 1px solid #cad5da;
+}
+.lineup-edit {
+  padding-bottom: 16px;
+  border-bottom: 1px solid #cad5da;
+}
 .scoring-form legend {
   font-weight: bold;
 }
