@@ -4,6 +4,7 @@ import { pool } from "@/db";
 import { EntryError, identifier } from "@/domain/entries";
 import { freezeContents } from "@/domain/finalization";
 import { rulesInput } from "@/domain/ranking-inputs";
+import { assessmentEngineSources } from "@/domain/event-assessment-sources";
 import {
   assessmentEvidence,
   assessmentPolicy,
@@ -338,6 +339,7 @@ export async function queueEventAssessment(userId: string, raw: unknown) {
         schema: "wcp.event-assessment-input.v1",
         engine: assessmentEngine,
         policy: assessmentPolicy,
+        engineSources: assessmentEngineSources,
         evidence,
         source: r,
         calculation: fieldFor(evidence, r),

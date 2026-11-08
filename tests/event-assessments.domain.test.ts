@@ -74,7 +74,7 @@ test("losing qualifiers halve only after first playoff defeat; bronze and split 
 test("required unknown rank/eligibility/prior inputs block, and rank 200 overlap is never invented", () => {
   for (const patch of [
     { rank: null },
-    { points: null },
+    { rank: 201, points: null },
     { rank: 200 },
     { eligibility: "unknown" as const },
   ]) {
@@ -89,6 +89,9 @@ test("required unknown rank/eligibility/prior inputs block, and rank 200 overlap
   const f = f1();
   f.entries[0].eligibility = "excluded";
   assert.equal(assessFourPlayer(f).awards[0].points, "0");
+  const unused = f1();
+  unused.entries[0].points = null;
+  assert.equal(assessFourPlayer(unused).sfm, "8");
 });
 test("losing qualifier requires a known first playoff result; fixed Worlds strength ignores unused rank inputs", () => {
   const f = f1();

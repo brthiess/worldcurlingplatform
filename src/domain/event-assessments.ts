@@ -98,9 +98,9 @@ export function assessFourPlayer(f: CalculationField): AssessmentResult {
     if (e.eligibility === "unknown")
       r.issues.push(`${e.entryId}: ranking eligibility is unresolved.`);
     if (e.eligibility === "eligible" && f.kind !== "worlds") {
-      if (e.rank === null || e.points === null)
+      if (e.rank === null || (e.rank > 200 && e.points === null))
         r.issues.push(
-          `${e.entryId}: exact pre-event rank and points are required.`,
+          `${e.entryId}: exact pre-event rank and, above 200, zero/nonzero points evidence are required.`,
         );
       else if (!Number.isSafeInteger(e.rank) || e.rank < 1)
         r.issues.push(`${e.entryId}: invalid pre-event rank.`);
@@ -122,7 +122,7 @@ export function assessFourPlayer(f: CalculationField): AssessmentResult {
                     ? "1/10"
                     : e.rank < 200
                       ? "1/20"
-                      : exact.value(e.points) === "0"
+                      : exact.value(e.points!) === "0"
                         ? "1/100"
                         : "1/50";
         reason = `Pre-event rank ${e.rank}`;
