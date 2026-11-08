@@ -17,6 +17,8 @@ type Registration = {
   members: Player[];
 };
 type Entry = {
+  admissionState: string;
+  registrationConfigured: boolean;
   entryAdmission: string;
   id: string;
   name: string;
@@ -40,6 +42,8 @@ type Team = {
   core: Player[];
   registrations: Registration[];
   entries: {
+    admissionState: string;
+    registrationConfigured: boolean;
     entryAdmission: string;
     id: string;
     name: string;
@@ -188,11 +192,21 @@ export function PublicRoster({
     const e = data as Entry;
     return (
       <main id="main">
-        {e.entryAdmission === "submitted_pending" && (
+        {e.registrationConfigured ? (
           <p className="notice">
-            Team submission recorded. Entry acceptance, capacity and payment are
-            unresolved; this submission does not reserve a place.
+            Admission: {e.admissionState}
+            {e.admissionState === "pending"
+              ? "; this submission does not reserve a place"
+              : ""}
+            . Payment, lineup readiness and ranking eligibility are separate.
           </p>
+        ) : (
+          e.entryAdmission === "submitted_pending" && (
+            <p className="notice">
+              Team submission recorded. Entry acceptance, capacity and payment
+              are unresolved; this submission does not reserve a place.
+            </p>
+          )
         )}
         <a
           className="back"
@@ -274,8 +288,12 @@ export function PublicRoster({
         <ul className="workspace-list">
           {t.entries.map((e) => (
             <li key={e.id}>
-              {e.entryAdmission === "submitted_pending" && (
-                <p className="muted">Submitted · acceptance unresolved</p>
+              {e.registrationConfigured ? (
+                <p className="muted">Admission: {e.admissionState}</p>
+              ) : (
+                e.entryAdmission === "submitted_pending" && (
+                  <p className="muted">Submitted · acceptance unresolved</p>
+                )
               )}
               <h3>
                 <a href={`/entries/${e.id}`}>{e.name}</a>
@@ -308,6 +326,8 @@ export function EventEntryLinks({
           divisionId: string;
           divisionName: string;
           entryAdmission: string;
+          admissionState: string;
+          registrationConfigured: boolean;
         }[]
       | null
     >(null),
@@ -349,9 +369,11 @@ export function EventEntryLinks({
                 <a href={`/entries/${e.id}`}>{e.name}</a>
                 <span className="muted">
                   {e.divisionName} ·{" "}
-                  {e.entryAdmission === "submitted_pending"
-                    ? "Submitted · acceptance unresolved · "
-                    : ""}
+                  {e.registrationConfigured
+                    ? `Admission: ${e.admissionState} · `
+                    : e.entryAdmission === "submitted_pending"
+                      ? "Submitted · acceptance unresolved · "
+                      : ""}
                   {e.version
                     ? `${e.status} · lineup v${e.version}`
                     : "Provisional · no lineup recorded"}

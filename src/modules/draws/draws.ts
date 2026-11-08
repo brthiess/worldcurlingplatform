@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { PoolClient } from "pg";
 import { pool } from "@/db";
 import { readDrawFieldEntries } from "@/modules/entries/draw-field";
+import { validateRegistrationDrawField } from "@/domain/registration";
 import {
   singleKnockout,
   SINGLE_TEMPLATE,
@@ -200,6 +201,28 @@ export async function saveDraw(userId: string, id: string, input: unknown) {
       throw new DrawError(
         "This operated profile currently supports four-player divisions.",
       );
+    // Edition EXCLUSIVE is already held. Read the complete current field, so a
+    // newly accepted peer cannot disappear merely because it was not in a preview.
+    const fullField = await readDrawFieldEntries(c, id, undefined, true);
+    const registeredFamily =
+      (
+        await c.query(
+          "SELECT format FROM division_registration WHERE division_id=$1",
+          [id],
+        )
+      ).rows[0]?.format ?? null;
+    function registrationField(selectedIds: string[], status: number) {
+      try {
+        validateRegistrationDrawField(
+          registeredFamily,
+          "single_knockout",
+          fullField.filter((e) => e.admitted).map((e) => e.id),
+          selectedIds,
+        );
+      } catch (e) {
+        throw new DrawError((e as Error).message, status);
+      }
+    }
     let graph: Graph, seeds: Seed[];
     if (x.action === "preview") {
       let generated: ReturnType<typeof singleKnockout>;
@@ -211,7 +234,7 @@ export async function saveDraw(userId: string, id: string, input: unknown) {
       } catch (e) {
         throw new DrawError((e as Error).message);
       }
-      const rows = await readDrawFieldEntries(c, id, x.seedEntryIds, true);
+      const rows = fullField.filter((e) => x.seedEntryIds!.includes(e.id));
       if (rows.length !== x.seedEntryIds!.length)
         throw new DrawError(
           "Every selected entry must belong to this division.",
@@ -227,6 +250,7 @@ export async function saveDraw(userId: string, id: string, input: unknown) {
       } catch (e) {
         throw new DrawError((e as Error).message, 422);
       }
+      registrationField(x.seedEntryIds!, 422);
       seeds = x.seedEntryIds!.map((entryId, i) => {
         const row = rows.find((r) => r.id === entryId)!;
         return { seed: i + 1, entryId, version: row.version, name: row.name };
@@ -243,11 +267,8 @@ export async function saveDraw(userId: string, id: string, input: unknown) {
         );
       graph = before.graph;
       seeds = before.seeds;
-      const current = await readDrawFieldEntries(
-        c,
-        id,
-        seeds.map((s) => s.entryId),
-        true,
+      const current = fullField.filter((e) =>
+        seeds.some((s) => s.entryId === e.id),
       );
       if (
         seeds.some(
@@ -268,6 +289,10 @@ export async function saveDraw(userId: string, id: string, input: unknown) {
       } catch (e) {
         throw new DrawError((e as Error).message, 409);
       }
+      registrationField(
+        seeds.map((s) => s.entryId),
+        409,
+      );
       if (
         (
           await c.query("SELECT id FROM game WHERE division_id=$1 LIMIT 1", [
