@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { venueFields } from "@/domain/scheduling";
 import type { ScheduleSnapshot } from "@/modules/scheduling/schedule";
 type Data = ScheduleSnapshot & {
@@ -18,6 +18,7 @@ function time(instant: string, zone: string) {
   }).format(new Date(instant));
 }
 export function ScheduleWorkbench() {
+  const loadSequence = useRef(0);
   const [events, setEvents] = useState<{ id: string; name: string }[]>([]),
     [eventId, setEventId] = useState(""),
     [data, setData] = useState<Data | null>(null),
@@ -30,6 +31,7 @@ export function ScheduleWorkbench() {
     [sessionId, setSessionId] = useState(""),
     [gameId, setGameId] = useState("");
   async function load(id: string) {
+    const sequence = ++loadSequence.current;
     setLoading(true);
     try {
       const r = await fetch(
@@ -37,6 +39,7 @@ export function ScheduleWorkbench() {
         { cache: "no-store" },
       );
       const next = await r.json();
+      if (sequence !== loadSequence.current) return;
       if (!r.ok) throw new Error(next.error);
       setData(next);
       setError("");
@@ -44,9 +47,10 @@ export function ScheduleWorkbench() {
       setPending(null);
       setStatus("Loaded accepted schedule.");
     } catch (e) {
-      setError((e as Error).message || "Schedule could not be loaded.");
+      if (sequence === loadSequence.current)
+        setError((e as Error).message || "Schedule could not be loaded.");
     } finally {
-      setLoading(false);
+      if (sequence === loadSequence.current) setLoading(false);
     }
   }
   useEffect(() => {

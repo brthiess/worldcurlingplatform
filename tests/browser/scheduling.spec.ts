@@ -240,3 +240,72 @@ test("organizer recovery, keyboard assignment/conflicts, empty state and accepte
   await expect(page.locator('.error[role="alert"]')).toHaveCount(0);
   expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
 });
+
+test("a delayed edition read cannot replace a more recently selected schedule", async ({
+  page,
+}) => {
+  test.setTimeout(120000);
+  const eventId = randomUUID(),
+    divisionId = randomUUID();
+  await pool.query(
+    "INSERT INTO event_edition(id,series_id,name,venue,location,timezone,starts_on,ends_on,origin,published,admission_status) VALUES($1,'prairie','Delayed schedule fixture','Acceptance ice','Regina','America/Regina','2026-11-08','2026-11-10','fictional_demo',true,'approved')",
+    [eventId],
+  );
+  await pool.query(
+    "INSERT INTO division(id,event_id,name,discipline,format) VALUES($1,$2,'Delayed division','men_four','Existing games')",
+    [divisionId, eventId],
+  );
+  await pool.query(
+    "INSERT INTO role_grant(id,user_id,role,event_id) VALUES($1,'demo-organizer','organizer',$2)",
+    [randomUUID(), eventId],
+  );
+  expect(
+    (
+      await signInApiWithRateWindow(
+        page.request,
+        "organizer@demo.invalid",
+        process.env.DEMO_PASSWORD,
+      )
+    ).status(),
+  ).toBe(200);
+  await page.goto("/admin/schedule?event=prairie-2026");
+  await expect(
+    page.getByRole("heading", { name: "Prairie Open 2026", exact: true }),
+  ).toBeVisible();
+  let release = () => {},
+    seen = () => {},
+    done = () => {};
+  const gate = new Promise<void>((r) => (release = r)),
+    intercepted = new Promise<void>((r) => (seen = r)),
+    handled = new Promise<void>((r) => (done = r));
+  await page.route(`**/api/v1/events/${eventId}/schedule`, async (route) => {
+    const response = await route.fetch();
+    seen();
+    await gate;
+    await route.fulfill({ response });
+    done();
+  });
+  await page.getByLabel("Event edition").selectOption(eventId);
+  await intercepted;
+  await page.getByLabel("Event edition").selectOption("prairie-2026");
+  await expect(
+    page.getByRole("heading", { name: "Prairie Open 2026", exact: true }),
+  ).toBeVisible();
+  const returned = page.waitForResponse((r) =>
+    r.url().endsWith(`/api/v1/events/${eventId}/schedule`),
+  );
+  release();
+  await returned;
+  await handled;
+  await page.evaluate(
+    () =>
+      new Promise<void>((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+      ),
+  );
+  await expect(
+    page.getByRole("heading", { name: "Prairie Open 2026", exact: true }),
+  ).toBeVisible();
+  await expect(page.getByLabel("Event edition")).toHaveValue("prairie-2026");
+  await page.unroute(`**/api/v1/events/${eventId}/schedule`);
+});
