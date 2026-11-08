@@ -71,7 +71,7 @@ export async function applicationDetail(userId: string, id: string) {
       fail(403, "This application is outside your assigned scope.");
     if (!app) fail(404, "Application not found.");
     const history = await client.query(
-      `SELECT h.version,h.action,h.reason,h.snapshot,h.created_at AS "createdAt",u.name AS "actorName",a.action AS "auditAction" FROM event_application_history h JOIN auth_user u ON u.id=h.actor_id JOIN audit_record a ON a.id=h.id WHERE h.event_id=$1 ORDER BY h.version`,
+      `SELECT h.version,h.request_id AS "requestId",h.action,h.reason,h.snapshot,h.created_at AS "createdAt",u.name AS "actorName",a.action AS "auditAction" FROM event_application_history h JOIN auth_user u ON u.id=h.actor_id JOIN audit_record a ON a.id=h.id WHERE h.event_id=$1 ORDER BY h.version`,
       [id],
     );
     await client.query("COMMIT");

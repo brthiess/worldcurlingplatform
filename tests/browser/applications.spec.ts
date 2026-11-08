@@ -4,7 +4,7 @@ import AxeBuilder from "@axe-core/playwright";
 import "dotenv/config";
 import { randomUUID } from "node:crypto";
 // Two real authentication retry windows can exceed the default 30-second test budget.
-test.setTimeout(180000);
+test.describe.configure({ timeout: 180000 });
 for (const [label, width, height] of [
   ["phone", 360, 800],
   ["tablet", 768, 1024],

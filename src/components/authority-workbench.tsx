@@ -2,7 +2,13 @@
 import { useEffect, useState } from "react";
 import type { ApprovalScope } from "@/domain/authority";
 import { disciplines } from "@/domain/applications";
+import {
+  AuthorityRecovery,
+  useAuthorityCommand,
+  type RetainedAuthorityCommand,
+} from "./authority-command";
 type Delegations = {
+  actorId: string;
   isAdministrator: boolean;
   organizations: { id: string; name: string }[];
   users: { id: string; name: string; isAdministrator: boolean }[];
@@ -61,22 +67,10 @@ const emptyScope: ApprovalScope = {
   includeEventIds: [],
   excludeEventIds: [],
 };
-async function command(path: string, body: unknown) {
-  const r = await fetch(path, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  const data = await r.json();
-  if (!r.ok) throw new Error(data.error);
-  return data;
-}
 export function AuthorityWorkbench() {
   const [data, setData] = useState<Delegations | null>(null),
     [staff, setStaff] = useState<Staff | null>(null),
     [error, setError] = useState(""),
-    [notice, setNotice] = useState(""),
-    [busy, setBusy] = useState(false),
     [loading, setLoading] = useState(true),
     [eventId, setEventId] = useState("");
   async function load() {
@@ -92,7 +86,8 @@ export function AuthorityWorkbench() {
             ? "Sign in to manage assigned authority."
             : "Authority could not be loaded. Try again.",
         );
-      setData(await a.json());
+      const nextData: Delegations = await a.json();
+      setData(nextData);
       const next = await b.json();
       setStaff(next);
       setEventId((current) =>
@@ -101,8 +96,10 @@ export function AuthorityWorkbench() {
           : (next.events[0]?.id ?? ""),
       );
       setError("");
+      return { data: nextData, staff: next as Staff };
     } catch (e) {
       setError((e as Error).message);
+      return null;
     } finally {
       setLoading(false);
     }
@@ -110,20 +107,31 @@ export function AuthorityWorkbench() {
   useEffect(() => {
     void load();
   }, []);
-  async function save(path: string, body: unknown, message: string) {
-    setBusy(true);
-    setNotice("");
-    setError("");
-    try {
-      await command(path, body);
-      await load();
-      setNotice(message);
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setBusy(false);
-    }
-  }
+  const recovery = useAuthorityCommand(
+    data?.actorId ? `wcp005-authority:${data.actorId}` : null,
+    data?.actorId,
+    async () => {
+      if (!(await load())) throw new Error("Refresh failed");
+    },
+    async (pending) => {
+      const current = await load();
+      if (!current || current.data.actorId !== pending.actorId) return false;
+      const input = JSON.parse(pending.body);
+      const kind = pending.path.endsWith("approval-delegations")
+        ? `approval_${input.action}`
+        : input.action === "revoke"
+          ? "staff_revoked"
+          : "role_granted";
+      return current.data.history.some(
+        (h) =>
+          h.resourceId === input.id &&
+          h.kind === kind &&
+          h.reason === (input.reason ?? "Event staff assignment").trim(),
+      );
+    },
+  );
+  const busy = recovery.locked,
+    save = recovery.submit;
   return (
     <main id="main" className="workspace authority-workspace">
       <p className="eyebrow">Operations</p>
@@ -140,17 +148,13 @@ export function AuthorityWorkbench() {
           </button>
         </div>
       )}
-      {notice && (
-        <p role="status" className="notice">
-          {notice}
-        </p>
-      )}
+      <AuthorityRecovery state={recovery} />
       {loading ? (
         <p role="status">Loading assigned authority…</p>
       ) : (
         data &&
         staff && (
-          <>
+          <fieldset disabled={busy} aria-label="Authority editing">
             <section>
               <h2>Approval delegations</h2>
               <p>
@@ -523,7 +527,7 @@ export function AuthorityWorkbench() {
                 </ol>
               )}
             </section>
-          </>
+          </fieldset>
         )
       )}
     </main>
@@ -533,16 +537,17 @@ export function ResponsibilityControls({
   id,
   version,
   onSaved,
+  onPendingChange,
 }: {
   id: string;
   version: number;
-  onSaved: () => void;
+  onSaved: () => Promise<void>;
+  onPendingChange: (pending: boolean) => void;
 }) {
   const [data, setData] = useState<Delegations | null>(null),
     [target, setTarget] = useState(""),
     [reason, setReason] = useState(""),
-    [error, setError] = useState(""),
-    [busy, setBusy] = useState(false);
+    [error, setError] = useState("");
   useEffect(() => {
     let active = true;
     void fetch("/api/v1/approval-delegations", { cache: "no-store" })
@@ -557,11 +562,46 @@ export function ResponsibilityControls({
       active = false;
     };
   }, [id, version]);
+  const recovery = useAuthorityCommand(
+    data?.actorId ? `wcp005-responsibility:${data.actorId}:${id}` : null,
+    data?.actorId,
+    async () => {
+      await onSaved();
+      setReason("");
+    },
+    async (pending: RetainedAuthorityCommand) => {
+      const response = await fetch(pending.path, { cache: "no-store" });
+      if (!response.ok) return false;
+      const current = await response.json(),
+        input = JSON.parse(pending.body);
+      if (
+        !current.history.some(
+          (h: {
+            requestId: string;
+            action: string;
+            reason: string;
+            version: number;
+          }) =>
+            h.requestId === input.requestId &&
+            h.action === input.action &&
+            h.reason === input.reason.trim() &&
+            h.version === input.version + 1,
+        )
+      )
+        return false;
+      await onSaved();
+      return true;
+    },
+  );
+  useEffect(() => {
+    onPendingChange(recovery.locked);
+    return () => onPendingChange(false);
+  }, [recovery.locked, onPendingChange]);
+  const busy = recovery.locked;
   async function save(action: string) {
-    setBusy(true);
-    setError("");
-    try {
-      await command(`/api/v1/applications/${id}`, {
+    await recovery.submit(
+      `/api/v1/applications/${id}`,
+      {
         requestId: crypto.randomUUID(),
         version,
         action,
@@ -569,18 +609,14 @@ export function ResponsibilityControls({
         ...(target.startsWith("wc:")
           ? { delegationId: null, reviewerId: target.slice(3) }
           : { delegationId: target }),
-      });
-      setReason("");
-      onSaved();
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setBusy(false);
-    }
+      },
+      "Responsibility command recorded.",
+    );
   }
   return (
     <details className="responsibility-controls">
       <summary>World Curling responsibility & override</summary>
+      <AuthorityRecovery state={recovery} label="responsibility" />
       {error && (
         <p role="alert" className="error">
           {error}

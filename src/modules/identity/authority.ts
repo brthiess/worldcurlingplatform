@@ -104,7 +104,14 @@ export async function delegationWorkspace(userId: string) {
       [userId, admin],
     )
   ).rows;
-  return { isAdministrator: admin, delegations, users, history, organizations };
+  return {
+    actorId: userId,
+    isAdministrator: admin,
+    delegations,
+    users,
+    history,
+    organizations,
+  };
 }
 export async function delegationCommand(userId: string, raw: unknown) {
   const input = raw as {

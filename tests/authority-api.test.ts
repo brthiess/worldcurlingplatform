@@ -762,3 +762,82 @@ test("queued application and scoring commands recheck authority after revocation
     blocker.release();
   }
 });
+test("staff assignment receipts replay exact grant/revocation, reject conflicting reuse and retain current authorization", async () => {
+  const organizer = await login("organizer"),
+    admin = await login("administrator");
+  const id = randomUUID(),
+    grant = {
+      id,
+      userId: "demo-ungranted",
+      role: "scorekeeper",
+      eventId: "prairie-2026",
+      gameId: "game-3",
+      reason: "Exact recovery duty",
+    };
+  try {
+    assert.equal(
+      (await request("/api/v1/role-grants", organizer, grant)).status,
+      201,
+    );
+    assert.equal(
+      (await request("/api/v1/role-grants", organizer, grant)).status,
+      201,
+    );
+    const revoke = {
+      action: "revoke",
+      id,
+      reason: "Exact recovery shift ended",
+    };
+    assert.equal(
+      (await request("/api/v1/role-grants", organizer, revoke)).status,
+      200,
+    );
+    assert.equal(
+      (await request("/api/v1/role-grants", organizer, revoke)).status,
+      200,
+    );
+    assert.equal(
+      (
+        await request("/api/v1/role-grants", organizer, {
+          ...revoke,
+          reason: "Changed reason",
+        })
+      ).status,
+      409,
+    );
+    assert.equal(
+      (await request("/api/v1/role-grants", organizer, grant)).status,
+      409,
+    );
+    const current = await (
+      await request("/api/v1/approval-delegations", admin)
+    ).json();
+    const history = current.history.filter(
+      (h: { resourceId: string }) => h.resourceId === id,
+    );
+    assert.equal(history.length, 2);
+    assert.deepEqual(history.map((h: { kind: string }) => h.kind).sort(), [
+      "role_granted",
+      "staff_revoked",
+    ]);
+    const denied = await fetch(base + "/api/v1/role-grants", {
+      method: "POST",
+      headers: {
+        cookie: admin,
+        Origin: base,
+        "Content-Type": "application/json",
+        "X-WCP-Actor": "demo-organizer",
+      },
+      body: JSON.stringify({ ...grant, id: randomUUID() }),
+    });
+    assert.equal(denied.status, 403);
+  } finally {
+    const current = await (await request("/api/v1/role-grants", admin)).json();
+    if (current.grants.some((g: { id: string }) => g.id === id))
+      await request("/api/v1/role-grants", admin, {
+        action: "revoke",
+        id,
+        reason: "Receipt test cleanup",
+      });
+  }
+});

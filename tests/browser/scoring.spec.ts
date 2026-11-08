@@ -9,7 +9,7 @@ import { randomUUID } from "node:crypto";
 import pg from "pg";
 import "dotenv/config";
 import { authApiWithRateWindow } from "./auth-fixture";
-test.setTimeout(180000);
+test.describe.configure({ timeout: 180000 });
 // Each browser suite owns its fixture connection lifecycle. Other files may
 // close the application module's pool in the same Playwright worker.
 const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });

@@ -403,4 +403,3 @@ test("real PostgreSQL scoring: start, scores, concurrency, retries, scope, sourc
     await pool.query("DELETE FROM game WHERE id=$1", [id]);
   }
 });
-

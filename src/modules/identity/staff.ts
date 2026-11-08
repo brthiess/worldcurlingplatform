@@ -67,8 +67,18 @@ export async function staffCommand(userId: string, raw: unknown) {
         [input.id],
       )
     ).rows[0];
+    const receipt =
+      action === "revoke"
+        ? (
+            await c.query(
+              "SELECT actor_id,reason,before_state FROM authority_history WHERE resource_id=$1 AND kind='staff_revoked'",
+              [input.id],
+            )
+          ).rows[0]
+        : undefined;
+    const recorded = before ?? receipt?.before_state;
     const admin = await isAdministrator(c, userId);
-    const eventId = action === "revoke" ? before?.eventId : input.eventId;
+    const eventId = action === "revoke" ? recorded?.eventId : input.eventId;
     const organizer = !!(
       await c.query(
         "SELECT id FROM role_grant WHERE user_id=$1 AND role='organizer' AND event_id=$2 AND game_id IS NULL FOR SHARE",
@@ -78,13 +88,19 @@ export async function staffCommand(userId: string, raw: unknown) {
     if (
       !admin &&
       (!organizer ||
-        (action === "revoke" ? before?.role : input.role) !== "scorekeeper")
+        (action === "revoke" ? recorded?.role : input.role) !== "scorekeeper")
     )
       fail(
         403,
         "Only World Curling or this event’s organizer can assign scoring access.",
       );
     if (action === "revoke") {
+      if (!before && receipt) {
+        if (receipt.actor_id !== userId || receipt.reason !== reason)
+          fail(409, "Revocation identifier already used by another command.");
+        await c.query("COMMIT");
+        return { id: input.id };
+      }
       if (!before) fail(404, "Assignment not found.");
       if (before.role === "administrator")
         fail(400, "This command manages event staff assignments.");
@@ -136,6 +152,20 @@ export async function staffCommand(userId: string, raw: unknown) {
           before.gameId !== input.gameId
         )
           fail(409, "Request identifier already used for another grant.");
+        const receipt = (
+          await c.query(
+            "SELECT actor_id,reason FROM authority_history WHERE resource_id=$1 AND kind='role_granted'",
+            [input.id],
+          )
+        ).rows[0];
+        if (
+          receipt &&
+          (receipt.actor_id !== userId || receipt.reason !== reason)
+        )
+          fail(
+            409,
+            "Request identifier already used by another grant command.",
+          );
       } else {
         await c.query("SELECT pg_advisory_xact_lock(hashtextextended($1,0))", [
           `staff-scope:${input.userId}:${input.role}:${input.eventId}:${input.gameId ?? ""}`,

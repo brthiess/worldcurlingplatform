@@ -67,13 +67,15 @@ export function ApplicationsWorkbench() {
     [form, setForm] = useState<ApplicationInput | null>(null),
     [newId, setNewId] = useState(""),
     [loading, setLoading] = useState(true),
-    [busy, setBusy] = useState(false),
+    [working, setBusy] = useState(false),
+    [responsibilityPending, setResponsibilityPending] = useState(false),
     [error, setError] = useState(""),
     [fields, setFields] = useState<Record<string, string>>({}),
     [notice, setNotice] = useState(""),
     [reason, setReason] = useState(""),
     [pending, setPending] = useState<Pending | null>(null),
     [queue, setQueue] = useState("all");
+  const busy = working || responsibilityPending;
   async function load() {
     setLoading(true);
     try {
@@ -110,8 +112,10 @@ export function ApplicationsWorkbench() {
       setDetail(result);
       setForm(result);
       setReason("");
+      return true;
     } catch (e) {
       setError((e as Error).message);
+      return false;
     } finally {
       setBusy(false);
     }
@@ -293,6 +297,7 @@ export function ApplicationsWorkbench() {
                 <label htmlFor="queue-status">Application status</label>
                 <select
                   id="queue-status"
+                  disabled={busy}
                   value={queue}
                   onChange={(e) => setQueue(e.target.value)}
                 >
@@ -705,8 +710,10 @@ export function ApplicationsWorkbench() {
                           <ResponsibilityControls
                             id={detail.id}
                             version={detail.version}
+                            onPendingChange={setResponsibilityPending}
                             onSaved={async () => {
-                              await open(detail.id);
+                              if (!(await open(detail.id)))
+                                throw new Error("Application refresh failed");
                               try {
                                 const response = await fetch(
                                   "/api/v1/applications",
@@ -718,6 +725,7 @@ export function ApplicationsWorkbench() {
                                 setError(
                                   "Responsibility changed, but the queue could not be refreshed. Reload the current version.",
                                 );
+                                throw new Error("Queue refresh failed");
                               }
                             }}
                           />
