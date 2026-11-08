@@ -136,6 +136,7 @@ export default function Admin() {
           <p>
             <a href="/admin/schedule">Draw scheduling</a>
           </p>
+          <p><a href="/admin/draws">Single knockout draws</a></p>
           <p>
             <a href="/admin/news">News sources and moderation</a>
           </p>
@@ -187,7 +188,7 @@ export default function Admin() {
               {workspace.games.map((game) => (
                 <li key={game.id}>
                   <p className="eyebrow">
-                    {game.eventName} · Sheet {game.sheet}
+                    {game.eventName} · {game.sheet?`Sheet ${game.sheet}`:'Sheet not assigned'}
                   </p>
                   <h3>
                     {game.nameA} vs {game.nameB}

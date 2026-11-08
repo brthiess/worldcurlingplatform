@@ -12,7 +12,7 @@ export async function actor(headers: Headers) {
 }
 export async function gameResource(id: string): Promise<Resource | null> {
   const result = await pool.query<Resource>(
-    'SELECT g.id AS "gameId",d.event_id AS "eventId" FROM game g JOIN draw_session ds ON ds.id=g.draw_id JOIN division d ON d.id=ds.division_id WHERE g.id=$1',
+    'SELECT g.id AS "gameId",d.event_id AS "eventId" FROM game g LEFT JOIN draw_session ds ON ds.id=g.draw_id JOIN division d ON d.id=g.division_id WHERE g.id=$1',
     [id],
   );
   return result.rows[0] ?? null;

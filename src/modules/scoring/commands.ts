@@ -9,6 +9,7 @@ import {
   type DifferenceMember,
 } from "@/domain/results";
 import { gameLineup, freezeLineups } from "./lineups";
+import { advanceDraw } from "@/modules/draws/advance";
 import {
   validateEnd,
   scoreTotals,
@@ -133,7 +134,7 @@ export function parseCommand(value: unknown): Command {
 async function snapshot(client: PoolClient, id: string) {
   const g = (
     await client.query(
-      `SELECT g.id,g.state,g.version,g.hammer,g.scoring_source AS "scoringSource",g.total_a AS "totalA",g.total_b AS "totalB",g.sheet,coalesce(a.display_name,g.slot_a) AS "nameA",coalesce(b.display_name,g.slot_b) AS "nameB",g.entry_a AS "entryA",g.entry_b AS "entryB",d.event_id AS "eventId",d.discipline,ds.number AS "drawNumber" FROM game g JOIN draw_session ds ON ds.id=g.draw_id JOIN division d ON d.id=ds.division_id LEFT JOIN event_entry a ON a.id=g.entry_a LEFT JOIN event_entry b ON b.id=g.entry_b WHERE g.id=$1`,
+      `SELECT g.id,g.state,g.version,g.hammer,g.scoring_source AS "scoringSource",g.total_a AS "totalA",g.total_b AS "totalB",g.sheet,coalesce(a.display_name,g.slot_a) AS "nameA",coalesce(b.display_name,g.slot_b) AS "nameB",g.entry_a AS "entryA",g.entry_b AS "entryB",d.event_id AS "eventId",d.discipline,ds.number AS "drawNumber" FROM game g LEFT JOIN draw_session ds ON ds.id=g.draw_id JOIN division d ON d.id=g.division_id LEFT JOIN event_entry a ON a.id=g.entry_a LEFT JOIN event_entry b ON b.id=g.entry_b WHERE g.id=$1`,
       [id],
     )
   ).rows[0];
@@ -211,8 +212,19 @@ async function snapshot(client: PoolClient, id: string) {
 async function authorize(client: PoolClient, actorId: string, id: string) {
   // Hold both the game and current grants while accepting a command. Grant revocation
   // and source changes cannot race past this authorization check.
+  const lockedEdition = (
+    await client.query(
+      "SELECT e.id FROM event_edition e JOIN division d ON d.event_id=e.id JOIN game g ON g.division_id=d.id WHERE g.id=$1 FOR UPDATE OF e",
+      [id],
+    )
+  ).rows[0]?.id;
   await client.query("SELECT id FROM game WHERE id=$1 FOR UPDATE", [id]);
   const g = await snapshot(client, id);
+  if (g.eventId !== lockedEdition)
+    throw new ScoringError(
+      409,
+      "Game edition changed. Reload the current game before applying this command.",
+    );
   const grants = await client.query<Grant>(
     'SELECT role,event_id AS "eventId",game_id AS "gameId" FROM role_grant WHERE user_id=$1 FOR SHARE',
     [actorId],
@@ -545,12 +557,20 @@ export async function saveScoring(actorId: string, id: string, input: unknown) {
         "INSERT INTO game_result_version(game_id,version,actor_id,confirmed_by,result,audit_id) VALUES($1,$2,$3,$4,$5,$6)",
         [id, after.version, actorId, name, frozenResult, auditId],
       );
+      await advanceDraw(
+        client,
+        id,
+        after.version,
+        result.winnerEntryId,
+        [before.entryA, before.entryB],
+        auditId,
+      );
       if (
         command.action === "correct" &&
         before.results[0]?.result.winnerEntryId !== result.winnerEntryId
       ) {
         const deps = await client.query(
-          "SELECT d.*,g.state,g.entry_a,g.entry_b FROM game_assignment_dependency d JOIN game g ON g.id=d.downstream_game_id WHERE upstream_game_id=$1 ORDER BY g.id FOR UPDATE OF g",
+          "SELECT d.*,g.state,g.entry_a,g.entry_b FROM game_assignment_dependency d JOIN game g ON g.id=d.downstream_game_id WHERE upstream_game_id=$1 AND NOT EXISTS(SELECT 1 FROM draw_node n JOIN competition_draw cd ON cd.division_id=n.division_id AND cd.version=n.revision AND cd.state='published' WHERE n.game_id=g.id) ORDER BY g.id FOR UPDATE OF g",
           [id],
         );
         for (const dep of deps.rows) {

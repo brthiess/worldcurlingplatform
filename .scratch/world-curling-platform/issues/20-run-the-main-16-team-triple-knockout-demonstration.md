@@ -4,7 +4,7 @@ number: 20
 title: "Run the main 16-team triple-knockout demonstration"
 parent: WCP-SPEC-001
 type: implementation
-status: ready-for-agent
+status: in-progress
 labels: [ready-for-agent]
 blocked_by: [WCP-019]
 source_spec_sha256: 045B46988225B6C8C0020B23C8C5D4EAA8E2E1916256148A0FDA26B5DA8673FD
@@ -18,7 +18,7 @@ published: 2026-11-07
 
 **Blocked by:** [19: Preview and run a single-knockout draw through public views](19-preview-and-run-a-single-knockout-draw-through-public-views.md).
 
-**Status:** ready-for-agent
+**Status:** in-progress
 
 ## Parent and scope
 
