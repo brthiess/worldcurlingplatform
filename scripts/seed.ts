@@ -119,6 +119,9 @@ try {
       ],
     );
   }
+  await client.query(
+    "INSERT INTO player(id,name,origin) VALUES('demo-player','Alex Demo','fictional_demo'),('demo-player-other','Morgan Demo','fictional_demo') ON CONFLICT DO NOTHING",
+  );
   await client.query("COMMIT");
   console.log(
     "Fictional scenario seeded (repeatable, preserves later changes). Demo persona emails: administrator/organizer/scorekeeper/reviewer @demo.invalid. Password comes only from local environment.",
