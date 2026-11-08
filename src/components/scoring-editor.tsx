@@ -162,7 +162,7 @@ export function ScoringEditor({ gameId }: { gameId: string }) {
     }
     sending.current = true;
     setPending(command);
-    setSave("saving");
+    setSave((s) => saveTransition(s, "send"));
     setError("");
     // Persist before sending: an interrupted response must retain the exact request.
     try {
@@ -188,11 +188,11 @@ export function ScoringEditor({ gameId }: { gameId: string }) {
       const result = await r.json();
       if (!r.ok) {
         if (r.status >= 500) throw new Error(result.error);
-        setSave("conflict");
+        setSave((s) => saveTransition(s, "conflict"));
         setError(result.error);
         return;
       }
-      setSave("saved");
+      setSave((s) => saveTransition(s, "acknowledged"));
       setPending(null);
       setBaseVersion(result.version);
       try {
@@ -203,7 +203,7 @@ export function ScoringEditor({ gameId }: { gameId: string }) {
         );
       }
     } catch {
-      setSave("uncertain");
+      setSave((s) => saveTransition(s, "interrupted"));
       setError(
         "The server may have accepted this request. Retry the same request to confirm; your edit is retained.",
       );
@@ -218,7 +218,7 @@ export function ScoringEditor({ gameId }: { gameId: string }) {
       setGame(g);
       setBaseVersion(g.version);
       setPending(null);
-      setSave("unsent");
+      setSave((s) => saveTransition(s, "reload"));
       setError(
         "Accepted version loaded. Your edit is retained; compare it before saving.",
       );
@@ -239,11 +239,16 @@ export function ScoringEditor({ gameId }: { gameId: string }) {
           : "Connection interrupted · no automatic synchronization"}
       </p>
       {error && (
-        <p role="alert" className="error">
+        <p role="alert" aria-label="Score entry error" className="error">
           {error}
         </p>
       )}
       {!game && !error && <p role="status">Loading assigned game…</p>}
+      {!game && error && (
+        <button onClick={() => window.location.reload()}>
+          Retry loading game
+        </button>
+      )}
       {game && (
         <>
           <h2>
@@ -408,7 +413,7 @@ export function ScoringEditor({ gameId }: { gameId: string }) {
           </p>
           <h2>Accepted history</h2>
           <ul className="workspace-list">
-            {game.history.map((h) => (
+            {game.history.slice(0, 3).map((h) => (
               <li key={h.version}>
                 Version {h.version} ·{" "}
                 {h.action === "game_started" ? "Game started" : "End saved"} ·{" "}
@@ -416,6 +421,22 @@ export function ScoringEditor({ gameId }: { gameId: string }) {
               </li>
             ))}
           </ul>
+          {game.history.length > 3 && (
+            <details>
+              <summary>
+                Earlier {game.history.length - 3} accepted changes
+              </summary>
+              <ul className="workspace-list">
+                {game.history.slice(3).map((h) => (
+                  <li key={h.version}>
+                    Version {h.version} ·{" "}
+                    {h.action === "game_started" ? "Game started" : "End saved"}{" "}
+                    · {h.actorId} · {new Date(h.createdAt).toLocaleString()}
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
           {!game.history.length && <p>No scoring commands accepted yet.</p>}
         </>
       )}

@@ -328,8 +328,10 @@ export function ScoresView({
             </span>
             <button
               className="secondary"
-              onClick={() => void load()}
-              disabled={refreshing}
+              onClick={() => {
+                if (!refreshing) void load();
+              }}
+              aria-disabled={refreshing}
             >
               {refreshing ? "Refreshing…" : "Refresh scores"}
             </button>

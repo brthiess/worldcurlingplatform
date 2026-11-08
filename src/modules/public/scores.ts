@@ -36,12 +36,17 @@ export type PublicEvent = {
   selection: ReturnType<typeof selectDraws>;
 };
 export async function publicEvent(id: string): Promise<PublicEvent | null> {
-  return db.transaction(async transaction=>{
-    await transaction.execute(sql`SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY`);
-    return projectEvent(transaction,id);
+  return db.transaction(async (transaction) => {
+    await transaction.execute(
+      sql`SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY`,
+    );
+    return projectEvent(transaction, id);
   });
 }
-async function projectEvent(connection:Pick<typeof db,'execute'>,id:string):Promise<PublicEvent|null>{
+async function projectEvent(
+  connection: Pick<typeof db, "execute">,
+  id: string,
+): Promise<PublicEvent | null> {
   const result = await connection.execute(
     sql`SELECT e.id,e.name,e.venue,e.location,e.timezone,e.starts_on::text AS "startsOn",e.ends_on::text AS "endsOn",e.origin,d.name AS division,d.format,d.id AS "divisionId" FROM event_edition e JOIN division d ON d.event_id=e.id WHERE e.id=${id} AND e.published=true ORDER BY d.id LIMIT 1`,
   );
@@ -62,17 +67,28 @@ async function projectEvent(connection:Pick<typeof db,'execute'>,id:string):Prom
   const endsResult = await connection.execute(
     sql`SELECT s.game_id,s.side,s.end_number,s.state,s.points FROM game_end_score s JOIN game g ON g.id=s.game_id JOIN draw_session ds ON ds.id=g.draw_id WHERE ds.division_id=${row.divisionId} ORDER BY s.end_number`,
   );
-  function ends(id:unknown,side:string):Score[]{
-    const rows=endsResult.rows.filter(e=>e.game_id===id&&e.side===side);
-    const length=Math.max(8,...rows.map(e=>Number(e.end_number)));
-    return Array.from({length},(_,i)=>{const e=rows.find(e=>Number(e.end_number)===i+1);return {state:e?String(e.state):'upcoming',points:e?.points===undefined||e.points===null?null:Number(e.points)};});
+  function ends(id: unknown, side: string): Score[] {
+    const rows = endsResult.rows.filter(
+      (e) => e.game_id === id && e.side === side,
+    );
+    const length = Math.max(8, ...rows.map((e) => Number(e.end_number)));
+    return Array.from({ length }, (_, i) => {
+      const e = rows.find((e) => Number(e.end_number) === i + 1);
+      return {
+        state: e ? String(e.state) : "upcoming",
+        points:
+          e?.points === undefined || e.points === null
+            ? null
+            : Number(e.points),
+      };
+    });
   }
   const games = gamesResult.rows.map((g) => ({
     ...g,
     updatedAt: new Date(g.updatedAt as string).toISOString(),
     endHammer: [] as (string | null)[],
-    endsA: ends(g.id,'a'),
-    endsB: ends(g.id,'b'),
+    endsA: ends(g.id, "a"),
+    endsB: ends(g.id, "b"),
   })) as PublicGame[];
   const hammers = await connection.execute(
     sql`SELECT h.game_id,h.end_number,h.hammer FROM game_end_hammer h JOIN game g ON g.id=h.game_id JOIN draw_session ds ON ds.id=g.draw_id WHERE ds.division_id=${row.divisionId}`,

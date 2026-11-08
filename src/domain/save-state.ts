@@ -19,6 +19,8 @@ export function saveTransition(
   if (event === "interrupted") return state === "saving" ? "uncertain" : state;
   if (event === "reload") return "unsent";
   if (event === "send")
-    return state === "unsent" || state === "uncertain" ? "saving" : state;
+    return state === "saved" || state === "unsent" || state === "uncertain"
+      ? "saving"
+      : state;
   return state === "saved" ? "unsent" : state;
 }

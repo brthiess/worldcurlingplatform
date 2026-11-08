@@ -14,6 +14,7 @@ test("duplicate commands replay before version checks, conflicting requests and 
 import { saveTransition } from "../src/domain/save-state";
 test("save states never turn an unacknowledged request into saved and block edits until resolved", () => {
   assert.equal(saveTransition("saved", "edit"), "unsent");
+  assert.equal(saveTransition("saved", "send"), "saving");
   assert.equal(saveTransition("unsent", "send"), "saving");
   assert.equal(saveTransition("saving", "interrupted"), "uncertain");
   assert.equal(saveTransition("uncertain", "edit"), "uncertain");
@@ -21,6 +22,8 @@ test("save states never turn an unacknowledged request into saved and block edit
   assert.equal(saveTransition("saving", "acknowledged"), "saved");
   assert.equal(saveTransition("saving", "conflict"), "conflict");
   assert.equal(saveTransition("conflict", "reload"), "unsent");
+  assert.equal(saveTransition("conflict", "edit"), "conflict");
+  assert.equal(saveTransition("saved", "interrupted"), "saved");
 });
 test("four-player ends allow a blank or one scoring side, preserve unknown and reject impossible scores", () => {
   assert.deepEqual(validateEnd({ state: "played", a: 0, b: 0 }), {
