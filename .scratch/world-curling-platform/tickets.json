@@ -419,13 +419,17 @@
       "file": "08-grant-team-season-representatives-self-entry-authority.md",
       "id": "WCP-008",
       "path": "issues/08-grant-team-season-representatives-self-entry-authority.md",
-      "status": "in-progress",
+      "status": "completed",
       "labels": [
         "ready-for-agent"
       ],
       "blocked_by": [
         "WCP-006"
-      ]
+      ],
+      "completion": {
+        "commit": "0536bf73714490b2526888daf0569d7c35de140c",
+        "evidence": "docs/verification/WCP-008-merge.md"
+      }
     },
     {
       "n": 9,
