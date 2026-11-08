@@ -7,7 +7,11 @@ import {
   activeDelegations,
   isAdministrator,
 } from "@/modules/identity/authority";
-import { matchesApprovalScope, approvalActionPolicy } from "@/domain/authority";
+import {
+  matchesApprovalScope,
+  approvalActionPolicy,
+  approvalOverride,
+} from "@/domain/authority";
 import {
   applicationTransition,
   validateApplication,
@@ -343,7 +347,7 @@ export async function applicationCommand(
         );
         const routing = await routeApplication(
           client,
-          { ...input, id },
+          { ...input, id, country: input.country.trim() },
           organization.rows[0].approval_administrator_id,
         );
         await client.query(
@@ -420,7 +424,9 @@ export async function applicationCommand(
         );
       let next;
       try {
-        next = applicationTransition(existing!.status, transitionAction);
+        next = action.startsWith("override_")
+          ? approvalOverride(existing!.status, transitionAction)
+          : applicationTransition(existing!.status, transitionAction);
       } catch {
         fail(409, "This application transition is not allowed.");
       }

@@ -8,19 +8,23 @@ import AxeBuilder from "@axe-core/playwright";
 import { randomUUID } from "node:crypto";
 import pg from "pg";
 import "dotenv/config";
+import { authApiWithRateWindow } from "./auth-fixture";
+test.setTimeout(180000);
 // Each browser suite owns its fixture connection lifecycle. Other files may
 // close the application module's pool in the same Playwright worker.
 const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
 let session: BrowserContext;
 test.beforeAll(async ({ browser }) => {
   session = await browser.newContext();
-  const r = await session.request.post("/api/auth/sign-in/email", {
-    headers: { Origin: process.env.BETTER_AUTH_URL! },
-    data: {
-      email: "scorekeeper@demo.invalid",
-      password: process.env.DEMO_PASSWORD,
-    },
-  });
+  const r = await authApiWithRateWindow(() =>
+    session.request.post("/api/auth/sign-in/email", {
+      headers: { Origin: process.env.BETTER_AUTH_URL! },
+      data: {
+        email: "scorekeeper@demo.invalid",
+        password: process.env.DEMO_PASSWORD,
+      },
+    }),
+  );
   expect(r.status()).toBe(200);
   await restore(session.request);
 });

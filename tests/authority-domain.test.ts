@@ -4,6 +4,7 @@ import {
   matchesApprovalScope,
   routeApproval,
   approvalActionPolicy,
+  approvalOverride,
 } from "../src/domain/authority";
 const scope = {
   countries: ["Canada"],
@@ -44,6 +45,22 @@ test("approval scopes require all dimensions and every division, with explicit n
     matchesApprovalScope(scope, { ...application, id: "excluded" }),
     false,
   );
+});
+test("reasoned WC overrides can replace a submitted or decided admission while a draft cannot be overridden", () => {
+  assert.deepEqual(approvalOverride("rejected", "approve"), {
+    status: "approved",
+    published: true,
+  });
+  assert.deepEqual(approvalOverride("approved", "reject"), {
+    status: "rejected",
+    published: false,
+  });
+  assert.deepEqual(approvalOverride("submitted", "approve"), {
+    status: "approved",
+    published: true,
+  });
+  assert.throws(() => approvalOverride("draft", "approve"));
+  assert.throws(() => approvalOverride("submitted", "edit"));
 });
 test("reassignment and overrides remain WC controlled and require explicit reasons", () => {
   const delegate = {

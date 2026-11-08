@@ -1,7 +1,33 @@
 import { test, expect, type APIRequestContext } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 import { randomUUID } from "node:crypto";
+import pg from "pg";
+import { hashPassword } from "better-auth/crypto";
 import "dotenv/config";
+const pool = new pg.Pool({
+  connectionString: process.env.DATABASE_URL,
+  max: 2,
+});
+const fixtureUsers: string[] = [];
+test.afterAll(async () => {
+  await pool.query("DELETE FROM auth_user WHERE id=ANY($1::text[])", [
+    fixtureUsers,
+  ]);
+  await pool.end();
+});
+async function fixtureAccount(prefix: string) {
+  const id = `wcp005-${prefix}-${randomUUID()}`;
+  fixtureUsers.push(id);
+  await pool.query(
+    "INSERT INTO auth_user(id,name,email,email_verified) VALUES($1,$2,$3,true)",
+    [id, "Authority test volunteer", `${id}@demo.invalid`],
+  );
+  await pool.query(
+    "INSERT INTO auth_account(id,account_id,provider_id,user_id,password,created_at,updated_at) VALUES($1,$2,'credential',$2,$3,now(),now())",
+    [randomUUID(), id, await hashPassword(process.env.DEMO_PASSWORD!)],
+  );
+  return id;
+}
 const base = process.env.BETTER_AUTH_URL!;
 async function login(request: APIRequestContext, role: string) {
   const send = () =>
@@ -37,6 +63,7 @@ for (const [label, width, height] of [
   }, info) => {
     test.setTimeout(120000);
     await page.setViewportSize({ width, height });
+    const recipientId = await fixtureAccount(label);
     const errors: string[] = [],
       networkErrors: string[] = [];
     page.on("pageerror", (e) => errors.push(e.message));
@@ -55,9 +82,11 @@ for (const [label, width, height] of [
       .selectOption("demo-reviewer");
     await page.getByLabel("Countries", { exact: true }).fill("Canada");
     await page
-      .getByLabel("Organizing organization identifiers", { exact: true })
-      .fill("prairie-club");
-    await page.getByLabel("Disciplines", { exact: true }).fill("men_four");
+      .getByLabel("Organizing organizations", { exact: true })
+      .selectOption("prairie-club");
+    await page
+      .getByLabel("Disciplines", { exact: true })
+      .selectOption("men_four");
     await page.getByLabel("Event categories", { exact: true }).fill(category);
     await page
       .getByLabel("Delegation reason", { exact: true })
@@ -69,10 +98,19 @@ for (const [label, width, height] of [
       page.getByText("Approval delegation recorded.", { exact: true }),
     ).toBeVisible();
     expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
-    await page.screenshot({
-      path: info.outputPath(`${label}-delegations.png`),
-      fullPage: true,
-    });
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+    ).toBe(true);
+    await page
+      .getByRole("listitem")
+      .filter({
+        has: page.getByRole("heading", { name: authorityName, exact: true }),
+      })
+      .screenshot({
+        path: info.outputPath(`${label}-delegations.png`),
+      });
     const id = randomUUID();
     const application = {
       organizationId: "prairie-club",
@@ -119,7 +157,7 @@ for (const [label, width, height] of [
     await page.getByLabel("Game", { exact: true }).selectOption("game-3");
     await page
       .getByLabel("Scorekeeper account email", { exact: true })
-      .fill("ungranted@demo.invalid");
+      .fill(`${recipientId}@demo.invalid`);
     await page
       .getByLabel("Assignment reason", { exact: true })
       .fill("Browser volunteer shift");
@@ -129,9 +167,13 @@ for (const [label, width, height] of [
     await expect(
       page.getByText("Scoring assignment saved.", { exact: true }),
     ).toBeVisible();
-    await page.screenshot({
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+    ).toBe(true);
+    await page.getByRole("group", { name: "Assign a scorekeeper" }).screenshot({
       path: info.outputPath(`${label}-staff.png`),
-      fullPage: true,
     });
     await page.request.post("/api/auth/sign-out", {
       headers: { Origin: base },
@@ -143,10 +185,11 @@ for (const [label, width, height] of [
       .getByRole("button", { name: `Review ${application.name}`, exact: true })
       .click();
     await expect(
-      page.getByText(
-        `Responsible authority: ${authorityName} · Demo reviewer`,
-        { exact: false },
-      ),
+      page
+        .getByText(`Responsible authority: ${authorityName} · Demo reviewer`, {
+          exact: false,
+        })
+        .first(),
     ).toBeVisible();
     await expect(
       page.getByRole("button", { name: "Save changes", exact: true }),
@@ -164,15 +207,60 @@ for (const [label, width, height] of [
       }),
     ).toBeVisible();
     expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
-    await page.screenshot({
+    await page.getByRole("region", { name: "Application details" }).screenshot({
       path: info.outputPath(`${label}-responsibility.png`),
-      fullPage: true,
     });
     await page.request.post("/api/auth/sign-out", {
       headers: { Origin: base },
       data: {},
     });
     await login(page.request, "administrator");
+    await page.goto("/admin/applications");
+    await page
+      .getByRole("button", { name: `Review ${application.name}`, exact: true })
+      .click();
+    await page
+      .getByText("World Curling responsibility & override", { exact: true })
+      .click();
+    await page
+      .getByLabel("Responsible authority and reviewer", { exact: true })
+      .selectOption("wc:demo-administrator");
+    await page
+      .getByLabel("Reassignment / override reason", { exact: true })
+      .fill("Reviewer shift ended; World Curling assumes responsibility");
+    await page
+      .getByRole("button", { name: "Reassign responsibility", exact: true })
+      .click();
+    await expect(
+      page
+        .getByText(
+          "Responsible authority: World Curling · Demo administrator",
+          { exact: false },
+        )
+        .first(),
+    ).toBeVisible();
+    await page
+      .getByLabel("Reassignment / override reason", { exact: true })
+      .fill(
+        "World Curling returns the admitted event after direct verification",
+      );
+    await page
+      .getByRole("button", {
+        name: "World Curling override: return",
+        exact: true,
+      })
+      .click();
+    await expect(
+      page.getByText("Public admission: not admitted", { exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByText("Version 5 · World Curling override: returned", {
+        exact: true,
+      }),
+    ).toBeVisible();
+    await page.getByRole("region", { name: "Application details" }).screenshot({
+      path: info.outputPath(`${label}-responsibility-history.png`),
+    });
     const delegations = await (
       await page.request.get("/api/v1/approval-delegations")
     ).json();
@@ -194,7 +282,7 @@ for (const [label, width, height] of [
     const staff = await (await page.request.get("/api/v1/role-grants")).json();
     const assignment = staff.grants.find(
       (g: { userId: string; gameId: string }) =>
-        g.userId === "demo-ungranted" && g.gameId === "game-3",
+        g.userId === recipientId && g.gameId === "game-3",
     );
     expect(
       (
@@ -221,7 +309,7 @@ test("unassigned account has server-scoped empty and denied views", async ({
   page,
 }, info) => {
   test.setTimeout(90000);
-  await login(page.request, "ungranted");
+  await login(page.request, await fixtureAccount("empty"));
   await page.goto("/admin/authority");
   await expect(
     page.getByText("No approval delegations are assigned to this account."),

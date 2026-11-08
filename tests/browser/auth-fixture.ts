@@ -1,4 +1,26 @@
-import type { Locator, Page } from "@playwright/test";
+import type { Locator, Page, APIResponse } from "@playwright/test";
+export async function authApiWithRateWindow(send: () => Promise<APIResponse>) {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const response = await send();
+    if (response.status() !== 429 || attempt === 2) return response;
+    const seconds = Number(
+      response.headers()["x-retry-after"] ??
+        response.headers()["retry-after"] ??
+        60,
+    );
+    await new Promise((resolve) =>
+      setTimeout(
+        resolve,
+        Math.min(
+          60000,
+          Math.max(1000, Number.isFinite(seconds) ? seconds * 1000 : 60000),
+        ),
+      ),
+    );
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+  throw new Error("Authentication retry window exhausted.");
+}
 export async function signInWithRateWindow(page: Page, button: Locator) {
   for (let attempt = 0; attempt < 3; attempt++) {
     const result = page.waitForResponse(

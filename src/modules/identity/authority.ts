@@ -94,11 +94,17 @@ export async function delegationWorkspace(userId: string) {
     : [];
   const history = (
     await pool.query(
-      'SELECT h.kind,h.resource_id AS "resourceId",h.reason,h.before_state AS before,h.after_state AS after,h.created_at AS "createdAt",u.name AS "actorName" FROM authority_history h JOIN auth_user u ON u.id=h.actor_id WHERE $2 OR EXISTS(SELECT 1 FROM approval_delegation d WHERE d.id=h.resource_id AND d.reviewer_id=$1) ORDER BY h.created_at DESC',
+      `SELECT h.kind,h.resource_id AS "resourceId",h.reason,h.before_state AS before,h.after_state AS after,h.created_at AS "createdAt",u.name AS "actorName" FROM authority_history h JOIN auth_user u ON u.id=h.actor_id WHERE $2 OR EXISTS(SELECT 1 FROM approval_delegation d WHERE d.id=h.resource_id AND d.reviewer_id=$1) OR EXISTS(SELECT 1 FROM role_grant r WHERE r.user_id=$1 AND r.role='organizer' AND r.game_id IS NULL AND r.event_id=coalesce(h.after_state->>'eventId',h.before_state->>'eventId')) ORDER BY h.created_at DESC`,
       [userId, admin],
     )
   ).rows;
-  return { isAdministrator: admin, delegations, users, history };
+  const organizations = (
+    await pool.query(
+      `SELECT o.id,o.name FROM organizing_organization o WHERE $2 OR EXISTS(SELECT 1 FROM approval_delegation d WHERE d.reviewer_id=$1 AND d.scope->'organizationIds' ? o.id) ORDER BY o.name,o.id`,
+      [userId, admin],
+    )
+  ).rows;
+  return { isAdministrator: admin, delegations, users, history, organizations };
 }
 export async function delegationCommand(userId: string, raw: unknown) {
   const input = raw as {
@@ -146,6 +152,7 @@ export async function delegationCommand(userId: string, raw: unknown) {
         typeof input.authorityName !== "string" ||
         !input.authorityName.trim() ||
         input.authorityName.length > 160 ||
+        /[\u0000-\u001f]/.test(input.authorityName) ||
         typeof input.reviewerId !== "string" ||
         !s ||
         ![
@@ -184,13 +191,14 @@ export async function delegationCommand(userId: string, raw: unknown) {
       if (before) {
         const same = (
           await c.query(
-            "SELECT authority_name=$2 AND reviewer_id=$3 AND scope=$4::jsonb AND created_by=$5 AS same FROM approval_delegation WHERE id=$1",
+            "SELECT authority_name=$2 AND reviewer_id=$3 AND scope=$4::jsonb AND created_by=$5 AND EXISTS(SELECT 1 FROM authority_history h WHERE h.resource_id=$1 AND h.kind='approval_grant' AND h.actor_id=$5 AND h.reason=$6) AS same FROM approval_delegation WHERE id=$1",
             [
               input.id,
               input.authorityName!.trim(),
               input.reviewerId,
               JSON.stringify(s),
               userId,
+              input.reason.trim(),
             ],
           )
         ).rows[0].same;

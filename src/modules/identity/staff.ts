@@ -39,7 +39,12 @@ export async function staffCommand(userId: string, raw: unknown) {
     reason?: string;
   };
   const action = input?.action ?? "grant",
-    reason = input?.reason?.trim() ?? "Event staff assignment";
+    reason =
+      input?.reason === undefined
+        ? "Event staff assignment"
+        : typeof input.reason === "string"
+          ? input.reason.trim()
+          : "";
   if (
     !input ||
     !["grant", "revoke"].includes(action) ||
@@ -58,7 +63,7 @@ export async function staffCommand(userId: string, raw: unknown) {
     ]);
     const before = (
       await c.query(
-        'SELECT id,user_id AS "userId",role,event_id AS "eventId",game_id AS "gameId" FROM role_grant WHERE id=$1',
+        'SELECT r.id,r.user_id AS "userId",u.name,r.role,r.event_id AS "eventId",r.game_id AS "gameId" FROM role_grant r JOIN auth_user u ON u.id=r.user_id WHERE r.id=$1',
         [input.id],
       )
     ).rows[0];
@@ -81,6 +86,8 @@ export async function staffCommand(userId: string, raw: unknown) {
       );
     if (action === "revoke") {
       if (!before) fail(404, "Assignment not found.");
+      if (before.role === "administrator")
+        fail(400, "This command manages event staff assignments.");
       await c.query("DELETE FROM role_grant WHERE id=$1", [input.id]);
       await recordAuthority(
         c,
@@ -130,6 +137,21 @@ export async function staffCommand(userId: string, raw: unknown) {
         )
           fail(409, "Request identifier already used for another grant.");
       } else {
+        await c.query("SELECT pg_advisory_xact_lock(hashtextextended($1,0))", [
+          `staff-scope:${input.userId}:${input.role}:${input.eventId}:${input.gameId ?? ""}`,
+        ]);
+        if (
+          (
+            await c.query(
+              "SELECT id FROM role_grant WHERE user_id=$1 AND role=$2 AND event_id=$3 AND game_id IS NOT DISTINCT FROM $4",
+              [input.userId, input.role, input.eventId, input.gameId],
+            )
+          ).rowCount
+        )
+          fail(
+            409,
+            "This account already has that assignment. Revoke the existing assignment before replacing it.",
+          );
         if (
           (
             await c.query(
@@ -155,6 +177,11 @@ export async function staffCommand(userId: string, raw: unknown) {
           null,
           {
             userId: input.userId,
+            name: (
+              await c.query("SELECT name FROM auth_user WHERE id=$1", [
+                input.userId,
+              ])
+            ).rows[0].name,
             role: input.role,
             eventId: input.eventId,
             gameId: input.gameId,

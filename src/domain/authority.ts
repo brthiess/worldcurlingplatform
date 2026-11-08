@@ -53,6 +53,17 @@ export function routeApproval(
         authorityName: "World Curling",
       };
 }
+export function approvalOverride(status: string, decision: string) {
+  if (
+    !["submitted", "approved", "rejected"].includes(status) ||
+    !["approve", "reject"].includes(decision)
+  )
+    throw new Error("This application cannot receive that override.");
+  return {
+    status: decision === "approve" ? "approved" : "rejected",
+    published: decision === "approve",
+  };
+}
 export function approvalActionPolicy(
   actor: {
     isAdministrator: boolean;

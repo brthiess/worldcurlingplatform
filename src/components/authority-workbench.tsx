@@ -1,8 +1,10 @@
 "use client";
 import { useEffect, useState } from "react";
 import type { ApprovalScope } from "@/domain/authority";
+import { disciplines } from "@/domain/applications";
 type Delegations = {
   isAdministrator: boolean;
+  organizations: { id: string; name: string }[];
   users: { id: string; name: string; isAdministrator: boolean }[];
   delegations: {
     id: string;
@@ -18,6 +20,18 @@ type Delegations = {
     actorName: string;
     createdAt: string;
     resourceId: string;
+    before: {
+      name?: string;
+      authority_name?: string;
+      eventId?: string;
+      gameId?: string;
+    } | null;
+    after: {
+      name?: string;
+      authority_name?: string;
+      eventId?: string;
+      gameId?: string;
+    } | null;
   }[];
 };
 type Staff = {
@@ -33,7 +47,7 @@ type Staff = {
 };
 const labels: Record<keyof ApprovalScope, string> = {
   countries: "Countries",
-  organizationIds: "Organizing organization identifiers",
+  organizationIds: "Organizing organizations",
   disciplines: "Disciplines",
   categories: "Event categories",
   includeEventIds: "Named included application identifiers",
@@ -111,7 +125,7 @@ export function AuthorityWorkbench() {
     }
   }
   return (
-    <main id="main" className="workspace">
+    <main id="main" className="workspace authority-workspace">
       <p className="eyebrow">Operations</p>
       <h1>Authority & event staff</h1>
       <p>
@@ -157,10 +171,13 @@ export function AuthorityWorkbench() {
                     for (const key of Object.keys(
                       scope,
                     ) as (keyof ApprovalScope)[])
-                      scope[key] = String(f.get(key) ?? "")
-                        .split(",")
-                        .map((x) => x.trim())
-                        .filter(Boolean);
+                      scope[key] =
+                        key === "organizationIds" || key === "disciplines"
+                          ? f.getAll(key).map(String)
+                          : String(f.get(key) ?? "")
+                              .split(",")
+                              .map((x) => x.trim())
+                              .filter(Boolean);
                     void save(
                       "/api/v1/approval-delegations",
                       {
@@ -193,18 +210,41 @@ export function AuthorityWorkbench() {
                       ))}
                     </select>
                     <p className="muted">
-                      Use comma-separated exact values. Empty countries,
-                      organizations, disciplines or categories allow all values
-                      in that dimension. Every division must match. Named
-                      inclusions bypass dimensions; named exclusions always
-                      deny. Supported disciplines: men_four, women_four,
-                      mixed_doubles. Default category: open.
+                      Select organizations and disciplines by name. Leave a
+                      selection empty to allow all. Countries, categories and
+                      named applications use comma-separated exact values; empty
+                      countries or categories allow all. Every division must
+                      match. Named inclusions bypass dimensions; named
+                      exclusions always deny. Copy a named application
+                      identifier from its details screen. Default category:
+                      open.
                     </p>
                     {(Object.keys(labels) as (keyof ApprovalScope)[]).map(
                       (key) => (
                         <div key={key}>
                           <label htmlFor={`scope-${key}`}>{labels[key]}</label>
-                          <input id={`scope-${key}`} name={key} />
+                          {key === "organizationIds" ||
+                          key === "disciplines" ? (
+                            <select
+                              multiple
+                              size={3}
+                              id={`scope-${key}`}
+                              name={key}
+                            >
+                              {(key === "organizationIds"
+                                ? data.organizations
+                                : Object.entries(disciplines).map(
+                                    ([id, name]) => ({ id, name }),
+                                  )
+                              ).map((option) => (
+                                <option key={option.id} value={option.id}>
+                                  {option.name}
+                                </option>
+                              ))}
+                            </select>
+                          ) : (
+                            <input id={`scope-${key}`} name={key} />
+                          )}
                         </div>
                       ),
                     )}
@@ -245,7 +285,19 @@ export function AuthorityWorkbench() {
                             <div key={key}>
                               <dt>{labels[key]}</dt>
                               <dd style={{ overflowWrap: "anywhere" }}>
-                                {d.scope[key].join(", ") ||
+                                {d.scope[key]
+                                  .map((value) =>
+                                    key === "organizationIds"
+                                      ? (data.organizations.find(
+                                          (o) => o.id === value,
+                                        )?.name ?? value)
+                                      : key === "disciplines"
+                                        ? (disciplines[
+                                            value as keyof typeof disciplines
+                                          ] ?? value)
+                                        : value,
+                                  )
+                                  .join(", ") ||
                                   (key === "includeEventIds" ||
                                   key === "excludeEventIds"
                                     ? "None"
@@ -443,7 +495,21 @@ export function AuthorityWorkbench() {
                 <ol className="history-list">
                   {data.history.map((h, i) => (
                     <li key={i}>
-                      <strong>{h.kind.replaceAll("_", " ")}</strong>
+                      <strong>
+                        {h.kind.replaceAll("_", " ")} ·{" "}
+                        {(h.after ?? h.before)?.authority_name ??
+                          (h.after ?? h.before)?.name ??
+                          "Recorded assignment"}
+                      </strong>
+                      {(h.after ?? h.before)?.eventId && (
+                        <p>
+                          {staff.events.find(
+                            (e) => e.id === (h.after ?? h.before)?.eventId,
+                          )?.name ?? "Assigned event"}{" "}
+                          ·{" "}
+                          {(h.after ?? h.before)?.gameId ?? "Event management"}
+                        </p>
+                      )}
                       <p>
                         {h.actorName} ·{" "}
                         {new Date(h.createdAt).toLocaleString("en-CA", {
@@ -513,7 +579,7 @@ export function ResponsibilityControls({
     }
   }
   return (
-    <details>
+    <details className="responsibility-controls">
       <summary>World Curling responsibility & override</summary>
       {error && (
         <p role="alert" className="error">
@@ -581,8 +647,8 @@ export function ResponsibilityControls({
             </button>
           </div>
           <p>
-            Overrides apply to submitted applications. All changes require a
-            reason and preserve the previous version in history.
+            Overrides apply to submitted or decided applications. All changes
+            require a reason and preserve the previous version in history.
           </p>
         </fieldset>
       )}

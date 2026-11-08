@@ -34,7 +34,10 @@ type Detail = Omit<ApplicationInput, "divisions"> &
       reason: string;
       actorName: string;
       createdAt: string;
-      snapshot: ApplicationInput;
+      snapshot: ApplicationInput & {
+        authorityName?: string;
+        reviewerName?: string;
+      };
     }[];
   };
 type Workspace = {
@@ -716,7 +719,21 @@ export function ApplicationsWorkbench() {
                             {detail.history.map((h) => (
                               <li key={h.version}>
                                 <strong>
-                                  Version {h.version} · {h.action}
+                                  Version {h.version} ·{" "}
+                                  {(
+                                    {
+                                      create: "Draft created",
+                                      edit: "Edition details saved",
+                                      submit: "Submitted for review",
+                                      approve: "Admitted",
+                                      reject: "Returned to organizer",
+                                      reassign: "Responsibility reassigned",
+                                      override_approve:
+                                        "World Curling override: admitted",
+                                      override_reject:
+                                        "World Curling override: returned",
+                                    } as Record<string, string>
+                                  )[h.action] ?? h.action}
                                 </strong>
                                 <p>
                                   {h.actorName} ·{" "}
@@ -739,6 +756,13 @@ export function ApplicationsWorkbench() {
                                     {h.snapshot.city}, {h.snapshot.country} ·{" "}
                                     {h.snapshot.venue || "Venue not confirmed"}
                                   </p>
+                                  {h.snapshot.authorityName && (
+                                    <p>
+                                      Responsible authority:{" "}
+                                      {h.snapshot.authorityName} ·{" "}
+                                      {h.snapshot.reviewerName}
+                                    </p>
+                                  )}
                                   <ul>
                                     {h.snapshot.divisions.map((d) => (
                                       <li key={d.id}>
