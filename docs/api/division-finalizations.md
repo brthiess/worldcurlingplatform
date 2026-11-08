@@ -15,6 +15,8 @@ Identical current-actor/request deliveries replay their recorded version/digest;
 
 ## Separate ranking evidence
 
+The accepted scheduling integration uses a common lock order: finalization takes edition `SHARE`, current entry rows `SHARE`, then division `UPDATE`, draw sessions and games. Scheduling takes edition `UPDATE` first. A real barrier test queues scheduling behind a game, queues finalization behind its edition, then releases the game: scheduling commits and the older finalization review returns409 without a partial snapshot. Entry writers must take compatible edition authority before their entry and division locks; cross-module races involving the later representative-entry workflow will be verified when that slice is accepted.
+
 Sporting finalization grants no eligibility waiver or ranking approval. Organizer review returns only division-scoped issue summaries: division eligibility, provisional lineup/identity, missing season reference, or missing/incomplete/stale World Curling starting-input review. A complete draft remains unreviewed; consumption requires accepted032 `state='reviewed'` plus current completeness. No private global entitlements, exact allocations, individual starting values, source records or staff rationale are included. Even zero scoped issues would not establish event assessment or ranking-publication approval. No calculation, publication, job or transitive historical reassessment is implemented here.
 
 ## Public history and digest contract

@@ -4,7 +4,10 @@ import assert from "node:assert/strict";
 import { randomUUID, createHash } from "node:crypto";
 import pg from "pg";
 import { authRequest } from "./auth-request";
-import { finalizationFixtureEvent } from "./finalization-fixture";
+import {
+  finalizationFixtureEvent,
+  clearFinalizationScoringGrants,
+} from "./finalization-fixture";
 import {
   rulesFixture,
   source as rankingSource,
@@ -13,7 +16,10 @@ const pool = new pg.Pool({
   connectionString: process.env.DATABASE_URL,
   max: 3,
 });
-after(() => pool.end());
+after(async () => {
+  await clearFinalizationScoringGrants(pool);
+  await pool.end();
+});
 const base = process.env.BETTER_AUTH_URL!;
 const sessions = new Map<string, string>();
 async function login(role: string) {
@@ -637,4 +643,80 @@ test("scheduled games and legacy totals cannot be passed off as completed explic
   );
   assert.equal(publicR.status, 200);
   assert.equal((await publicR.json()).selected, null);
+});
+test("accepted schedule edits and finalization serialize without a partial or mixed-source snapshot", async () => {
+  const cookie = await login("organizer"),
+    f = await fixture(cookie),
+    eventId = await finalizationFixtureEvent(pool);
+  const reviewed = await (
+    await request(
+      `/api/v1/division-finalizations?division=${f.divisionId}`,
+      cookie,
+    )
+  ).json();
+  const schedule = await request(`/api/v1/events/${eventId}/schedule`, cookie);
+  assert.equal(schedule.status, 200);
+  const current = await schedule.json(),
+    blocker = await pool.connect();
+  let scheduling!: Promise<Response>, finalizing!: Promise<Response>;
+  async function blockedBy(pid: number) {
+    for (let attempt = 0; attempt < 100; attempt++) {
+      const r = await pool.query(
+        "SELECT pid FROM pg_stat_activity WHERE datname=current_database() AND $1=ANY(pg_blocking_pids(pid))",
+        [pid],
+      );
+      if (r.rowCount) return r.rows[0].pid as number;
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
+    throw new Error("The real API did not reach its queued source lock.");
+  }
+  try {
+    await blocker.query("BEGIN");
+    await blocker.query("SELECT id FROM game WHERE id=$1 FOR UPDATE", [
+      f.gameId,
+    ]);
+    const pid = (await blocker.query("SELECT pg_backend_pid() AS pid")).rows[0]
+      .pid;
+    scheduling = request(`/api/v1/events/${eventId}/schedule`, cookie, {
+      requestId: randomUUID(),
+      expectedVersion: current.version,
+      reason: "Concurrent new draw changes reviewed division context",
+      action: "session",
+      session: {
+        id: randomUUID(),
+        divisionId: f.divisionId,
+        number: 2,
+        localStart: "2041-01-01T18:00",
+        utcOffset: "+00:00",
+        durationMinutes: 120,
+      },
+    });
+    const schedulePid = await blockedBy(pid);
+    finalizing = request("/api/v1/division-finalizations", cookie, {
+      divisionId: f.divisionId,
+      version: 0,
+      sourceDigest: reviewed.sourceDigest,
+      requestId: randomUUID(),
+      placements: f.entries.map((entryId, i) => ({ entryId, place: i + 1 })),
+      note: "Review before queued schedule edit",
+      rulesReference: "Event rules edition 1",
+    });
+    await blockedBy(schedulePid);
+  } finally {
+    await blocker.query("ROLLBACK");
+    blocker.release();
+  }
+  const [scheduled, finalized] = await Promise.all([scheduling, finalizing]);
+  assert.equal(scheduled.status, 200, await scheduled.clone().text());
+  assert.equal(finalized.status, 409, await finalized.clone().text());
+  const after = await (
+    await request(
+      `/api/v1/division-finalizations?division=${f.divisionId}`,
+      cookie,
+    )
+  ).json();
+  assert.equal(after.version, 0);
+  assert.equal(after.selected, null);
+  assert.equal(after.source.draws.length, 2);
+  assert.notEqual(after.sourceDigest, reviewed.sourceDigest);
 });

@@ -268,6 +268,11 @@ export async function saveFinalization(userId: string, raw: unknown) {
         input.divisionId,
       ])
     ).rows[0];
+    // Accepted scheduling writes take the edition first. Acquire it before
+    // entry/division/draw locks so a queued new session cannot form a FK cycle.
+    await c.query("SELECT id FROM event_edition WHERE id=$1 FOR SHARE", [
+      event?.event_id ?? null,
+    ]);
     await authorize(c, userId, event?.event_id ?? "unavailable");
     const command = {
       divisionId: input.divisionId,

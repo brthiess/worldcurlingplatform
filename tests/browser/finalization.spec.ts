@@ -4,7 +4,10 @@ import pg from "pg";
 import { randomUUID } from "node:crypto";
 import "dotenv/config";
 import { signInApiWithRateWindow } from "./auth-fixture";
-import { finalizationFixtureEvent } from "../finalization-fixture";
+import {
+  finalizationFixtureEvent,
+  clearFinalizationScoringGrants,
+} from "../finalization-fixture";
 const pool = new pg.Pool({
   connectionString: process.env.DATABASE_URL,
   max: 3,
@@ -29,6 +32,7 @@ test.beforeAll(async ({ browser }) => {
     ).toBe(200);
 });
 test.afterAll(async () => {
+  await clearFinalizationScoringGrants(pool);
   await organizer.close();
   await scorer.close();
   await pool.end();
@@ -201,6 +205,10 @@ test("organizer reviews, finalizes and replaces changed results on a phone with 
     }),
   ).toBeVisible();
   await page.setViewportSize({ width: 360, height: 800 });
+  await page.getByText("Frozen event lineups", { exact: true }).click();
+  await expect(
+    page.getByRole("link", { name: "Final player 1", exact: true }).first(),
+  ).toBeVisible();
   await page.screenshot({
     path: info.outputPath("phone-public-original.png"),
     fullPage: true,

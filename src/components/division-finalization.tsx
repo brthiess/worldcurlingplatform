@@ -116,15 +116,46 @@ function Snapshot({ revision }: { revision: Revision }) {
         {f.placements.map((p) => (
           <li key={p.entryId}>
             <strong>Place {p.place}</strong>{" "}
-            <a
-              href={`/entries/${p.entryId}?version=${f.source.entries.find((e) => e.id === p.entryId)?.version ?? 0}`}
-            >
+            <a href={`/entries/${p.entryId}`}>
               {f.source.entries.find((e) => e.id === p.entryId)?.name ??
                 p.entryId}
             </a>
           </li>
         ))}
       </ol>
+      <p className="muted">
+        Entry links open current details. The frozen event lineups below belong
+        to this revision.
+      </p>
+      <details>
+        <summary>Frozen event lineups</summary>
+        {f.source.entries.map((entry) => (
+          <section key={entry.id}>
+            <h3>
+              {entry.name} · entry version {entry.version}
+            </h3>
+            <p>
+              Event lineup{" "}
+              {entry.lineup
+                ? `version ${entry.lineup.version} · ${entry.lineup.status}`
+                : "not recorded"}
+              . Declared/defaulted evidence does not certify stone delivery.
+            </p>
+            {entry.lineup?.members.length ? (
+              <ul>
+                {entry.lineup.members.map((m) => (
+                  <li key={m.playerId}>
+                    <a href={`/players/${m.playerId}`}>{m.name}</a> ·{" "}
+                    {m.participation}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p>No event lineup members were recorded.</p>
+            )}
+          </section>
+        ))}
+      </details>
       <p>
         <strong>Competition rules:</strong> {f.rulesReference}
       </p>

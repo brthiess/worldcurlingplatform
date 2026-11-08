@@ -126,7 +126,8 @@ export default function Admin() {
           </p>
           <p>
             <a href="/admin/finalizations">Finalize division results</a>
-
+          </p>
+          <p>
             <a href="/admin/schedule">Draw scheduling</a>
           </p>
           <p>

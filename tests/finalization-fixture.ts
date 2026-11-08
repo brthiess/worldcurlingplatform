@@ -16,3 +16,8 @@ export async function finalizationFixtureEvent(pool: Pool) {
   );
   return id;
 }
+export async function clearFinalizationScoringGrants(pool: Pool) {
+  await pool.query(
+    "DELETE FROM role_grant r USING game g,draw_session ds,division d WHERE r.game_id=g.id AND g.draw_id=ds.id AND ds.division_id=d.id AND d.event_id='finalization-test-2041' AND r.user_id='demo-scorekeeper' AND r.role='scorekeeper'",
+  );
+}
