@@ -7,6 +7,7 @@ type Player = {
   identityStatus: string;
   biography: string;
   handedness: string | null;
+  photoUrl: string | null;
 };
 export function PlayerView({ id }: { id?: string }) {
   const [data, setData] = useState<Player[] | null>(null),
@@ -67,6 +68,15 @@ export function PlayerView({ id }: { id?: string }) {
             )}
             {id && (
               <>
+                {p.photoUrl ? (
+                  <img
+                    className="player-photo"
+                    src={p.photoUrl}
+                    alt={"Approved photo of " + p.name}
+                  />
+                ) : (
+                  <p className="muted">No approved photo.</p>
+                )}
                 <h2>Biography</h2>
                 <p className="player-biography">
                   {p.biography || "No biography provided."}

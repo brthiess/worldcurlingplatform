@@ -4,7 +4,7 @@ number: 13
 title: "Review private photo submissions and publish approved images"
 parent: WCP-SPEC-001
 type: implementation
-status: in-progress
+status: completed
 labels: [ready-for-agent]
 blocked_by: [WCP-012]
 source_spec_sha256: 045B46988225B6C8C0020B23C8C5D4EAA8E2E1916256148A0FDA26B5DA8673FD
@@ -18,7 +18,7 @@ published: 2026-11-07
 
 **Blocked by:** [12: Create accounts, approve player claims and edit profiles](12-create-accounts-approve-player-claims-and-edit-profiles.md).
 
-**Status:** in-progress
+**Status:** completed
 
 ## Parent and scope
 
@@ -30,13 +30,13 @@ published: 2026-11-07
 
 ## Acceptance criteria
 
-- [ ] Keep pending/rejected media private and leave the previous approved image visible until approval.
-- [ ] Validate and process uploads into durable storage; bind approval to immutable reviewed content rather than a replaceable upload key.
-- [ ] Retain approval/rejection actor, time and reason; do not expose upload credentials or private originals through public APIs.
-- [ ] **Unit testing:** Test media type/size/input validation, request transitions, asset binding and public/private projection policy.
-- [ ] **Database/API verification:** Exercise upload, rejection and approval with controlled storage adapters and real PostgreSQL; prove a pending asset is inaccessible through public paths and cannot be swapped after review.
-- [ ] **Frontend quality:** Provide usable upload/progress/preview/status controls and reviewer comparison, with clear rejection feedback and correct public image replacement at mobile and desktop sizes.
-- [ ] Record actual verification commands/results and relevant browser/screenshots or API evidence. Report meaningful uncovered branches or limitations; do not claim checks that were not run.
+- [x] Keep pending/rejected media private and leave the previous approved image visible until approval.
+- [x] Validate and process uploads into durable storage; bind approval to immutable reviewed content rather than a replaceable upload key.
+- [x] Retain approval/rejection actor, time and reason; do not expose upload credentials or private originals through public APIs.
+- [x] **Unit testing:** Test media type/size/input validation, request transitions, asset binding and public/private projection policy.
+- [x] **Database/API verification:** Exercise upload, rejection and approval with controlled storage adapters and real PostgreSQL; prove a pending asset is inaccessible through public paths and cannot be swapped after review.
+- [x] **Frontend quality:** Provide usable upload/progress/preview/status controls and reviewer comparison, with clear rejection feedback and correct public image replacement at mobile and desktop sizes.
+- [x] Record actual verification commands/results and relevant browser/screenshots or API evidence. Report meaningful uncovered branches or limitations; do not claim checks that were not run.
 
 ## Slice boundary
 

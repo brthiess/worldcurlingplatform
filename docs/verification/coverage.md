@@ -9,7 +9,7 @@ Execution began 2026-11-08. This file describes the bounded acceptance inventory
 | Event admission (D-02) | Dated editions/divisions, responsible approver, explicit delegation; registration/ranking separate | 004,005,046 | Edition/application locally verified (004); delegation pending |
 | Mobile scoring (D-03) | Assigned scorekeeper starts/scores/confirms/corrects; stale/idempotent commands and honest save status | 002,003,026,046 | Live scoring locally verified (002); confirmation/lineups and mixed doubles pending |
 | Entry/payment (D-04) | Existing/assembled/provisional lineups, team-season authority, holds/withdrawal, sandbox checkout/refunds | 006–011,028,029,046 | Planned |
-| Profile/media (D-05) | Staff-approved claims; biography/handedness; reviewed immutable private photo replacement | 012,013,047 | Accounts/claims locally verified (012); photo work pending |
+| Profile/media (D-05) | Staff-approved claims; biography/handedness; reviewed immutable private photo replacement | 012,013,047 | Accounts/claims/photos locally verified (012,013); hosted demonstration pending |
 | Ranking review (D-06) | Sourced history and complete 2026-27 drafts, contribution/replay evidence and explicit publication gates | 014–016,032–039,047 | Planned |
 | Finalization/revision (D-07) | Frozen result snapshots, direct replacement ranking publication, retained originals | 027,038,039,047 | Planned |
 | Partner companion | Scoped feed score/confirm/correct; denied unrelated command; sequential active-source switch | 030,031,047 | Planned |

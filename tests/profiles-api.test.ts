@@ -1,7 +1,12 @@
+import { authRequest } from "./auth-request";
 import "dotenv/config";
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { pool } from "../src/db";
+import pg from "pg";
+const pool = new pg.Pool({
+  connectionString: process.env.DATABASE_URL,
+  max: 2,
+});
 import { hashPassword } from "better-auth/crypto";
 const base = process.env.BETTER_AUTH_URL!;
 async function call(path: string, body?: unknown, cookie = "") {
@@ -14,17 +19,14 @@ async function call(path: string, body?: unknown, cookie = "") {
 const sessions = new Map<string, string>();
 async function login(role: string): Promise<string> {
   if (sessions.has(role)) return sessions.get(role)!;
-  let r = await call("/api/auth/sign-in/email", {
-    email: role + "@demo.invalid",
-    password: process.env.DEMO_PASSWORD,
-  });
-  if (r.status === 429) {
-    await new Promise((resolve) => setTimeout(resolve, 61000));
-    r = await call("/api/auth/sign-in/email", {
+  const r = await authRequest(base + "/api/auth/sign-in/email", {
+    method: "POST",
+    headers: { Origin: base, "Content-Type": "application/json" },
+    body: JSON.stringify({
       email: role + "@demo.invalid",
       password: process.env.DEMO_PASSWORD,
-    });
-  }
+    }),
+  });
   assert.equal(r.status, 200);
   const cookie = r.headers
     .getSetCookie()
@@ -66,6 +68,7 @@ test("public players are independent of accounts; approved claims permit only th
     "identityStatus",
     "name",
     "origin",
+    "photoUrl",
   ]);
   assert.equal(publicPlayer.identityStatus, "identified");
   const cookie = fixtureData.cookie,
