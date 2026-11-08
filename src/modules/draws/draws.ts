@@ -35,7 +35,7 @@ async function scope(
   divisionId: string,
   write = false,
 ) {
-  const division = (
+  let division = (
     await c.query(
       'SELECT d.id,d.name,d.event_id AS "eventId",d.discipline,e.name AS "eventName" FROM division d JOIN event_edition e ON e.id=d.event_id WHERE d.id=$1',
       [divisionId],
@@ -43,10 +43,23 @@ async function scope(
   ).rows[0];
   if (!division) throw new DrawError("Division not found.", 404);
   // Event first, then division, games and entries: shares scheduling/scoring lock order.
-  if (write)
+  if (write) {
     await c.query("SELECT id FROM event_edition WHERE id=$1 FOR UPDATE", [
       division.eventId,
     ]);
+    const current = (
+      await c.query(
+        'SELECT d.id,d.name,d.event_id AS "eventId",d.discipline,e.name AS "eventName" FROM division d JOIN event_edition e ON e.id=d.event_id WHERE d.id=$1 FOR UPDATE OF d',
+        [divisionId],
+      )
+    ).rows[0];
+    if (!current || current.eventId !== division.eventId)
+      throw new DrawError(
+        "Division edition changed. Reload the current division before applying this command.",
+        409,
+      );
+    division = current;
+  }
   const grants = await c.query(
     "SELECT id FROM role_grant WHERE user_id=$1 AND ((role='administrator' AND event_id IS NULL AND game_id IS NULL) OR (role='organizer' AND event_id=$2 AND game_id IS NULL)) FOR SHARE",
     [userId, division.eventId],
@@ -56,10 +69,6 @@ async function scope(
       "Organizer authority for this edition is required.",
       403,
     );
-  if (write)
-    await c.query("SELECT id FROM division WHERE id=$1 FOR UPDATE", [
-      divisionId,
-    ]);
   return division;
 }
 async function state(c: PoolClient, id: string): Promise<DrawState> {
@@ -100,7 +109,7 @@ export async function drawWorkspace(userId: string, id: string) {
       )
     ).rows;
     await c.query("COMMIT");
-    return { ...data, division, entries, history };
+    return { ...data, actorId: userId, division, entries, history };
   } catch (e) {
     await c.query("ROLLBACK");
     throw e;
@@ -386,7 +395,43 @@ export async function publicDraw(id: string) {
       )
     ).rows;
     await c.query("COMMIT");
-    return { ...current, division: row, games, history };
+    const source = (s: DrawSource): DrawSource =>
+      "seed" in s ? { seed: s.seed } : { winner: s.winner };
+    const graph = current.graph
+      ? {
+          template: current.graph.template,
+          games: current.graph.games.map((g) => ({
+            id: g.id,
+            key: g.key,
+            round: g.round,
+            a: source(g.a),
+            b: source(g.b),
+          })),
+          byes: current.graph.byes.map((b) => ({
+            seed: b.seed,
+            omittedGame: b.omittedGame,
+            destination: b.destination,
+            side: b.side,
+          })),
+        }
+      : null;
+    return {
+      divisionId: current.divisionId,
+      version: current.version,
+      state: current.state,
+      template: current.template,
+      templateVersion: current.templateVersion,
+      seeds: current.seeds.map((s) => ({
+        seed: s.seed,
+        entryId: s.entryId,
+        version: s.version,
+        name: s.name,
+      })),
+      graph,
+      division: row,
+      games,
+      history,
+    };
   } catch (e) {
     await c.query("ROLLBACK");
     throw e;

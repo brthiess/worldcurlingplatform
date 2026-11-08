@@ -1211,6 +1211,9 @@ footer {
 }
 /* Competition routes use actual game records; the mobile list avoids a wide bracket. */
 .draw-controls { display:flex; align-items:end; gap:1rem; flex-wrap:wrap; margin:1rem 0; }
+.draw-workspace fieldset { min-width:0; }
+.draw-workspace select,.draw-controls select { width:100%; max-width:100%; }
+.draw-workspace > p { overflow-wrap:anywhere; }
 .draw-controls > div { min-width:0; }
 .draw-controls [role="group"] { display:flex; gap:.5rem; flex-wrap:wrap; }
 .draw-graph { overflow-x:auto; max-width:100%; margin:1.5rem 0; padding:.25rem; }

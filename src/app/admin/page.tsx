@@ -177,7 +177,7 @@ export default function Admin() {
               {workspace.games.map((game) => (
                 <li key={game.id}>
                   <p className="eyebrow">
-                    {game.eventName} · Sheet {game.sheet}
+                    {game.eventName} · {game.sheet?`Sheet ${game.sheet}`:'Sheet not assigned'}
                   </p>
                   <h3>
                     {game.nameA} vs {game.nameB}

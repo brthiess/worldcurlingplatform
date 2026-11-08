@@ -1,11 +1,19 @@
 import "dotenv/config";
-import { test, after } from "node:test";
+import { test, after, before } from "node:test";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import pg from "pg";
 import { authRequest } from "./auth-request";
+import { drawFixtureEvent } from "./draws-fixture";
 const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
-after(() => pool.end());
+let event: Awaited<ReturnType<typeof drawFixtureEvent>>;
+before(async () => {
+  event = await drawFixtureEvent(pool);
+});
+after(async () => {
+  if (event) await event.cleanup();
+  await pool.end();
+});
 const base = process.env.BETTER_AUTH_URL!;
 async function login(role = "organizer") {
   const r = await authRequest(base + "/api/auth/sign-in/email", {
@@ -22,12 +30,23 @@ async function login(role = "organizer") {
     .map((c) => c.split(";")[0])
     .join("; ");
 }
+async function waitForEditionBarrier() {
+  const deadline = Date.now() + 8000;
+  while (Date.now() < deadline) {
+    const blocked = await pool.query(
+      "SELECT pid FROM pg_stat_activity WHERE datname=current_database() AND wait_event_type='Lock' AND (query LIKE '%FROM event_edition WHERE id=$1 FOR UPDATE%' OR query LIKE '%FOR UPDATE OF e%')",
+    );
+    if (blocked.rowCount) return;
+    await new Promise((r) => setTimeout(r, 40));
+  }
+  assert.fail("Expected the HTTP writer to wait on its edition barrier");
+}
 test("organizer persists a private seeded preview, publishes the reviewed version and exposes only public graph data", async () => {
   const id = "knockout-" + randomUUID(),
     cookie = await login();
   await pool.query(
-    "INSERT INTO division(id,event_id,name,discipline,format) VALUES($1,'prairie-2026','Single knockout API','men_four','single knockout')",
-    [id],
+    "INSERT INTO division(id,event_id,name,discipline,format) VALUES($1,$2,'Single knockout API','men_four','single knockout')",
+    [id, event.id],
   );
   const seeds: string[] = [];
   for (let n = 1; n <= 6; n++) {
@@ -56,7 +75,27 @@ test("organizer persists a private seeded preview, publishes the reviewed versio
     seedEntryIds: seeds,
     reason: "Review independent six-entry fixture",
   };
-  const r = await request(preview);
+  const barrier = await pool.connect();
+  await barrier.query("BEGIN");
+  await barrier.query("SELECT id FROM event_edition WHERE id=$1 FOR UPDATE", [
+    event.id,
+  ]);
+  const pendingPreview = request(preview);
+  try {
+    await waitForEditionBarrier();
+    // A waiting graph writer must not own lower division/entry locks.
+    await pool.query("SELECT id FROM division WHERE id=$1 FOR UPDATE NOWAIT", [
+      id,
+    ]);
+    await pool.query(
+      "SELECT id FROM event_entry WHERE id=$1 FOR UPDATE NOWAIT",
+      [seeds[0]],
+    );
+  } finally {
+    await barrier.query("COMMIT");
+    barrier.release();
+  }
+  const r = await pendingPreview;
   assert.equal(r.status, 200, await r.clone().text());
   const data = await r.json();
   assert.equal(data.state, "preview");
@@ -123,23 +162,93 @@ test("organizer persists a private seeded preview, publishes the reviewed versio
     /actorId|requestId|command|demo-organizer/,
   );
   const q2 = publicData.games.find((g: any) => g.key === "Q2");
+  const scheduleUrl = base + "/api/v1/events/" + event.id + "/schedule";
+  const initialSchedule = await (
+    await fetch(scheduleUrl, { headers: { cookie } })
+  ).json();
+  assert.equal(
+    initialSchedule.games.find((g: any) => g.id === q2.id).divisionId,
+    id,
+  );
+  const drawId = randomUUID();
+  const sessionResponse = await fetch(scheduleUrl, {
+    method: "POST",
+    headers: { cookie, Origin: base, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      requestId: randomUUID(),
+      expectedVersion: initialSchedule.version,
+      reason: "Schedule actual published game",
+      action: "session",
+      session: {
+        id: drawId,
+        divisionId: id,
+        number: 1,
+        localStart: "2026-11-09T09:00",
+        utcOffset: "-06:00",
+        durationMinutes: 120,
+      },
+    }),
+  });
+  assert.equal(
+    sessionResponse.status,
+    200,
+    await sessionResponse.clone().text(),
+  );
+  const sessionData = await sessionResponse.json();
+  const assignmentResponse = await fetch(scheduleUrl, {
+    method: "POST",
+    headers: { cookie, Origin: base, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      requestId: randomUUID(),
+      expectedVersion: sessionData.version,
+      reason: "Assign published quarterfinal to known session",
+      action: "assign",
+      gameId: q2.id,
+      drawId,
+      sheet: "A",
+    }),
+  });
+  assert.equal(
+    assignmentResponse.status,
+    200,
+    await assignmentResponse.clone().text(),
+  );
+  const scheduled = await (
+    await fetch(base + "/api/v1/public/divisions/" + id + "/draw")
+  ).json();
+  assert.equal(scheduled.games.find((g: any) => g.key === "Q2").drawId, drawId);
+  assert.equal(
+    scheduled.games.find((g: any) => g.key === "Q2").startsAt,
+    "2026-11-09T15:00:00.000Z",
+  );
   const score = async (gameId: string, body: object) =>
     fetch(base + "/api/v1/games/" + gameId + "/scoring", {
       method: "POST",
       headers: { cookie, Origin: base, "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
-  assert.equal(
-    (
-      await score(q2.id, {
-        requestId: randomUUID(),
-        expectedVersion: 0,
-        action: "start",
-        hammer: null,
-      })
-    ).status,
-    200,
+  const scoreBarrier = await pool.connect();
+  await scoreBarrier.query("BEGIN");
+  await scoreBarrier.query(
+    "SELECT id FROM event_edition WHERE id=$1 FOR UPDATE",
+    [event.id],
   );
+  const pendingStart = score(q2.id, {
+    requestId: randomUUID(),
+    expectedVersion: 0,
+    action: "start",
+    hammer: null,
+  });
+  try {
+    await waitForEditionBarrier();
+    await pool.query("SELECT id FROM game WHERE id=$1 FOR UPDATE NOWAIT", [
+      q2.id,
+    ]);
+  } finally {
+    await scoreBarrier.query("COMMIT");
+    scoreBarrier.release();
+  }
+  assert.equal((await pendingStart).status, 200);
   assert.equal(
     (
       await score(q2.id, {
@@ -321,9 +430,12 @@ test("organizer persists a private seeded preview, publishes the reviewed versio
     (await publicGame.json()).games[0].results[0].result.entryB,
     seeds[3],
   );
-  const schedule = await fetch(base + "/api/v1/events/prairie-2026/schedule", {
-    headers: { cookie },
-  });
+  const schedule = await fetch(
+    base + "/api/v1/events/" + event.id + "/schedule",
+    {
+      headers: { cookie },
+    },
+  );
   assert.equal(schedule.status, 200);
   assert.ok(
     (await schedule.json()).games.some(
@@ -336,8 +448,8 @@ test("invalid fields, cross-scope seeds and stale entry previews cannot publish;
   const cookie = await login(),
     id = "full-" + randomUUID();
   await pool.query(
-    "INSERT INTO division(id,event_id,name,discipline,format) VALUES($1,'prairie-2026','Eight-entry API','men_four','single knockout')",
-    [id],
+    "INSERT INTO division(id,event_id,name,discipline,format) VALUES($1,$2,'Eight-entry API','men_four','single knockout')",
+    [id, event.id],
   );
   const seeds: string[] = [];
   for (let n = 1; n <= 8; n++) {
@@ -461,5 +573,160 @@ test("invalid fields, cross-scope seeds and stale entry previews cannot publish;
   await assert.rejects(
     pool.query("UPDATE game SET entry_a=$2 WHERE id=$1", [s1.id, "entry-1"]),
     /division/,
+  );
+});
+
+test("actor-bound commands and current scoring grants protect unscheduled published games", async () => {
+  const cookie = await login(),
+    id = "scope-" + randomUUID(),
+    seeds: string[] = [];
+  await pool.query(
+    "INSERT INTO division(id,event_id,name,discipline,format) VALUES($1,$2,'Scoped knockout','men_four','single knockout')",
+    [id, event.id],
+  );
+  for (let n = 1; n <= 6; n++) {
+    const en = id + "-" + n;
+    seeds.push(en);
+    await pool.query(
+      "INSERT INTO event_entry(id,division_id,display_name) VALUES($1,$2,$3)",
+      [en, id, "Scope team " + n],
+    );
+  }
+  const url = base + "/api/v1/divisions/" + id + "/draw",
+    preview = {
+      requestId: randomUUID(),
+      expectedVersion: 0,
+      action: "preview",
+      seedEntryIds: seeds,
+      reason: "Scoped profile",
+    };
+  const headers = { cookie, Origin: base, "Content-Type": "application/json" };
+  assert.equal(
+    (
+      await fetch(url, {
+        method: "POST",
+        headers: { ...headers, "X-WCP-Actor": "demo-administrator" },
+        body: JSON.stringify(preview),
+      })
+    ).status,
+    403,
+  );
+  assert.equal(
+    (
+      await fetch(url, {
+        method: "POST",
+        headers: { ...headers, "X-WCP-Actor": "demo-organizer" },
+        body: JSON.stringify(preview),
+      })
+    ).status,
+    200,
+  );
+  const publish = {
+    requestId: randomUUID(),
+    expectedVersion: 1,
+    action: "publish",
+    reason: "Publish scoped profile",
+  };
+  const published = await (
+    await fetch(url, { method: "POST", headers, body: JSON.stringify(publish) })
+  ).json();
+  const q2 = published.graph.games.find((g: any) => g.key === "Q2"),
+    grant = randomUUID();
+  await pool.query(
+    "INSERT INTO role_grant(id,user_id,role,event_id,game_id) VALUES($1,'demo-scorekeeper','scorekeeper',$2,$3)",
+    [grant, event.id, q2.id],
+  );
+  const volunteer = await login("scorekeeper"),
+    scoring = base + "/api/v1/games/" + q2.id + "/scoring";
+  try {
+    const read = await fetch(scoring, { headers: { cookie: volunteer } });
+    assert.equal(read.status, 200);
+    const game = await read.json();
+    assert.equal(game.drawNumber, null);
+    assert.equal(game.sheet, "");
+    assert.equal(game.entryA, seeds[3]);
+    const start = {
+      requestId: randomUUID(),
+      expectedVersion: 0,
+      action: "start",
+      hammer: null,
+    };
+    assert.equal(
+      (
+        await fetch(scoring, {
+          method: "POST",
+          headers: { ...headers, cookie: volunteer },
+          body: JSON.stringify(start),
+        })
+      ).status,
+      200,
+    );
+    await pool.query("DELETE FROM role_grant WHERE id=$1", [grant]);
+    assert.equal(
+      (
+        await fetch(scoring, {
+          method: "POST",
+          headers: { ...headers, cookie: volunteer },
+          body: JSON.stringify(start),
+        })
+      ).status,
+      403,
+    );
+  } finally {
+    await pool.query("DELETE FROM role_grant WHERE id=$1", [grant]);
+  }
+});
+
+test("queued graph writer rechecks the division association after acquiring edition and division locks", async () => {
+  const cookie = await login(),
+    id = "association-" + randomUUID(),
+    seeds: string[] = [];
+  await pool.query(
+    "INSERT INTO division(id,event_id,name,discipline,format) VALUES($1,$2,'Queued scope fixture','men_four','single knockout')",
+    [id, event.id],
+  );
+  for (let n = 1; n <= 6; n++) {
+    const en = id + "-" + n;
+    seeds.push(en);
+    await pool.query(
+      "INSERT INTO event_entry(id,division_id,display_name) VALUES($1,$2,$3)",
+      [en, id, "Queued team " + n],
+    );
+  }
+  const c = await pool.connect();
+  await c.query("BEGIN");
+  await c.query("SELECT id FROM event_edition WHERE id=$1 FOR UPDATE", [
+    event.id,
+  ]);
+  const pending = fetch(base + "/api/v1/divisions/" + id + "/draw", {
+    method: "POST",
+    headers: { cookie, Origin: base, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      requestId: randomUUID(),
+      expectedVersion: 0,
+      action: "preview",
+      seedEntryIds: seeds,
+      reason: "Queued original edition",
+    }),
+  });
+  try {
+    await waitForEditionBarrier();
+    await c.query("UPDATE division SET event_id='other-2026' WHERE id=$1", [
+      id,
+    ]);
+  } finally {
+    await c.query("COMMIT");
+    c.release();
+  }
+  const rejected = await pending;
+  assert.equal(rejected.status, 409, await rejected.clone().text());
+  assert.equal(
+    (
+      await pool.query(
+        "SELECT count(*)::integer AS n FROM draw_revision WHERE division_id=$1",
+        [id],
+      )
+    ).rows[0].n,
+    0,
   );
 });

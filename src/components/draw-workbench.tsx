@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { drawWorkspace } from "@/modules/draws/draws";
 import { DrawPanel } from "./draw-panel";
+import type { RetainedAuthorityCommand } from "./authority-command";
 type Data = Awaited<ReturnType<typeof drawWorkspace>>;
 type Choice = { id: string; name: string; eventId: string; eventName: string };
 export function DrawWorkbench() {
@@ -16,7 +17,7 @@ export function DrawWorkbench() {
     [status, setStatus] = useState(""),
     [loading, setLoading] = useState(true),
     [busy, setBusy] = useState(false),
-    [pending, setPending] = useState<unknown>(null),
+    [pending, setPending] = useState<RetainedAuthorityCommand | null>(null),
     [stale, setStale] = useState(false);
   async function load(id: string) {
     const current = ++sequence.current;
@@ -31,7 +32,22 @@ export function DrawWorkbench() {
       if (!r.ok) throw new Error(next.error);
       setData(next);
       setStale(false);
-      setPending(null);
+      const raw = sessionStorage.getItem(
+        `wcp.draw-command.${next.actorId}.${id}`,
+      );
+      if (raw) {
+        const saved = JSON.parse(raw) as RetainedAuthorityCommand;
+        if (
+          saved.actorId !== next.actorId ||
+          saved.path !== `/api/v1/divisions/${encodeURIComponent(id)}/draw` ||
+          typeof saved.body !== "string" ||
+          typeof JSON.parse(saved.body)?.requestId !== "string"
+        )
+          throw new Error(
+            "Retained command could not be read. Editing stays locked until this tab’s recovery data is reviewed.",
+          );
+        setPending(saved);
+      } else setPending(null);
       setError("");
       setCount(next.seeds.length || 6);
       setSeeds(
@@ -83,38 +99,62 @@ export function DrawWorkbench() {
       sequence.current++;
     };
   }, []);
-  async function save(command: unknown) {
+  async function save(command: unknown, retained?: RetainedAuthorityCommand) {
+    if (!data || busy || (pending && !retained)) return;
+    const saved = retained ?? {
+      actorId: data.actorId,
+      path: `/api/v1/divisions/${encodeURIComponent(divisionId)}/draw`,
+      body: JSON.stringify(command),
+      message: "Draw revision",
+      acknowledged: false,
+    };
+    const key = `wcp.draw-command.${saved.actorId}.${divisionId}`;
+    try {
+      sessionStorage.setItem(key, JSON.stringify(saved));
+    } catch {
+      setError("Recovery storage is unavailable. No command was sent.");
+      setStale(true);
+      return;
+    }
     setBusy(true);
     setError("");
-    setPending(command);
+    setPending(saved);
     setStatus("Sending draw revision…");
     try {
-      const r = await fetch(
-        `/api/v1/divisions/${encodeURIComponent(divisionId)}/draw`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(command),
+      const r = await fetch(saved.path, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-WCP-Actor": saved.actorId,
         },
-      );
+        body: saved.body,
+      });
       const result = await r.json();
       if (!r.ok) {
-        if (r.status < 500) {
+        if (r.status < 500 && !retained) {
+          sessionStorage.removeItem(key);
           setPending(null);
           if (r.status === 409) setStale(true);
         }
         throw new Error(result.error);
       }
       setData((old) => (old ? { ...old, ...result } : old));
+      sessionStorage.removeItem(key);
       setPending(null);
       setStatus(`Saved ${result.state} revision ${result.version}.`);
       setReason("");
       // Keep the accepted command response visible even if a history refresh fails.
-      const history = await fetch(
-        `/api/v1/divisions/${encodeURIComponent(divisionId)}/draw`,
-        { cache: "no-store" },
-      );
-      if (history.ok) setData(await history.json());
+      try {
+        const history = await fetch(
+          `/api/v1/divisions/${encodeURIComponent(divisionId)}/draw`,
+          { cache: "no-store" },
+        );
+        if (history.ok) setData(await history.json());
+      } catch {
+        setError(
+          "The draw was saved. Revision history could not refresh; reload the accepted draw to review it.",
+        );
+      }
     } catch (e) {
       setError(
         (e as Error).message ||
@@ -138,7 +178,7 @@ export function DrawWorkbench() {
   const locked =
     busy || !!pending || stale || loading || data?.state === "published";
   return (
-    <main id="main" className="workspace">
+    <main id="main" className="workspace draw-workspace">
       <p className="eyebrow">Organizer operations</p>
       <h1>Single knockout draw</h1>
       <p>
@@ -158,8 +198,12 @@ export function DrawWorkbench() {
       <p role="status">{loading ? "Loading saved draw…" : status}</p>
       {!!pending && !busy && (
         <div className="notice">
-          The save outcome is uncertain.{" "}
-          <button onClick={() => void save(pending)}>Retry same request</button>
+          The original command is retained for this signed-in account in this
+          tab. Editing stays locked after a reload until the same request is
+          confirmed.{" "}
+          <button onClick={() => void save(JSON.parse(pending.body), pending)}>
+            Retry same request
+          </button>
         </div>
       )}
       {!pending && divisionId && (

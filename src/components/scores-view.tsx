@@ -245,7 +245,7 @@ export function ScoresView({
                         {d.name} · scores
                       </a>
                       <span> · Ranking eligibility: {d.rankingStatus}</span>
-                      <span> · <a href={`/events/${data.event.id}/bracket?division=${encodeURIComponent(d.id)}`}>Competition bracket / game list</a></span>
+                      {d.hasPublishedDraw&&<span> · <a href={`/events/${data.event.id}/bracket?division=${encodeURIComponent(d.id)}`}>Competition bracket / game list</a></span>}
                     </li>
                   ))}
                 </ul>
@@ -493,6 +493,7 @@ export function ScoresView({
           )}
         </>
       )}
+      {gameId&&data?.divisions.find(d=>d.id===data.selectedDivisionId)?.hasPublishedDraw&&<p><a href={`/events/${data.event.id}/bracket?division=${encodeURIComponent(data.selectedDivisionId!)}`}>Competition bracket / game list →</a></p>}
     </main>
   );
 }

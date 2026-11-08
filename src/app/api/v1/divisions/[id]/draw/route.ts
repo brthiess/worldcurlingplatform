@@ -14,6 +14,12 @@ async function run(
       throw new DrawError("Untrusted request origin", 403);
     const current = await actor(request.headers);
     if (!current) throw new DrawError("Sign in required", 401);
+    const boundActor = request.headers.get("x-wcp-actor");
+    if (write && boundActor && boundActor !== current.id)
+      throw new DrawError(
+        "This retained command belongs to a different signed-in account.",
+        403,
+      );
     const { id } = await params;
     return Response.json(
       write

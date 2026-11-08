@@ -4,13 +4,21 @@ import "dotenv/config";
 import { randomUUID } from "node:crypto";
 import pg from "pg";
 import { signInApiWithRateWindow } from "./auth-fixture";
+import { drawFixtureEvent } from "../draws-fixture";
 const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
-test.afterAll(() => pool.end());
+let event: Awaited<ReturnType<typeof drawFixtureEvent>>;
+test.beforeAll(async () => {
+  event = await drawFixtureEvent(pool);
+});
+test.afterAll(async () => {
+  if (event) await event.cleanup();
+  await pool.end();
+});
 async function fixture() {
   const id = "browser-ko-" + randomUUID();
   await pool.query(
-    "INSERT INTO division(id,event_id,name,discipline,format) VALUES($1,'prairie-2026','Knockout browser fixture','men_four','single knockout')",
-    [id],
+    "INSERT INTO division(id,event_id,name,discipline,format) VALUES($1,$2,'Knockout browser fixture','men_four','single knockout')",
+    [id, event.id],
   );
   const entries: string[] = [];
   for (let n = 1; n <= 6; n++) {
@@ -106,6 +114,10 @@ for (const [device, width, height] of [
     await expect(
       page.getByRole("article", { name: "S1 · possible route", exact: true }),
     ).toBeVisible();
+    await page.screenshot({
+      path: info.outputPath(device + "-bracket.png"),
+      fullPage: true,
+    });
     await page.getByRole("button", { name: "Game list", exact: true }).click();
     await expect(
       page.getByRole("region", { name: "Knockout game list", exact: true }),
@@ -163,6 +175,7 @@ for (const [device, width, height] of [
     await expect(
       page.getByRole("article", { name: "S1 · selected team", exact: true }),
     ).toBeVisible({ timeout: 15000 });
+    await expect(page.getByText("· Winner", { exact: true })).toHaveCount(1);
     await expect(page.getByLabel("Follow a team")).toHaveValue(entries[3]);
     await expect(
       page.getByRole("button", { name: "Game list", exact: true }),
@@ -214,7 +227,7 @@ test("draw loading, empty, interruption, uncertain retry and stale preview are t
       )
     ).status(),
   ).toBe(200);
-  await page.goto("/events/prairie-2026/bracket?division=" + id);
+  await page.goto("/events/" + event.id + "/bracket?division=" + id);
   await expect(page.getByRole("status")).toContainText(
     "No published competition draw",
   );
@@ -234,7 +247,10 @@ test("draw loading, empty, interruption, uncertain retry and stale preview are t
     .getByLabel("Revision reason", { exact: true })
     .fill("Uncertain browser delivery");
   let interrupted = false;
+  const retainedBodies: string[] = [];
   await page.route("**/api/v1/divisions/" + id + "/draw", async (route) => {
+    if (route.request().method() === "POST")
+      retainedBodies.push(route.request().postData()!);
     if (route.request().method() === "POST" && !interrupted) {
       interrupted = true;
       await route.fetch();
@@ -248,12 +264,21 @@ test("draw loading, empty, interruption, uncertain retry and stale preview are t
   await expect(
     page.getByRole("button", { name: "Save preview", exact: true }),
   ).toBeDisabled();
+  await page.reload();
+  await expect(
+    page.getByRole("button", { name: "Retry same request", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Save preview", exact: true }),
+  ).toBeDisabled();
   await page
     .getByRole("button", { name: "Retry same request", exact: true })
     .click();
   await expect(page.getByRole("status")).toHaveText(
     "Saved preview revision 1.",
   );
+  expect(retainedBodies).toHaveLength(2);
+  expect(retainedBodies[1]).toBe(retainedBodies[0]);
   await page.unroute("**/api/v1/divisions/" + id + "/draw");
   const sibling = await page.request.post("/api/v1/divisions/" + id + "/draw", {
     headers: { Origin: process.env.BETTER_AUTH_URL! },
@@ -270,14 +295,18 @@ test("draw loading, empty, interruption, uncertain retry and stale preview are t
   await page
     .getByRole("button", { name: "Publish reviewed draw", exact: true })
     .click();
-  await expect(page.getByRole("alert")).toContainText("Draw changed");
+  await expect(
+    page.getByRole("alert").filter({ hasText: "Draw changed" }),
+  ).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Save preview", exact: true }),
   ).toBeDisabled();
   await page
     .getByRole("button", { name: "Reload accepted draw", exact: true })
     .click();
-  await expect(page.getByText(/Revision 2 · preview/)).toBeVisible();
+  await expect(
+    page.getByText(/^Revision 2 · preview\. Template/),
+  ).toBeVisible();
   await page.getByLabel("Publication reason").fill("Publish current version");
   await page
     .getByRole("button", { name: "Publish reviewed draw", exact: true })
@@ -309,4 +338,95 @@ test("draw loading, empty, interruption, uncertain retry and stale preview are t
   await page.unroute("**/api/v1/public/divisions/" + id + "/draw");
   await page.getByRole("button", { name: "Try again", exact: true }).click();
   await expect(page.getByRole("status")).toHaveCount(0);
+});
+
+test("a published unscheduled game can be assigned through the real organizer schedule screen", async ({
+  page,
+}, info) => {
+  test.setTimeout(120000);
+  await page.setViewportSize({ width: 360, height: 800 });
+  const { id, entries } = await fixture();
+  expect(
+    (
+      await signInApiWithRateWindow(
+        page.request,
+        "organizer@demo.invalid",
+        process.env.DEMO_PASSWORD,
+      )
+    ).status(),
+  ).toBe(200);
+  const headers = { Origin: process.env.BETTER_AUTH_URL! };
+  expect(
+    (
+      await page.request.post("/api/v1/divisions/" + id + "/draw", {
+        headers,
+        data: {
+          requestId: randomUUID(),
+          expectedVersion: 0,
+          action: "preview",
+          seedEntryIds: entries,
+          reason: "Schedule screen fixture preview",
+        },
+      })
+    ).status(),
+  ).toBe(200);
+  const p = await page.request.post("/api/v1/divisions/" + id + "/draw", {
+    headers,
+    data: {
+      requestId: randomUUID(),
+      expectedVersion: 1,
+      action: "publish",
+      reason: "Publish schedule screen fixture",
+    },
+  });
+  expect(p.status()).toBe(200);
+  const q2 = (await p.json()).graph.games.find((g: any) => g.key === "Q2");
+  await page.goto("/admin/schedule?event=" + event.id);
+  await page.getByLabel("Division", { exact: true }).selectOption(id);
+  await page.getByLabel("Draw number", { exact: true }).fill("1");
+  await page.getByLabel("Venue date and time").fill("2026-11-09T09:00");
+  await page.getByLabel("UTC offset", { exact: true }).fill("-06:00");
+  await page
+    .getByLabel("Revision reason", { exact: true })
+    .first()
+    .fill("Assign actual known venue time");
+  await page.getByRole("button", { name: "Save session", exact: true }).click();
+  await expect(
+    page.getByRole("status").filter({ hasText: "Saved schedule revision" }),
+  ).toBeVisible();
+  const schedule = await (
+    await page.request.get("/api/v1/events/" + event.id + "/schedule")
+  ).json();
+  const draw = schedule.draws.find((d: any) => d.divisionId === id);
+  await page.getByLabel("Game", { exact: true }).selectOption(q2.id);
+  await page
+    .getByLabel("Target session", { exact: true })
+    .selectOption(draw.id);
+  await page.getByLabel("Sheet", { exact: true }).fill("A");
+  await page
+    .getByLabel("Revision reason", { exact: true })
+    .last()
+    .fill("Assign published quarterfinal");
+  await page
+    .getByRole("button", { name: "Save game assignment", exact: true })
+    .click();
+  await expect(
+    page.getByRole("status").filter({ hasText: "Saved schedule revision" }),
+  ).toBeVisible();
+  const stored = await (
+    await page.request.get("/api/v1/public/divisions/" + id + "/draw")
+  ).json();
+  expect(stored.games.find((g: any) => g.id === q2.id).startsAt).toBe(
+    "2026-11-09T15:00:00.000Z",
+  );
+  await page.goto(
+    "/events/" + event.id + "/bracket?division=" + id + "&view=list",
+  );
+  await expect(
+    page.getByRole("article", { name: "Q2", exact: true }),
+  ).toContainText("America/Regina · Sheet A");
+  await page.screenshot({
+    path: info.outputPath("phone-scheduled-published-game.png"),
+    fullPage: true,
+  });
 });

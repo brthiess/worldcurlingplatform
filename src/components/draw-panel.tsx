@@ -124,7 +124,7 @@ export function DrawPanel({
                               ) : (
                                 <span>{name}</span>
                               )}
-                              {game?.winnerEntryId === entryId && (
+                            {entryId && game?.winnerEntryId === entryId && (
                                 <span className="winner-label"> · Winner</span>
                               )}
                             </span>

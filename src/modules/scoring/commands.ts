@@ -9,7 +9,7 @@ import {
   type DifferenceMember,
 } from "@/domain/results";
 import { gameLineup, freezeLineups } from "./lineups";
-import {advanceDraw} from '@/modules/draws/advance';
+import { advanceDraw } from "@/modules/draws/advance";
 import {
   validateEnd,
   scoreTotals,
@@ -212,9 +212,19 @@ async function snapshot(client: PoolClient, id: string) {
 async function authorize(client: PoolClient, actorId: string, id: string) {
   // Hold both the game and current grants while accepting a command. Grant revocation
   // and source changes cannot race past this authorization check.
-  await client.query('SELECT e.id FROM event_edition e JOIN division d ON d.event_id=e.id JOIN game g ON g.division_id=d.id WHERE g.id=$1 FOR UPDATE OF e',[id]);
+  const lockedEdition = (
+    await client.query(
+      "SELECT e.id FROM event_edition e JOIN division d ON d.event_id=e.id JOIN game g ON g.division_id=d.id WHERE g.id=$1 FOR UPDATE OF e",
+      [id],
+    )
+  ).rows[0]?.id;
   await client.query("SELECT id FROM game WHERE id=$1 FOR UPDATE", [id]);
   const g = await snapshot(client, id);
+  if (g.eventId !== lockedEdition)
+    throw new ScoringError(
+      409,
+      "Game edition changed. Reload the current game before applying this command.",
+    );
   const grants = await client.query<Grant>(
     'SELECT role,event_id AS "eventId",game_id AS "gameId" FROM role_grant WHERE user_id=$1 FOR SHARE',
     [actorId],
@@ -547,7 +557,14 @@ export async function saveScoring(actorId: string, id: string, input: unknown) {
         "INSERT INTO game_result_version(game_id,version,actor_id,confirmed_by,result,audit_id) VALUES($1,$2,$3,$4,$5,$6)",
         [id, after.version, actorId, name, frozenResult, auditId],
       );
-      await advanceDraw(client,id,after.version,result.winnerEntryId,[before.entryA,before.entryB],auditId);
+      await advanceDraw(
+        client,
+        id,
+        after.version,
+        result.winnerEntryId,
+        [before.entryA, before.entryB],
+        auditId,
+      );
       if (
         command.action === "correct" &&
         before.results[0]?.result.winnerEntryId !== result.winnerEntryId

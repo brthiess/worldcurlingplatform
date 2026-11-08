@@ -58,6 +58,7 @@ export type PublicEvent = {
     discipline: string;
     format: string;
     rankingStatus: string;
+    hasPublishedDraw: boolean;
   }[];
   selectedDivisionId: string | null;
   event: {
@@ -98,7 +99,7 @@ async function projectEvent(
   );
   if (!result.rows.length) return null;
   const divisionResult = await connection.execute(
-    sql`SELECT id,name,discipline,format,ranking_status AS "rankingStatus" FROM division WHERE event_id=${id} ORDER BY name,id`,
+    sql`SELECT d.id,d.name,d.discipline,d.format,d.ranking_status AS "rankingStatus",EXISTS(SELECT 1 FROM competition_draw cd WHERE cd.division_id=d.id AND cd.state='published') AS "hasPublishedDraw" FROM division d WHERE d.event_id=${id} ORDER BY d.name,d.id`,
   );
   const divisions = divisionResult.rows as PublicEvent["divisions"];
   if (divisionId && !divisions.some((d) => d.id === divisionId)) return null;
