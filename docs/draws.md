@@ -2,6 +2,8 @@
 
 WCP-019 adopts `application-single8-seeded-v1`, template version 1. This is an application profile, not a claim of official competition regulations. It supports men's/women's four-player divisions, with six or eight explicitly selected entries in seed order and no bronze game. The main 16-team triple-knockout demonstration is unchanged.
 
+Every known core team may occupy only one seed, even when represented by two distinct entry records. Preview and publication both check current trusted team IDs. Distinct entries with unresolved/null team identity remain allowed; equal display names or overlapping partial rosters never cause an inferred merge.
+
 Eight entries: Q1=1/8, Q2=4/5, Q3=2/7, Q4=3/6; S1=WQ1/WQ2, S2=WQ3/WQ4; F=WS1/WS2. Seven actual games. Six entries: omit Q1/Q3; seed 1 enters S1 and seed 2 enters S2 directly. Q2, Q4, S1, S2 and F are five actual games. These structural byes have provenance in the immutable graph and create no game, result, forfeit or win. The literal top-seed champion plays two games in the six-entry profile.
 
 At `/admin/draws`, choose an authorized division and each seed, save a persistent preview, inspect the stored graph, then publish that exact reviewed revision. Publishing refuses changed entry versions and divisions with existing games. A published graph cannot be replaced by this bounded command. An ordinary new preview preserves prior previews. Future unrestricted graph editing, other families and qualification tiebreak rules are outside this slice.
