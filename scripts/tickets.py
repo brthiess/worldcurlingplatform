@@ -93,9 +93,9 @@ def main():
         text = issue.read_text(encoding='utf-8-sig')
         text = re.sub(r'^status: .+$', f'status: {status}', text, count=1, flags=re.M)
         text = re.sub(r'^\*\*Status:\*\* .+$', f'**Status:** {status}', text, count=1, flags=re.M)
-        issue.write_text(text, encoding='utf-8')
+        issue.write_bytes(text.encode('utf-8'))
         ticket['status'] = status
-        GRAPH.write_text(json.dumps(graph, indent=2, ensure_ascii=False) + '\n', encoding='utf-8')
+        GRAPH.write_bytes((json.dumps(graph, indent=2, ensure_ascii=False) + '\n').encode('utf-8'))
         state = json.loads(STATE.read_text(encoding='utf-8-sig'))
         state.update(phase='implementation', status='active', updated_at=datetime.now(timezone.utc).isoformat())
         state['tickets_started'] = [t['id'] for t in tickets.values() if t['status'] != 'ready-for-agent']
@@ -105,7 +105,7 @@ def main():
         state.setdefault('events', []).append({'time': state['updated_at'], 'ticket': args.ticket,
                                               'status': status, 'reason': args.reason,
                                               'commit': args.commit, 'evidence': args.evidence})
-        STATE.write_text(json.dumps(state, indent=2, ensure_ascii=False) + '\n', encoding='utf-8')
+        STATE.write_bytes((json.dumps(state, indent=2, ensure_ascii=False) + '\n').encode('utf-8'))
     print(json.dumps({'count': len(tickets), 'frontier': frontier(tickets),
                       'active': [t['id'] for t in tickets.values() if t['status'] == 'in-progress'],
                       'completed': [t['id'] for t in tickets.values() if t['status'] == 'completed'],
