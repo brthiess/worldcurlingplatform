@@ -81,4 +81,22 @@ This transport is a local test inbox, not internet email delivery. It refuses a 
 
 `/players` reads explicit public sport fields. `/account/profile` shows only the signed-in account's claim history and approved profile; the global World Curling administrator can review all claims there. Demo persona sign-in remains at `/admin`. Claim reviews need a reason; final decisions are retained. A player and an account each have at most one approved link. Competing pending claims can be reviewed, but a conflicting approval returns 409 without partial changes. Ownership permits only biography (500 plain-text characters) and left/right/unknown handedness, with current-version protection. It confers no team, organizer, scoring or grant authority.
 
-The repeatable local seed includes independent fictional `demo-player` (Alex Demo) and `demo-player-other` (Morgan Demo) records with blank biography/unknown handedness. Fresh seed records have no account link. Re-seeding preserves later claims and profile edits; use a fresh isolated database for a fresh scenario. Photos are a separate WCP-013 slice.
+The repeatable local seed includes independent fictional `demo-player` (Alex Demo) and `demo-player-other` (Morgan Demo) records with blank biography/unknown handedness. Fresh seed records have no account link. Re-seeding preserves later claims, profile edits and photos; use a fresh isolated database for a fresh scenario.
+
+## Private photo review (WCP-013)
+
+Set `MEDIA_STORAGE_ROOT` to an absolute durable directory outside the checkout and any `public/` directory. On this machine WCP-013 uses `C:/Users/brthi/Projects/world-curling-platform-2/.runtime/wcp013-media`; it survives disposable worktree removal and is ignored by Git. Only the application process and local operator should access it. No media belongs in Git or public static files. The controlled local filesystem adapter is a real durable transport for local acceptance; hosted storage, domain, TLS and email remain WCP-045 inputs.
+
+An approved player owner uploads PNG/JPEG/WebP at `/account/profile`. Limits: 5 MiB, minimum 64px each dimension, at most16 megapixels, one frame. The server fully decodes, strips metadata and re-encodes PNG up to1200px; it discards the original. Exclusive file creation and synced writes precede database submission. A failed database commit may leave an unreachable private orphan; automatic garbage collection and disaster recovery are outside this slice. Do not modify files in place: immutable database digests are checked on every read and review, and mismatches fail closed. Windows files inherit the operator's directory ACLs; POSIX mode requests are0700/0600.
+
+Global administrators see current/submitted comparisons and review history on the same page. Approval requires the exact reviewed digest and current public-image reference, records actor/time/reason, and changes the public reference in the same PostgreSQL transaction as decision/audit. Rejection retains the previous approved image. Final decisions are immutable; new submissions have new asset IDs. One pending submission per player prevents silent replacement during review. An uncertain upload can be retried using the same request ID/content after refreshing status.
+
+| Endpoint | Behavior |
+|---|---|
+| `POST /api/v1/players/:id/photos` | Same-origin, linked owner only; raw image body, exact MIME type, `X-Request-Id` (1–80 letters/digits/hyphens). Identical request retries return the original immutable asset; changed content returns409. |
+| `GET /api/v1/photos` | Own submission history; current global administrators see all. No storage paths or original bytes. |
+| `GET /api/v1/photos/:id/preview` | Processed PNG for the submitting owner or current global administrator only. Private/no-store; others404/anonymous401. |
+| `POST /api/v1/photos/:id/review` | Same-origin global administrator; `{decision,reason,digest,currentAssetId}`. Exact content/comparison check; decisions approved/rejected; final retries must match actor/reason. |
+| `GET /api/v1/public/photos/:assetId` | Current approved processed asset only; pending/rejected/previous assets404. Public player projection includes its safe `photoUrl` or null. |
+
+Use only clearly synthetic geometric fixtures for local screenshots/tests. No invented player portraits are supplied. Evidence: `docs/verification/WCP-013.md`.

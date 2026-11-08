@@ -1,8 +1,13 @@
+import { signInWithRateWindow } from "./auth-fixture";
 import { test, expect } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 import { readFile, readdir, mkdir } from "node:fs/promises";
-import { pool } from "../../src/db";
+import pg from "pg";
 import "dotenv/config";
+const pool = new pg.Pool({
+  connectionString: process.env.DATABASE_URL,
+  max: 2,
+});
 async function mail(email: string, kind: string) {
   const files = (await readdir(".runtime/mail")).sort().reverse();
   for (const file of files) {
@@ -45,10 +50,10 @@ test("visitor verifies an account, receives staff approval, edits a persistent p
   await expect(page.getByRole("status")).toContainText("Email verified");
   await page.getByLabel("Email", { exact: true }).fill(email);
   await page.getByLabel("Password", { exact: true }).fill(password);
-  await page
-    .getByRole("button", { name: "Sign in", exact: true })
-    .last()
-    .click();
+  await signInWithRateWindow(
+    page,
+    page.getByRole("button", { name: "Sign in", exact: true }).last(),
+  );
   await expect(
     page.getByRole("heading", { name: "Claims and profile", exact: true }),
   ).toBeVisible();
@@ -67,7 +72,10 @@ test("visitor verifies an account, receives staff approval, edits a persistent p
   await review.goto(process.env.BETTER_AUTH_URL! + "/admin");
   await review.getByLabel("Demo persona").selectOption("administrator");
   await review.getByLabel("Demo password").fill(process.env.DEMO_PASSWORD!);
-  await review.getByRole("button", { name: "Sign in", exact: true }).click();
+  await signInWithRateWindow(
+    review,
+    review.getByRole("button", { name: "Sign in", exact: true }),
+  );
   await expect(review.getByText("Signed in as")).toBeVisible();
   await review.goto(process.env.BETTER_AUTH_URL! + "/account/profile");
   const card = review
@@ -144,10 +152,10 @@ test("visitor verifies an account, receives staff approval, edits a persistent p
   await page.goto("/account");
   await page.getByLabel("Email", { exact: true }).fill(email);
   await page.getByLabel("Password", { exact: true }).fill(nextPassword);
-  await page
-    .getByRole("button", { name: "Sign in", exact: true })
-    .last()
-    .click();
+  await signInWithRateWindow(
+    page,
+    page.getByRole("button", { name: "Sign in", exact: true }).last(),
+  );
   await expect(page.getByLabel("Short biography")).toHaveValue(
     "A fictional profile used to verify player-controlled text.",
   );

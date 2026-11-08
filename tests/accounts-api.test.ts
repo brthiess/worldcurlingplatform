@@ -1,10 +1,11 @@
+import { authRequest } from "./auth-request";
 import "dotenv/config";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFile, readdir } from "node:fs/promises";
 const base = process.env.BETTER_AUTH_URL!;
 async function post(path: string, body: unknown, cookie = "") {
-  return fetch(base + path, {
+  return authRequest(base + path, {
     method: "POST",
     headers: { Origin: base, "Content-Type": "application/json", cookie },
     body: JSON.stringify(body),

@@ -1,3 +1,4 @@
+import { signInWithRateWindow } from "./auth-fixture";
 import { test, expect } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 import "dotenv/config";
@@ -25,7 +26,10 @@ for (const [label, width, height] of [
     await page.goto("/admin");
     await page.getByLabel("Demo persona").selectOption("organizer");
     await page.getByLabel("Demo password").fill(process.env.DEMO_PASSWORD!);
-    await page.getByRole("button", { name: "Sign in", exact: true }).click();
+    await signInWithRateWindow(
+      page,
+      page.getByRole("button", { name: "Sign in", exact: true }),
+    );
     await page
       .getByRole("link", { name: "Event applications", exact: true })
       .click();
@@ -67,7 +71,10 @@ for (const [label, width, height] of [
     await page.getByRole("button", { name: "Sign out", exact: true }).click();
     await page.getByLabel("Demo persona").selectOption("administrator");
     await page.getByLabel("Demo password").fill(process.env.DEMO_PASSWORD!);
-    await page.getByRole("button", { name: "Sign in", exact: true }).click();
+    await signInWithRateWindow(
+      page,
+      page.getByRole("button", { name: "Sign in", exact: true }),
+    );
     await page
       .getByRole("link", { name: "Event applications", exact: true })
       .click();
@@ -141,7 +148,10 @@ test("next-year copy, loading, unsent save retry, stale version recovery and cal
   await page.goto("/admin");
   await page.getByLabel("Demo persona").selectOption("organizer");
   await page.getByLabel("Demo password").fill(process.env.DEMO_PASSWORD!);
-  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await signInWithRateWindow(
+    page,
+    page.getByRole("button", { name: "Sign in", exact: true }),
+  );
   await expect(
     page.getByRole("heading", { name: "Your workspace" }),
   ).toBeVisible();
