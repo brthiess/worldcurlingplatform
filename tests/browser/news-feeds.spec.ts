@@ -17,6 +17,11 @@ test("controlled feed cards, real queued fetch, failure, moderation and external
   browser,
 }) => {
   test.setTimeout(150000);
+  expect(
+    process.env.NEWS_FIXTURE_ORIGIN,
+    "Configure a unique NEWS_FIXTURE_ORIGIN for the loopback app and its tests.",
+  ).toBeTruthy();
+  const fixtureOrigin = new URL(process.env.NEWS_FIXTURE_ORIGIN!).origin;
   const key = crypto.randomUUID(),
     feedPath = "/browser-" + key,
     publisher = "Controlled browser fixture",
@@ -38,11 +43,13 @@ test("controlled feed cards, real queued fetch, failure, moderation and external
       `<rss><channel><item><title><![CDATA[${title}<script>alert('unsafe')</script>]]></title><link>${story}</link><pubDate>${new Date().toISOString()}</pubDate><description><![CDATA[<p>A supplied excerpt from a controlled feed fixture. This is browser acceptance data, not a real news report.</p><script>window.bad=true</script>]]></description><content:encoded>Full article text must never appear.</content:encoded></item></channel></rss>`,
     );
   });
-  await new Promise<void>((r) => server.listen(3244, "127.0.0.1", r));
+  await new Promise<void>((r) =>
+    server.listen(Number(new URL(fixtureOrigin).port), "127.0.0.1", r),
+  );
   const boss = await startWorker(pool);
   const source = await manageSource(pool, "demo-administrator", {
     publisher,
-    feedUrl: "http://127.0.0.1:3244" + feedPath,
+    feedUrl: fixtureOrigin + feedPath,
     approved: true,
     reason: "Controlled local browser feed fixture",
   });
@@ -68,7 +75,7 @@ test("controlled feed cards, real queued fetch, failure, moderation and external
     ).toBeVisible();
     await page.goto("/admin/news");
     const card = page.getByRole("article").filter({
-      has: page.getByText("http://127.0.0.1:3244" + feedPath, {
+      has: page.getByText(fixtureOrigin + feedPath, {
         exact: true,
       }),
     });

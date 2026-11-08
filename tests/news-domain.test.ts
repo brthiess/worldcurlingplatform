@@ -72,6 +72,9 @@ test("reserved fetch addresses and impossible calendar dates are rejected", () =
     "192.88.99.1",
     "2001:2::1",
     "2001:db8::1",
+    "2001::1",
+    "2001:0002::1",
+    "2002:7f00:1::",
   ])
     assert.equal(isPublicAddress(address), false, address);
   const xml =

@@ -16,6 +16,11 @@ const pool = new pg.Pool({
 });
 after(() => pool.end());
 test("real pg-boss retries a failing approved HTTP fixture then persists exactly once", async () => {
+  assert.ok(
+    process.env.NEWS_FIXTURE_ORIGIN,
+    "Configure a unique NEWS_FIXTURE_ORIGIN for the loopback app and its tests.",
+  );
+  const fixtureOrigin = new URL(process.env.NEWS_FIXTURE_ORIGIN).origin;
   let requests = 0;
   const feedPath = "/" + crypto.randomUUID();
   const story = "https://publisher.example/job-" + crypto.randomUUID();
@@ -36,12 +41,14 @@ test("real pg-boss retries a failing approved HTTP fixture then persists exactly
       `<rss><channel><item><title>Controlled worker fixture</title><link>${story}</link><pubDate>Sun, 08 Nov 2026 10:00:00 GMT</pubDate><description>Worker fixture supplied excerpt.</description></item><item><title>Duplicate</title><link>${story}</link><pubDate>Sun, 08 Nov 2026 10:00:00 GMT</pubDate></item></channel></rss>`,
     );
   });
-  await new Promise<void>((r) => server.listen(3244, "127.0.0.1", r));
+  await new Promise<void>((r) =>
+    server.listen(Number(new URL(fixtureOrigin).port), "127.0.0.1", r),
+  );
   const boss = await startWorker(pool);
   try {
     const source = await manageSource(pool, "demo-administrator", {
       publisher: "Controlled retry fixture",
-      feedUrl: "http://127.0.0.1:3244" + feedPath,
+      feedUrl: fixtureOrigin + feedPath,
       approved: true,
       reason: "Approved local controlled retry fixture",
     });

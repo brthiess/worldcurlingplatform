@@ -53,11 +53,17 @@ export function isPublicAddress(address: string) {
       (a === 203 && b === 0 && c === 113)
     );
   }
-  if (isIP(address) === 6)
+  if (isIP(address) === 6) {
+    const words = address.split(":");
+    const first = parseInt(words[0], 16),
+      second = parseInt(words[1] || "0", 16);
     return (
-      /^2[0-9a-f]{3}:/i.test(address) &&
-      !/^2001:(?:db8|0|2|10|20):/i.test(address)
+      first >= 0x2000 &&
+      first <= 0x2fff &&
+      first !== 0x2002 &&
+      !(first === 0x2001 && (second < 0x200 || second === 0xdb8))
     );
+  }
   return false;
 }
 export function articleUrl(value: unknown) {
