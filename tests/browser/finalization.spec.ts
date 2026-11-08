@@ -103,6 +103,16 @@ async function fixture() {
 test("organizer reviews, finalizes and replaces changed results on a phone with immutable public history", async ({
   page,
 }, info) => {
+  const pageErrors: string[] = [],
+    consoleErrors: string[] = [],
+    serverErrors: string[] = [];
+  page.on("pageerror", (e) => pageErrors.push(e.message));
+  page.on("console", (m) => {
+    if (m.type() === "error") consoleErrors.push(m.text());
+  });
+  page.on("response", (r) => {
+    if (r.status() >= 500) serverErrors.push(r.url());
+  });
   await page.context().addCookies(await organizer.cookies());
   const f = await fixture();
   await page.setViewportSize({ width: 360, height: 800 });
@@ -193,4 +203,161 @@ test("organizer reviews, finalizes and replaces changed results on a phone with 
     path: info.outputPath("phone-public-original.png"),
     fullPage: true,
   });
+  expect(pageErrors).toEqual([]);
+  expect(consoleErrors).toEqual([]);
+  expect(serverErrors).toEqual([]);
+});
+test("loading, failed read, stale review and lost acknowledgement recover without duplicate finalizations; empty and denied views stay honest", async ({
+  page,
+}, info) => {
+  const f = await fixture();
+  await page.context().addCookies(await organizer.cookies());
+  await page.setViewportSize({ width: 360, height: 800 });
+  const pageErrors: string[] = [];
+  page.on("pageerror", (e) => pageErrors.push(e.message));
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route(
+    `**/api/v1/division-finalizations?division=${f.divisionId}`,
+    async (route) => {
+      const r = await route.fetch();
+      await gate;
+      await route.fulfill({ response: r });
+    },
+    { times: 1 },
+  );
+  await page.goto(`/admin/finalizations?division=${f.divisionId}`);
+  await expect(
+    page.getByText("Loading division review…", { exact: true }),
+  ).toBeVisible();
+  release();
+  await expect(page.getByLabel("Final place for Final North")).toBeEnabled();
+  await page.route(
+    `**/api/v1/division-finalizations?division=${f.divisionId}`,
+    (route) => route.abort("failed"),
+    { times: 1 },
+  );
+  await page.getByRole("button", { name: "Reload current division" }).click();
+  await expect(page.locator("main").getByRole("alert")).toBeVisible();
+  await page.getByRole("button", { name: "Reload current division" }).click();
+  await expect(page.locator("main").getByRole("alert")).toHaveCount(0);
+  const fill = async () => {
+    await page.getByLabel("Final place for Final North").fill("1");
+    await page.getByLabel("Final place for Final Lake").fill("2");
+    await page
+      .getByLabel("Competition rules reference")
+      .fill("Event terms edition 1");
+    await page
+      .getByLabel("Public review note")
+      .fill("Reviewed completed sporting field");
+  };
+  await fill();
+  expect(
+    (
+      await scorer.request.post(`/api/v1/games/${f.gameId}/scoring`, {
+        headers: { Origin: process.env.BETTER_AUTH_URL! },
+        data: {
+          requestId: randomUUID(),
+          expectedVersion: 1,
+          action: "correct",
+          hammer: null,
+          outcome: "forfeit",
+          winnerEntryId: f.entries[0],
+          reason: "Corrected recorded reason",
+          ends: [],
+        },
+      })
+    ).status(),
+  ).toBe(200);
+  await page
+    .getByRole("button", { name: "Finalize division", exact: true })
+    .click();
+  await expect(page.locator("main").getByRole("alert")).toContainText(
+    "Division results changed",
+  );
+  await page.getByRole("button", { name: "Reload current division" }).click();
+  await fill();
+  let committed = false;
+  await page.route(
+    "**/api/v1/division-finalizations",
+    async (route) => {
+      if (route.request().method() !== "POST") {
+        await route.continue();
+        return;
+      }
+      const r = await route.fetch();
+      expect(r.status()).toBe(200);
+      committed = true;
+      await route.abort("failed");
+    },
+    { times: 1 },
+  );
+  await page
+    .getByRole("button", { name: "Finalize division", exact: true })
+    .click();
+  await expect(
+    page.getByRole("button", { name: "Retry exact finalization command" }),
+  ).toBeVisible();
+  await expect.poll(() => committed).toBe(true);
+  await expect(
+    page.getByRole("button", { name: "Retry exact finalization command" }),
+  ).toBeEnabled();
+  await expect(page.getByLabel("Public review note")).toBeDisabled();
+  await expect(page.getByLabel("Division", { exact: true })).toBeDisabled();
+  await expect(
+    page.getByRole("button", { name: "Reload current division" }),
+  ).toBeDisabled();
+  await page.reload();
+  await expect(
+    page.getByRole("button", { name: "Retry exact finalization command" }),
+  ).toBeVisible();
+  await expect(page.getByLabel("Public review note")).toBeDisabled();
+  await page
+    .getByRole("button", { name: "Retry exact finalization command" })
+    .click();
+  await expect(
+    page.getByText("Finalization 1 saved.", { exact: true }),
+  ).toBeVisible();
+  const accepted = await (
+    await organizer.request.get(
+      `/api/v1/division-finalizations?division=${f.divisionId}`,
+    )
+  ).json();
+  expect(accepted.history.length).toBe(1);
+  await page
+    .getByRole("button", { name: "Review revision 1", exact: true })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "Original finalization · revision 1" }),
+  ).toBeVisible();
+  await page.screenshot({
+    path: info.outputPath("phone-recovered.png"),
+    fullPage: true,
+  });
+  const empty = `final-empty-${randomUUID()}`;
+  await pool.query(
+    "INSERT INTO division(id,event_id,name,discipline,format) VALUES($1,'prairie-2026','Empty review','men_four','Manual review')",
+    [empty],
+  );
+  await page.goto(`/admin/finalizations?division=${empty}`);
+  await expect(
+    page.getByText("No games have been recorded.", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Finalize division", exact: true }),
+  ).toBeDisabled();
+  await page.goto(`/divisions/${empty}/results`);
+  await expect(
+    page.getByText(/No finalization has been recorded/),
+  ).toBeVisible();
+  await page.context().clearCookies();
+  await page.context().addCookies(await scorer.cookies());
+  await page.goto("/admin/finalizations");
+  await expect(page.locator("main").getByRole("alert")).toContainText(
+    "Organizer authority",
+  );
+  await expect(page.getByLabel("Public review note")).toHaveCount(0);
+  expect(pageErrors).toEqual([]);
 });

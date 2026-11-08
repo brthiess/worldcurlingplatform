@@ -177,7 +177,11 @@ export function FinalizationWorkbench() {
       setRules(f?.rulesReference ?? "");
       return true;
     } catch (e) {
-      setError((e as Error).message);
+      setError(
+        e instanceof TypeError
+          ? "Division review could not be loaded. Retry the current division."
+          : (e as Error).message,
+      );
       return false;
     } finally {
       setLoading(false);

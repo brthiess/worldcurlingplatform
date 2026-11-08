@@ -448,6 +448,21 @@ test("prerequisites, placements, current sources, duplicates and audit failure p
     403,
   );
   // A new real entry revision invalidates the exact source previously reviewed.
+  assert.equal(
+    (
+      await fetch(base + "/api/v1/division-finalizations", {
+        method: "POST",
+        headers: {
+          cookie: organizer,
+          Origin: base,
+          "Content-Type": "application/json",
+          "X-WCP-Actor": "demo-administrator",
+        },
+        body: JSON.stringify(body),
+      })
+    ).status,
+    403,
+  );
   const entry = initial.source.entries.find(
     (e: { id: string }) => e.id === f.entries[0],
   );
