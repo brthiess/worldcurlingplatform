@@ -219,15 +219,6 @@ export async function saveEntry(
       [eventId],
     );
     if (!edition.rowCount) throw new EntryError("Edition not found.", 404);
-    const d = await c.query(
-      "SELECT d.discipline,d.event_id,d.entry_season,e.origin,e.published,e.admission_status FROM division d JOIN event_edition e ON e.id=d.event_id WHERE d.id=$1 AND d.event_id=$2 FOR SHARE OF d",
-      [divisionId, eventId],
-    );
-    if (!d.rowCount)
-      throw new EntryError(
-        "The division's edition changed. Reload before saving.",
-        409,
-      );
     const existing = await c.query(
       "SELECT * FROM event_entry WHERE id=$1 FOR UPDATE",
       [id],
@@ -235,6 +226,15 @@ export async function saveEntry(
     if (existing.rowCount && existing.rows[0].division_id !== divisionId)
       throw new EntryError(
         "The entry's division changed. Reload before saving.",
+        409,
+      );
+    const d = await c.query(
+      "SELECT d.discipline,d.event_id,d.entry_season,e.origin,e.published,e.admission_status FROM division d JOIN event_edition e ON e.id=d.event_id WHERE d.id=$1 AND d.event_id=$2 FOR SHARE OF d",
+      [divisionId, eventId],
+    );
+    if (!d.rowCount)
+      throw new EntryError(
+        "The division's edition changed. Reload before saving.",
         409,
       );
     const manual = await authorize(c, userId, d.rows[0].event_id);
