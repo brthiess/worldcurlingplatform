@@ -160,6 +160,73 @@ test("organizer creates next year, responsible administrator admits it, correcti
   saved = await r.json();
   assert.equal(saved.venue, "Confirmed Ice");
   assert.equal(saved.history.length, 5);
+  const fixtureDatabase = new pg.Pool({
+    connectionString: process.env.DATABASE_URL,
+  });
+  const draws = [randomUUID(), randomUUID()],
+    games = [randomUUID(), randomUUID()];
+  try {
+    for (const [index, division] of application.divisions.entries()) {
+      await fixtureDatabase.query(
+        "INSERT INTO draw_session(id,division_id,number,starts_at,state) VALUES($1,$2,1,'2027-11-08T12:00:00Z','scheduled')",
+        [draws[index], division.id],
+      );
+      await fixtureDatabase.query(
+        "INSERT INTO game(id,draw_id,sheet,phase,state,slot_a,slot_b) VALUES($1,$2,'A','Opening round','scheduled',$3,'Opponent pending')",
+        [
+          games[index],
+          draws[index],
+          index === 0 ? "Men North" : "Women Granite",
+        ],
+      );
+    }
+    const overview = await (
+      await request(`/api/v1/public/events/${id}`)
+    ).json();
+    assert.equal(overview.selectedDivisionId, null);
+    assert.deepEqual(overview.games, []);
+    const women = await (
+      await request(
+        `/api/v1/public/events/${id}?division=${application.divisions[1].id}`,
+      )
+    ).json();
+    assert.equal(women.event.division, "Women");
+    assert.deepEqual(
+      women.games.map((g: { nameA: string }) => g.nameA),
+      ["Women Granite"],
+    );
+    const game = await (
+      await request(`/api/v1/public/games/${games[1]}`)
+    ).json();
+    assert.equal(game.event.division, "Women");
+    assert.equal(game.games[0].nameA, "Women Granite");
+    assert.equal(
+      (await request(`/api/v1/public/events/${id}?division=prairie-men`))
+        .status,
+      404,
+    );
+    const blocked = await request(`/api/v1/applications/${id}`, organizer, {
+      requestId: randomUUID(),
+      action: "edit",
+      version: saved.version,
+      application: { ...application, divisions: [application.divisions[1]] },
+    });
+    assert.equal(blocked.status, 409);
+    const afterBlocked = await (
+      await request(`/api/v1/applications/${id}`, organizer)
+    ).json();
+    assert.equal(afterBlocked.version, saved.version);
+    assert.equal(afterBlocked.history.length, 5);
+  } finally {
+    await fixtureDatabase.query("DELETE FROM game WHERE id=ANY($1::text[])", [
+      games,
+    ]);
+    await fixtureDatabase.query(
+      "DELETE FROM draw_session WHERE id=ANY($1::text[])",
+      [draws],
+    );
+    await fixtureDatabase.end();
+  }
   assert.deepEqual(
     (await (await request("/api/v1/public/events/prairie-2026")).json()).event,
     before.event,

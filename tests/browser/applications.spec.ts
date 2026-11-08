@@ -12,7 +12,16 @@ for (const [label, width, height] of [
   }, info) => {
     await page.setViewportSize({ width, height });
     const errors: string[] = [];
+    const networkErrors: string[] = [];
     page.on("pageerror", (e) => errors.push(e.message));
+    page.on("response", (response) => {
+      if (response.status() >= 500)
+        networkErrors.push(`${response.status()} ${response.url()}`);
+    });
+    page.on("requestfailed", (request) => {
+      if (request.failure()?.errorText !== "net::ERR_ABORTED")
+        networkErrors.push(request.failure()?.errorText ?? request.url());
+    });
     await page.goto("/admin");
     await page.getByLabel("Demo persona").selectOption("organizer");
     await page.getByLabel("Demo password").fill(process.env.DEMO_PASSWORD!);
@@ -121,6 +130,7 @@ for (const [label, width, height] of [
       fullPage: true,
     });
     expect(errors).toEqual([]);
+    expect(networkErrors).toEqual([]);
   });
 }
 test("next-year copy, loading, unsent save retry, stale version recovery and calendar empty states", async ({

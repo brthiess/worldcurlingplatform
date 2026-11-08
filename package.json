@@ -14,7 +14,7 @@
     "test": "tsx --test tests/domain.test.ts tests/applications.domain.test.ts",
     "test:coverage": "node --experimental-test-coverage --import tsx --test tests/domain.test.ts tests/applications.domain.test.ts",
     "format": "prettier --write src scripts tests package.json tsconfig.json playwright.config.ts",
-    "test:api": "tsx --test tests/api.test.ts tests/applications.api.test.ts",
+    "test:api": "tsx --test --test-concurrency=1 tests/api.test.ts tests/applications.api.test.ts",
     "test:browser": "playwright test",
     "typecheck": "tsc --noEmit",
     "db:migrate": "tsx scripts/migrate.ts",
