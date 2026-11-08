@@ -1,53 +1,72 @@
 {
   "recorded_date": "2026-11-08",
-  "phase": "preflight",
-  "status": "blocked_missing_requested_workflow",
+  "phase": "implementation",
+  "status": "active",
   "authoritative_spec": ".scratch/world-curling-platform/spec.md",
   "task_graph": ".scratch/world-curling-platform/tickets.json",
   "execution_issues": ".scratch/world-curling-platform/issues/",
   "archived_drafts_used_for_execution": false,
   "published_ticket_count": 47,
-  "initial_dependency_frontier": ["WCP-001"],
-  "tickets_started": [],
+  "initial_dependency_frontier": [
+    "WCP-001"
+  ],
+  "tickets_started": [
+    "WCP-001"
+  ],
   "tickets_completed": [],
-  "blocker": {
-    "requested_workflow": "/implement-spec",
-    "reason": "The requested workflow is not in the available skill catalog, and no matching file or reference was found in the searched installed skill, command, or project locations.",
-    "searched_locations": [
-      "C:/Users/brthi/.agents",
-      "C:/Users/brthi/.codex/skills",
-      "C:/Users/brthi/.codex/plugins",
-      "C:/Users/brthi/.claude",
-      "C:/Users/brthi/Projects"
-    ],
-    "required_input": "Provide the implement-spec SKILL.md location or install the requested workflow.",
-    "instruction_basis": "Developer skill instructions require searching for a missing named skill and stopping when it is necessary to carry out the requested workflow."
+  "workflow": {
+    "fresh_agent_per_ticket": true,
+    "max_parallel_implementers": 3,
+    "found_and_read": true,
+    "skill": "C:/Users/brthi/.codex/skills/implement-spec/SKILL.md"
   },
   "git": {
-    "workspace_dot_git_exists": false,
-    "initialized": false,
-    "worktrees_created": [],
-    "probe": "git -C C:/Users/brthi/Projects/world-curling-platform-2 rev-parse --is-inside-work-tree",
-    "probe_exit_code": 1,
-    "probe_observation": "Git failed while searching a parent directory with Permission denied. No repository or remote was established by this probe."
+    "remote": null,
+    "integration_branch": "integration/world-curling-platform",
+    "worktrees_created": [
+      ".worktrees/WCP-001"
+    ],
+    "initialized": true,
+    "baseline_commit": "f6d6d8d"
   },
   "verification": {
-    "unit_tests": "not_run_no_application",
-    "postgresql_api": "not_run_no_application",
-    "frontend_quality": "not_run_no_application",
-    "browser": "not_run_no_application",
-    "completion_claims": "none"
+    "completion_claims": "none",
+    "browser": "pending_first_slice",
+    "frontend_quality": "pending_first_slice",
+    "unit_tests": "pending_first_slice",
+    "postgresql_api": "pending_first_slice"
   },
   "crawler": {
-    "required_access": "read_only_initial_import_source",
     "accessed": false,
-    "modified": false
+    "modified": false,
+    "required_access": "read_only_initial_import_source"
   },
+  "external_inputs": [
+    {
+      "ticket": "WCP-045",
+      "status": "not_supplied",
+      "required": "Domain/DNS, source remote, hosting access and reviewed quote; provider credentials when exercised"
+    }
+  ],
   "resume": [
-    "Read the supplied or installed implement-spec workflow before implementation.",
-    "Complete authoritative-spec review and prepare Git without incorporating unrelated files.",
-    "Start WCP-001 in an isolated worktree, retaining all published acceptance checks.",
-    "Advance only tickets whose blockers are verified complete, with bounded parallelism and durable evidence.",
-    "Keep external-input blockers local to affected tickets and continue other eligible work."
+    "Review active ticket worktrees and evidence before integration.",
+    "Run python scripts/tickets.py status to compute the published frontier.",
+    "Close only reviewed integrated tickets with meaningful unit/PostgreSQL/API/frontend/browser evidence.",
+    "Continue unblocked work and report provider/deployment limitations honestly."
+  ],
+  "updated_at": "2026-11-08T15:37:35.684583+00:00",
+  "active_tickets": [
+    "WCP-001"
+  ],
+  "frontier": [],
+  "events": [
+    {
+      "time": "2026-11-08T15:37:35.684583+00:00",
+      "ticket": "WCP-001",
+      "status": "in-progress",
+      "reason": null,
+      "commit": null,
+      "evidence": null
+    }
   ]
 }
