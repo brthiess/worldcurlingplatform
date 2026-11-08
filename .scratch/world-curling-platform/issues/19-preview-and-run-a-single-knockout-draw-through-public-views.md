@@ -4,7 +4,7 @@ number: 19
 title: "Preview and run a single-knockout draw through public views"
 parent: WCP-SPEC-001
 type: implementation
-status: in-progress
+status: completed
 labels: [ready-for-agent]
 blocked_by: [WCP-018]
 source_spec_sha256: 045B46988225B6C8C0020B23C8C5D4EAA8E2E1916256148A0FDA26B5DA8673FD
@@ -18,7 +18,7 @@ published: 2026-11-07
 
 **Blocked by:** [18: Schedule draw sessions and show known conflicts](18-schedule-draw-sessions-and-show-known-conflicts.md).
 
-**Status:** in-progress
+**Status:** completed
 
 ## Parent and scope
 
@@ -31,13 +31,13 @@ published: 2026-11-07
 
 ## Acceptance criteria
 
-- [ ] Introduce the shared relational graph/template-version contract with stable games, participants, explicit advancement and published revision history.
-- [ ] Use one bounded documented configuration, seeded entries and supported bye behavior; no unrestricted graph designer.
-- [ ] Expose usable bracket and game-list views; actual result/participant history cannot be rewritten by a later slot revision.
-- [ ] **Unit testing:** Compare generated fixtures and advancement to an independently specified expected graph; check bye, slot/participant and progression invariants.
-- [ ] **Database/API verification:** Publish and advance via real score confirmation APIs, verifying stored graph/slot state and auditable revision behavior in PostgreSQL.
-- [ ] **Frontend quality:** Deliver responsive preview/publish, linked bracket/list navigation and selected-team highlighting with unresolved-slot labels and keyboard-accessible game links.
-- [ ] Record actual verification commands/results and relevant browser/screenshots or API evidence. Report meaningful uncovered branches or limitations; do not claim checks that were not run.
+- [x] Introduce the shared relational graph/template-version contract with stable games, participants, explicit advancement and published revision history.
+- [x] Use one bounded documented configuration, seeded entries and supported bye behavior; no unrestricted graph designer.
+- [x] Expose usable bracket and game-list views; actual result/participant history cannot be rewritten by a later slot revision.
+- [x] **Unit testing:** Compare generated fixtures and advancement to an independently specified expected graph; check bye, slot/participant and progression invariants.
+- [x] **Database/API verification:** Publish and advance via real score confirmation APIs, verifying stored graph/slot state and auditable revision behavior in PostgreSQL.
+- [x] **Frontend quality:** Deliver responsive preview/publish, linked bracket/list navigation and selected-team highlighting with unresolved-slot labels and keyboard-accessible game links.
+- [x] Record actual verification commands/results and relevant browser/screenshots or API evidence. Report meaningful uncovered branches or limitations; do not claim checks that were not run.
 
 ## Slice boundary
 
