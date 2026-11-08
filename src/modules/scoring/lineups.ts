@@ -19,6 +19,7 @@ export async function gameLineup(
   id: string,
   side: string,
   entryId: string,
+  legacyConfirmed = false,
 ): Promise<GameLineup> {
   const stored = await c.query(
     'SELECT entry_id AS "entryId",event_lineup_version AS "eventLineupVersion",mode,members FROM game_lineup_version WHERE game_id=$1 AND side=$2 ORDER BY version DESC LIMIT 1',
@@ -26,6 +27,7 @@ export async function gameLineup(
   );
   if (stored.rowCount && stored.rows[0].entryId === entryId)
     return stored.rows[0];
+  if (legacyConfirmed) return defaultLineup(entryId, null);
   const event = await readEventLineup(c, entryId);
   return defaultLineup(entryId, event);
 }
@@ -39,6 +41,7 @@ export async function freezeLineups(
     lineupA: GameLineup | null;
     lineupB: GameLineup | null;
   },
+  auditId: string,
   exclude?: string,
 ) {
   for (const side of ["a", "b"] as const) {
@@ -51,7 +54,7 @@ export async function freezeLineups(
     );
     if (!existing.rowCount)
       await c.query(
-        "INSERT INTO game_lineup_version(game_id,version,side,entry_id,event_lineup_version,mode,members) VALUES($1,$2,$3,$4,$5,$6,$7)",
+        "INSERT INTO game_lineup_version(game_id,version,side,entry_id,event_lineup_version,mode,members,audit_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8)",
         [
           id,
           version,
@@ -60,6 +63,7 @@ export async function freezeLineups(
           lineup.eventLineupVersion,
           lineup.mode,
           JSON.stringify(lineup.members),
+          auditId,
         ],
       );
   }

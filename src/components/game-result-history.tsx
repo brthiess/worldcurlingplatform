@@ -18,7 +18,9 @@ export function LineupEvidence({
       <p className="muted">
         {lineup?.eventLineupVersion
           ? `Event lineup version ${lineup.eventLineupVersion}.`
-          : "No recorded event lineup; players unknown."}{" "}
+          : lineup?.mode === "difference"
+            ? "No recorded event lineup reference."
+            : "No recorded event lineup; players unknown."}{" "}
         Roster evidence does not verify who delivered stones.
       </p>
       {!!lineup?.members.length && (
@@ -87,6 +89,33 @@ export function GameResultHistory({
     <section aria-label="Result history">
       <h3>Result history</h3>
       {record(latest)}
+      {results.find((r) => r.result.legacyBefore)?.result.legacyBefore && (
+        <details>
+          <summary>Original unversioned result</summary>
+          {(() => {
+            const old = results.find((r) => r.result.legacyBefore)!.result
+              .legacyBefore!;
+            return (
+              <>
+                <p>
+                  {old.nameA} {old.totalA ?? "?"}–{old.totalB ?? "?"}{" "}
+                  {old.nameB}. Confirmation attribution: {old.attribution}.
+                  Outcome, winner and original lineup reference were not
+                  recorded.
+                </p>
+                <ol>
+                  {old.ends.map((e, i) => (
+                    <li key={i}>
+                      End {i + 1}: {e.state}
+                      {e.state === "played" ? ` · ${e.a}–${e.b}` : ""}
+                    </li>
+                  ))}
+                </ol>
+              </>
+            );
+          })()}
+        </details>
+      )}
       {results.length > 1 && (
         <details>
           <summary>Earlier result versions</summary>

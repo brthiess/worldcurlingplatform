@@ -1,6 +1,6 @@
 "use client";
 import { EventEntryLinks } from "@/components/public-rosters";
-import { GameResultHistory } from "./game-result-history";
+import { GameResultHistory, LineupEvidence } from "./game-result-history";
 import { useEffect, useState, useCallback, useRef } from "react";
 import type { PublicEvent, PublicGame } from "@/modules/public/scores";
 import { scoreCell } from "@/domain/scores";
@@ -288,11 +288,13 @@ export function ScoresView({
                     <span
                       className={`badge ${game.state === "live" ? "live" : ""}`}
                     >
-                      {game.state === "live"
-                        ? "Live · provisional"
-                        : game.state === "confirmed"
-                          ? "Confirmed result"
-                          : "Scheduled"}
+                      {game.results.length > 1
+                        ? "Corrected final result"
+                        : game.state === "live"
+                          ? "Live · provisional"
+                          : game.state === "confirmed"
+                            ? "Confirmed result"
+                            : "Scheduled"}
                     </span>
                   </div>
                   <ScoreTable game={game} />
@@ -330,6 +332,13 @@ export function ScoresView({
                       Organizer attention required for affected assignments.
                       Recorded participants and results are preserved.
                     </p>
+                  )}
+                  {gameId && (
+                    <details>
+                      <summary>Current game lineup evidence</summary>
+                      <LineupEvidence name={game.nameA} lineup={game.lineupA} />
+                      <LineupEvidence name={game.nameB} lineup={game.lineupB} />
+                    </details>
                   )}
                   {gameId && <GameResultHistory results={game.results} />}
                   {gameId && (

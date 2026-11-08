@@ -293,11 +293,19 @@ export function ScoringEditor({ gameId }: { gameId: string }) {
               void send("end");
             }}
           >
-            <fieldset disabled={locked || game.scoringSource !== "manual"}>
+            <fieldset
+              disabled={
+                locked ||
+                game.scoringSource !== "manual" ||
+                game.state === "confirmed"
+              }
+            >
               <legend>
                 {game.state === "scheduled"
                   ? "Start game"
-                  : "Record or correct a live end"}
+                  : game.state === "confirmed"
+                    ? "Confirmed live scores"
+                    : "Record or correct a live end"}
               </legend>
               <label htmlFor="hammer">Known hammer (selected end)</label>
               <select
@@ -436,9 +444,8 @@ export function ScoringEditor({ gameId }: { gameId: string }) {
           <ul className="workspace-list">
             {game.history.slice(0, 3).map((h) => (
               <li key={h.version}>
-                Version {h.version} ·{" "}
-                {h.action === "game_started" ? "Game started" : "End saved"} ·{" "}
-                {h.actorId} · {new Date(h.createdAt).toLocaleString()}
+                Version {h.version} · {historyLabel(h.action)} · {h.actorId} ·{" "}
+                {new Date(h.createdAt).toLocaleString()}
               </li>
             ))}
           </ul>
@@ -450,9 +457,8 @@ export function ScoringEditor({ gameId }: { gameId: string }) {
               <ul className="workspace-list">
                 {game.history.slice(3).map((h) => (
                   <li key={h.version}>
-                    Version {h.version} ·{" "}
-                    {h.action === "game_started" ? "Game started" : "End saved"}{" "}
-                    · {h.actorId} · {new Date(h.createdAt).toLocaleString()}
+                    Version {h.version} · {historyLabel(h.action)} · {h.actorId}{" "}
+                    · {new Date(h.createdAt).toLocaleString()}
                   </li>
                 ))}
               </ul>
@@ -462,5 +468,18 @@ export function ScoringEditor({ gameId }: { gameId: string }) {
         </>
       )}
     </main>
+  );
+}
+function historyLabel(action: string) {
+  return (
+    (
+      {
+        game_started: "Game started",
+        end_saved: "End saved",
+        result_confirmed: "Result confirmed",
+        result_corrected: "Result corrected",
+        game_lineup_recorded: "Game lineup recorded",
+      } as Record<string, string>
+    )[action] ?? action
   );
 }

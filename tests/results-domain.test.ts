@@ -9,6 +9,12 @@ test("normal results require the participating winner and a complete decisive li
   const ends = [
     { state: "played", a: 2, b: 0 },
     { state: "played", a: 0, b: 1 },
+    { state: "played", a: 0, b: 0 },
+    { state: "played", a: 0, b: 0 },
+    { state: "played", a: 0, b: 0 },
+    { state: "played", a: 0, b: 0 },
+    { state: "played", a: 0, b: 0 },
+    { state: "played", a: 0, b: 0 },
   ] as const;
   assert.deepEqual(
     validateResult("live", "confirm", ["north", "prairie"], {
@@ -136,4 +142,16 @@ test("a game default keeps its event version and labels defaulted evidence; diff
     /plain-text/,
   );
   assert.equal(event.members[0].playerId, "p1");
+});
+test("normal completion uses the eight-end four-player profile; an early stop is recorded as a concession", () => {
+  assert.throws(
+    () =>
+      validateResult("live", "confirm", ["north", "prairie"], {
+        outcome: "normal",
+        winnerEntryId: "north",
+        reason: "",
+        ends: [{ state: "played", a: 2, b: 0 }],
+      }),
+    /eight/,
+  );
 });

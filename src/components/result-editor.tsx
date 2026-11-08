@@ -155,6 +155,8 @@ export function ResultEditor({
       setPending(null);
       setVersion(data.version);
       setStatus("saved");
+      if (command.action === "confirm" || command.action === "correct")
+        setDraft((d) => ({ ...d, editing: false }));
       try {
         await onApplied();
       } catch {
@@ -310,7 +312,7 @@ export function ResultEditor({
     <section aria-label="Game result" className="result-editor">
       <h2>Game result</h2>
       <p className="notice">
-        {game.results.length > 1
+        {game.results.length > 1 || game.results[0]?.result.correction
           ? `Corrected final · ${game.results[0].result.outcome}`
           : game.state === "confirmed"
             ? `Final · ${game.results[0]?.result.outcome ?? "legacy result"}`

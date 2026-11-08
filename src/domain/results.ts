@@ -100,6 +100,10 @@ export function validateResult(
       ends.some((e) => e.state === "unknown")
     )
       throw new Error("A normal result needs a complete decisive line score");
+    if (ends.filter((e) => e.state === "played").length < 8)
+      throw new Error(
+        "Normal completion requires eight played ends in this four-player profile; use conceded for an early stop",
+      );
     if (
       total.a === total.b ||
       input.winnerEntryId !== participants[total.a! > total.b! ? 0 : 1]

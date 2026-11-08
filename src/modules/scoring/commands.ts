@@ -178,8 +178,12 @@ async function snapshot(client: PoolClient, id: string) {
     ends,
     results,
     attention,
-    lineupA: g.entryA ? await gameLineup(client, id, "a", g.entryA) : null,
-    lineupB: g.entryB ? await gameLineup(client, id, "b", g.entryB) : null,
+    lineupA: g.entryA
+      ? await gameLineup(client, id, "a", g.entryA, g.state === "confirmed")
+      : null,
+    lineupB: g.entryB
+      ? await gameLineup(client, id, "b", g.entryB, g.state === "confirmed")
+      : null,
     endHammer,
     hammerEnd,
     hammer:
@@ -211,6 +215,7 @@ async function saveDifference(
   side: "a" | "b",
   members: DifferenceMember[],
   before: Awaited<ReturnType<typeof snapshot>>,
+  auditId: string,
 ) {
   const lineup = side === "a" ? before.lineupA : before.lineupB;
   if (!lineup)
@@ -225,7 +230,7 @@ async function saveDifference(
   if (selected.rowCount !== members.length)
     throw new ScoringError(400, "Every lineup player must exist");
   await client.query(
-    "INSERT INTO game_lineup_version(game_id,version,side,entry_id,event_lineup_version,mode,members) VALUES($1,$2,$3,$4,$5,'difference',$6)",
+    "INSERT INTO game_lineup_version(game_id,version,side,entry_id,event_lineup_version,mode,members,audit_id) VALUES($1,$2,$3,$4,$5,'difference',$6,$7)",
     [
       id,
       version,
@@ -239,6 +244,7 @@ async function saveDifference(
           participation: "declared",
         })),
       ),
+      auditId,
     ],
   );
 }
@@ -263,7 +269,8 @@ export async function scoringGame(actorId: string, id: string) {
   }
 }
 export async function saveScoring(actorId: string, id: string, input: unknown) {
-  const command = parseCommand(input),
+  const auditId = randomUUID(),
+    command = parseCommand(input),
     client = await pool.connect();
   try {
     await client.query("BEGIN");
@@ -344,8 +351,9 @@ export async function saveScoring(actorId: string, id: string, input: unknown) {
             side,
             command.lineups[side]!,
             before,
+            auditId,
           );
-      await freezeLineups(client, id, before.version + 1, before);
+      await freezeLineups(client, id, before.version + 1, before, auditId);
       await client.query(
         "UPDATE game SET state='confirmed',total_a=$2,total_b=$3 WHERE id=$1",
         [id, result.totalA, result.totalB],
@@ -372,7 +380,14 @@ export async function saveScoring(actorId: string, id: string, input: unknown) {
           409,
           "Assign the participant before recording its game lineup",
         );
-      await freezeLineups(client, id, before.version + 1, before, command.side);
+      await freezeLineups(
+        client,
+        id,
+        before.version + 1,
+        before,
+        auditId,
+        command.side,
+      );
       await saveDifference(
         client,
         id,
@@ -380,6 +395,7 @@ export async function saveScoring(actorId: string, id: string, input: unknown) {
         command.side!,
         command.members!,
         before,
+        auditId,
       );
     } else if (command.action === "start") {
       if (before.state !== "scheduled" || !before.entryA || !before.entryB)
@@ -388,7 +404,7 @@ export async function saveScoring(actorId: string, id: string, input: unknown) {
           "Start requires a scheduled game with both opponents assigned",
         );
       await client.query("UPDATE game SET state='live' WHERE id=$1", [id]);
-      await freezeLineups(client, id, before.version + 1, before);
+      await freezeLineups(client, id, before.version + 1, before, auditId);
     } else {
       if (before.state !== "live")
         throw new ScoringError(
@@ -444,8 +460,33 @@ export async function saveScoring(actorId: string, id: string, input: unknown) {
       ],
     );
     const after = await snapshot(client, id),
-      auditId = randomUUID(),
       response = { requestId: command.requestId, version: after.version };
+    const frozenResult = result
+      ? {
+          ...result,
+          correction: command.action === "correct",
+          entryA: before.entryA,
+          entryB: before.entryB,
+          nameA: before.nameA,
+          nameB: before.nameB,
+          lineupA: after.lineupA,
+          lineupB: after.lineupB,
+          ...(command.action === "correct" && !before.results.length
+            ? {
+                legacyBefore: {
+                  entryA: before.entryA,
+                  entryB: before.entryB,
+                  nameA: before.nameA,
+                  nameB: before.nameB,
+                  totalA: before.totalA,
+                  totalB: before.totalB,
+                  ends: before.ends,
+                  attribution: "Not recorded",
+                },
+              }
+            : {}),
+        }
+      : undefined;
     await client.query(
       "INSERT INTO audit_record(id,actor_id,action,resource_id,request_id,resource_version,before_state,after_state) VALUES($1,$2,$3,$4,$5,$6,$7,$8)",
       [
@@ -467,15 +508,7 @@ export async function saveScoring(actorId: string, id: string, input: unknown) {
         result
           ? {
               ...after,
-              confirmedResult: {
-                ...result,
-                entryA: before.entryA,
-                entryB: before.entryB,
-                nameA: before.nameA,
-                nameB: before.nameB,
-                lineupA: after.lineupA,
-                lineupB: after.lineupB,
-              },
+              confirmedResult: frozenResult,
             }
           : after,
       ],
@@ -486,22 +519,7 @@ export async function saveScoring(actorId: string, id: string, input: unknown) {
       ).rows[0].name;
       await client.query(
         "INSERT INTO game_result_version(game_id,version,actor_id,confirmed_by,result,audit_id) VALUES($1,$2,$3,$4,$5,$6)",
-        [
-          id,
-          after.version,
-          actorId,
-          name,
-          {
-            ...result,
-            entryA: before.entryA,
-            entryB: before.entryB,
-            nameA: before.nameA,
-            nameB: before.nameB,
-            lineupA: after.lineupA,
-            lineupB: after.lineupB,
-          },
-          auditId,
-        ],
+        [id, after.version, actorId, name, frozenResult, auditId],
       );
       if (
         command.action === "correct" &&
