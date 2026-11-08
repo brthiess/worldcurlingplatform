@@ -1,17 +1,17 @@
-import type { Locator, Page, APIRequestContext } from "@playwright/test";
-export async function signInApiWithRateWindow(
-  request: APIRequestContext,
-  email: string,
-  password: string | undefined,
-) {
+import type {
+  Locator,
+  Page,
+  APIResponse,
+  APIRequestContext,
+} from "@playwright/test";
+export async function authApiWithRateWindow(send: () => Promise<APIResponse>) {
   for (let attempt = 0; attempt < 3; attempt++) {
-    const r = await request.post("/api/auth/sign-in/email", {
-      headers: { Origin: process.env.BETTER_AUTH_URL! },
-      data: { email, password },
-    });
-    if (r.status() !== 429 || attempt === 2) return r;
+    const response = await send();
+    if (response.status() !== 429 || attempt === 2) return response;
     const seconds = Number(
-      r.headers()["x-retry-after"] ?? r.headers()["retry-after"] ?? 60,
+      response.headers()["x-retry-after"] ??
+        response.headers()["retry-after"] ??
+        60,
     );
     await new Promise((resolve) =>
       setTimeout(
@@ -24,7 +24,7 @@ export async function signInApiWithRateWindow(
     );
     await new Promise((resolve) => setTimeout(resolve, 250));
   }
-  throw Error("Authentication retry window exhausted");
+  throw new Error("Authentication retry window exhausted.");
 }
 export async function signInWithRateWindow(page: Page, button: Locator) {
   for (let attempt = 0; attempt < 3; attempt++) {
@@ -52,4 +52,16 @@ export async function signInWithRateWindow(page: Page, button: Locator) {
     );
     await new Promise((resolve) => setTimeout(resolve, 250));
   }
+}
+export function signInApiWithRateWindow(
+  request: APIRequestContext,
+  email: string,
+  password: string | undefined,
+) {
+  return authApiWithRateWindow(() =>
+    request.post("/api/auth/sign-in/email", {
+      headers: { Origin: process.env.BETTER_AUTH_URL! },
+      data: { email, password },
+    }),
+  );
 }

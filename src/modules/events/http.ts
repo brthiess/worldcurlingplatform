@@ -19,6 +19,18 @@ export async function applicationHttp(
     const current = await actor(request.headers);
     if (!current)
       return Response.json({ error: "Sign in required" }, { status: 401 });
+    if (
+      write &&
+      request.headers.has("X-WCP-Actor") &&
+      request.headers.get("X-WCP-Actor") !== current.id
+    )
+      return Response.json(
+        {
+          error:
+            "The signed-in account changed. Recover this command with its original account.",
+        },
+        { status: 403, headers: { "Cache-Control": "no-store" } },
+      );
     return Response.json(await run(current.id), {
       status,
       headers: { "Cache-Control": "no-store" },

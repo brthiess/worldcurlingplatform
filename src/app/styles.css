@@ -1017,6 +1017,44 @@ footer {
     padding: 14px;
   }
 }
+
+.responsibility-controls {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+.responsibility-controls fieldset {
+  min-width: 0;
+  margin: 12px 0;
+  padding: 12px;
+}
+.responsibility-controls select,
+.responsibility-controls textarea {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  margin: 8px 0 16px;
+}
+.responsibility-controls button {
+  max-width: 100%;
+  white-space: normal;
+}
+.authority-workspace fieldset {
+  min-width: 0;
+  padding: 0;
+  border: 0;
+}
+.authority-workspace input,
+.authority-workspace select,
+.authority-workspace textarea {
+  min-width: 0;
+  max-width: 100%;
+}
+.authority-workspace h3,
+.authority-workspace legend,
+.authority-workspace p {
+  overflow-wrap: anywhere;
+}
 .news-page {
   max-width: 1200px;
   margin: auto;

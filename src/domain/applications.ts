@@ -10,6 +10,7 @@ export type ApplicationInput = {
   country: string;
   venue: string;
   timezone: string;
+  category?: string;
   divisions: ProposedDivision[];
 };
 export const disciplines = {
@@ -52,6 +53,12 @@ export function validateApplication(value: unknown): Record<string, string> {
     unknown
   >;
   const errors: Record<string, string> = {};
+  if (
+    input.category !== undefined &&
+    (typeof input.category !== "string" ||
+      !/^[a-z][a-z0-9_-]{0,79}$/.test(input.category))
+  )
+    errors.category = "Use a category identifier (letters, numbers, hyphens).";
   if (
     input.newSeriesName !== undefined &&
     (typeof input.newSeriesName !== "string" ||
