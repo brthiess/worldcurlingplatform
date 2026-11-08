@@ -88,8 +88,21 @@ for (const [label, width, height] of [
   }, info) => {
     test.setTimeout(120000);
     await page.setViewportSize({ width, height });
-    const errors: string[] = [];
+    const errors: string[] = [],
+      consoleErrors: string[] = [],
+      networkErrors: string[] = [];
     page.on("pageerror", (e) => errors.push(e.message));
+    page.on("console", (message) => {
+      if (message.type() === "error") consoleErrors.push(message.text());
+    });
+    page.on("response", (response) => {
+      if (response.status() >= 500)
+        networkErrors.push(`${response.status()} ${response.url()}`);
+    });
+    page.on("requestfailed", (request) => {
+      if (request.failure()?.errorText !== "net::ERR_ABORTED")
+        networkErrors.push(request.failure()?.errorText ?? request.url());
+    });
     const f = await fixture(page.request, label);
     await login(page.request, "administrator");
     await page.goto("/admin/representatives");
@@ -205,6 +218,8 @@ for (const [label, width, height] of [
       ).toBeVisible();
     }
     expect(errors).toEqual([]);
+    expect(consoleErrors).toEqual([]);
+    expect(networkErrors).toEqual([]);
   });
 }
 test("uncertain grant and entry keep exact commands across reload; current account and revoked authority deny recovery", async ({
@@ -314,6 +329,32 @@ test("uncertain grant and entry keep exact commands across reload; current accou
   });
   await page
     .getByLabel("Entry name", { exact: true })
+    .fill(f.name + " reconciled amendment");
+  await page.getByRole("button", { name: "Save entry", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Retry last save", exact: true }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", {
+      name: "Reconcile recorded entry command",
+      exact: true,
+    })
+    .click();
+  await expect(
+    page.getByRole("button", { name: "Retry last save", exact: true }),
+  ).toHaveCount(0);
+  expect(
+    (await (await page.request.get(`/api/v1/entries/${created.id}`)).json())
+      .version,
+  ).toBe(2);
+  expect(
+    (
+      await page.request.get(`/api/v1/entries/${created.id}?version=3`)
+    ).status(),
+  ).toBe(404);
+  loseAmend = true;
+  await page
+    .getByLabel("Entry name", { exact: true })
     .fill(f.name + " authority recovery");
   await page.getByRole("button", { name: "Save entry", exact: true }).click();
   await expect(
@@ -388,7 +429,7 @@ test("team authority shows loading, no authority, failed read and stale season s
     }),
   );
   await page.goto("/admin/representatives");
-  await expect(page.getByRole("alert")).toHaveText(
+  await expect(page.locator("main").getByRole("alert")).toHaveText(
     "Team authority could not be loaded.",
   );
   await page.unroute("**/api/v1/team-representation");
@@ -432,7 +473,7 @@ test("team authority shows loading, no authority, failed read and stale season s
   await page
     .getByRole("button", { name: "Save division entry season", exact: true })
     .click();
-  await expect(page.getByRole("alert")).toContainText(
+  await expect(page.locator("main").getByRole("alert")).toContainText(
     "division season changed",
   );
   await page

@@ -139,7 +139,7 @@ export function RepresentationWorkbench() {
             <a href="/admin/entries">Open your team entries</a>
           </p>
           {data.isAdministrator ? (
-            <div className="application-layout">
+            <div className="representation-layout">
               <section className="application-detail">
                 <h2>Grant team-season authority</h2>
                 <form
