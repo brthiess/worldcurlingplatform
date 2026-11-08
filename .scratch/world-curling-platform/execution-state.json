@@ -37,7 +37,7 @@
     "postgresql_api": "pending_first_slice"
   },
   "crawler": {
-    "accessed": false,
+    "accessed": true,
     "modified": false,
     "required_access": "read_only_initial_import_source"
   },
@@ -54,19 +54,24 @@
     "Close only reviewed integrated tickets with meaningful unit/PostgreSQL/API/frontend/browser evidence.",
     "Continue unblocked work and report provider/deployment limitations honestly."
   ],
-  "updated_at": "2026-11-08T15:37:35.684583+00:00",
+  "updated_at": "2026-11-08T09:37:35.684583-06:00",
   "active_tickets": [
     "WCP-001"
   ],
   "frontier": [],
   "events": [
     {
-      "time": "2026-11-08T15:37:35.684583+00:00",
+      "time": "2026-11-08T09:37:35.684583-06:00",
       "ticket": "WCP-001",
       "status": "in-progress",
       "reason": null,
       "commit": null,
       "evidence": null
     }
-  ]
+  ],
+  "research": {
+    "import": "complete_read_only_exploration",
+    "index": "docs/agents/research-index.md",
+    "wctrs": "complete_bounded_exploration"
+  }
 }
