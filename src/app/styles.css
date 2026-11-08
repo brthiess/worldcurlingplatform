@@ -4,6 +4,104 @@
   background: #f1f4f5;
   font-synthesis: none;
 }
+.ranking-workspace {
+  max-width: 1100px;
+}
+.ranking-workspace fieldset {
+  min-width: 0;
+}
+.ranking-navigation {
+  border: 1px solid #bacbd1;
+  padding: 16px;
+  margin: 20px 0;
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: end;
+}
+.ranking-navigation label {
+  display: grid;
+  gap: 8px;
+  flex: 1 1 260px;
+  min-width: 0;
+}
+.ranking-navigation select {
+  width: 100%;
+  max-width: 100%;
+}
+.form-card.ranking-form {
+  max-width: none;
+  width: 100%;
+}
+.ranking-form > fieldset {
+  border: 0;
+  padding: 0;
+}
+.ranking-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px 24px;
+}
+.ranking-form details {
+  border-top: 1px solid #bacbd1;
+  padding: 16px 0;
+  overflow-wrap: anywhere;
+}
+.ranking-form summary {
+  cursor: pointer;
+  padding: 10px 0;
+  font-weight: 600;
+  line-height: 1.5;
+}
+.ranking-form summary .muted {
+  display: block;
+  font-weight: normal;
+}
+.ranking-form summary:focus-visible {
+  outline: 3px solid #da7200;
+  outline-offset: 3px;
+}
+.ranking-form .ranking-checkpoint {
+  border: 1px solid #bacbd1;
+  padding: 16px;
+  margin: 20px 0;
+}
+.ranking-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 24px;
+}
+.ranking-actions button {
+  margin: 0;
+}
+.ranking-history,
+.ranking-issues {
+  background: white;
+  padding: 24px;
+  border: 1px solid #bacbd1;
+  margin: 24px 0;
+  overflow-wrap: anywhere;
+}
+.ranking-issues li {
+  border-bottom: 1px solid #d1dce0;
+  padding: 14px 0;
+}
+@media (max-width: 600px) {
+  .ranking-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .ranking-history,
+  .ranking-issues {
+    padding: 18px;
+  }
+  .ranking-navigation {
+    align-items: stretch;
+  }
+  .ranking-actions button {
+    width: 100%;
+  }
+}
 .field-label {
   display: block;
   font-weight: 600;
