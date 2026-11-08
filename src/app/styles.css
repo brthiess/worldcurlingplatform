@@ -4,6 +4,123 @@
   background: #f1f4f5;
   font-synthesis: none;
 }
+.field-label {
+  display: block;
+  font-weight: 600;
+  margin: 20px 0 8px;
+}
+.entry-roster {
+  padding-left: 24px;
+}
+.entry-roster > li {
+  border-bottom: 1px solid #d1dce0;
+  padding: 20px 0;
+}
+.entry-roster h4 {
+  margin: 0 0 6px;
+  overflow-wrap: anywhere;
+  font-size: 18px;
+}
+.entry-roster p {
+  margin: 8px 0;
+}
+.form-card .check-label {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  line-height: 1.5;
+}
+.form-card .check-label input {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
+.search-results {
+  list-style: none;
+  padding: 0;
+  max-height: 300px;
+  overflow: auto;
+  border-left: 3px solid #b6cbd1;
+}
+.search-results li {
+  padding: 12px 16px;
+  border-bottom: 1px solid #d1dce0;
+  overflow-wrap: anywhere;
+}
+.search-results p {
+  margin: 6px 0;
+}
+.form-card .search-results button {
+  margin: 8px 0 0;
+}
+.roster-section {
+  margin: 28px 0;
+  background: white;
+  border: 1px solid #d1dce0;
+  padding: 24px;
+  border-radius: 8px;
+}
+.roster-section h2 {
+  overflow-wrap: anywhere;
+  font-size: 22px;
+}
+.public-roster {
+  list-style: none;
+  padding: 0;
+}
+.public-roster li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 0;
+  border-bottom: 1px solid #d1dce0;
+}
+.public-roster li > a {
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+.roster-labels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  font-size: 14px;
+}
+.roster-labels .notice {
+  margin: 0;
+  padding: 4px 8px;
+}
+.entry-links-container {
+  max-width: 1160px;
+  padding: 0 24px 36px;
+  margin: 0 auto;
+}
+.entry-link-list {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+.entry-link-list li {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 600px) {
+  .roster-section {
+    padding: 18px;
+  }
+  .entry-link-list {
+    grid-template-columns: 1fr;
+  }
+  .entry-links-container {
+    padding: 0 14px 24px;
+  }
+}
 * {
   box-sizing: border-box;
 }

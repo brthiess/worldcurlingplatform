@@ -159,7 +159,7 @@
       "file": "03-confirm-results-and-make-ordinary-auditable-corrections.md",
       "id": "WCP-003",
       "path": "issues/03-confirm-results-and-make-ordinary-auditable-corrections.md",
-      "status": "ready-for-agent",
+      "status": "in-progress",
       "labels": [
         "ready-for-agent"
       ],
@@ -312,13 +312,17 @@
       "file": "06-manually-enter-teams-and-resolve-core-composition-identities.md",
       "id": "WCP-006",
       "path": "issues/06-manually-enter-teams-and-resolve-core-composition-identities.md",
-      "status": "in-progress",
+      "status": "completed",
       "labels": [
         "ready-for-agent"
       ],
       "blocked_by": [
         "WCP-004"
-      ]
+      ],
+      "completion": {
+        "commit": "4f50650c849021c5d764c71fe73409a56971997e",
+        "evidence": "docs/verification/WCP-006.md"
+      }
     },
     {
       "n": 7,

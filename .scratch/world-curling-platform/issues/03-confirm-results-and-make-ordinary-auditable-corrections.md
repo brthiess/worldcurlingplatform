@@ -4,7 +4,7 @@ number: 3
 title: "Confirm results and make ordinary auditable corrections"
 parent: WCP-SPEC-001
 type: implementation
-status: ready-for-agent
+status: in-progress
 labels: [ready-for-agent]
 blocked_by: [WCP-002]
 source_spec_sha256: 045B46988225B6C8C0020B23C8C5D4EAA8E2E1916256148A0FDA26B5DA8673FD
@@ -18,7 +18,7 @@ published: 2026-11-07
 
 **Blocked by:** [02: Save live end scores from a mobile scorekeeper screen](02-save-live-end-scores-from-a-mobile-scorekeeper-screen.md).
 
-**Status:** ready-for-agent
+**Status:** in-progress
 
 ## Parent and scope
 
