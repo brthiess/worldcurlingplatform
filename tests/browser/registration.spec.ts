@@ -122,25 +122,21 @@ for (const [label, width, height] of [
     await expect(
       page.getByText("1 of 1 places remaining", { exact: true }),
     ).toBeVisible();
-    const first = page
-      .getByRole("listitem")
-      .filter({
-        has: page.getByRole("heading", {
-          name: `Fictional team 1 ${f.suffix}`,
-        }),
-      });
+    const first = page.getByRole("listitem").filter({
+      has: page.getByRole("heading", {
+        name: `Fictional team 1 ${f.suffix}`,
+      }),
+    });
     await first.getByRole("button", { name: "Request entry place" }).click();
     await expect(first.getByText("Accepted", { exact: true })).toBeVisible();
     await expect(
       page.getByText("0 of 1 places remaining", { exact: true }),
     ).toBeVisible();
-    const second = page
-      .getByRole("listitem")
-      .filter({
-        has: page.getByRole("heading", {
-          name: `Fictional team 2 ${f.suffix}`,
-        }),
-      });
+    const second = page.getByRole("listitem").filter({
+      has: page.getByRole("heading", {
+        name: `Fictional team 2 ${f.suffix}`,
+      }),
+    });
     await second.getByRole("button", { name: "Request entry place" }).click();
     await expect(
       second.getByText("Waitlisted — no reserved place", { exact: true }),
@@ -177,13 +173,11 @@ test("reviewed fee holds expire, and invitation-only representatives can request
   await page
     .getByLabel("Division", { exact: true })
     .selectOption(reviewed.division);
-  const first = page
-    .getByRole("listitem")
-    .filter({
-      has: page.getByRole("heading", {
-        name: `Fictional team 1 ${reviewed.suffix}`,
-      }),
-    });
+  const first = page.getByRole("listitem").filter({
+    has: page.getByRole("heading", {
+      name: `Fictional team 1 ${reviewed.suffix}`,
+    }),
+  });
   await first.getByRole("button", { name: "Submit for review" }).click();
   await expect(
     page.getByText("1 of 1 places remaining", { exact: true }),
@@ -242,13 +236,11 @@ test("reviewed fee holds expire, and invitation-only representatives can request
   await page
     .getByLabel("Division", { exact: true })
     .selectOption(invited.division);
-  const row = page
-    .getByRole("listitem")
-    .filter({
-      has: page.getByRole("heading", {
-        name: `Fictional team 1 ${invited.suffix}`,
-      }),
-    });
+  const row = page.getByRole("listitem").filter({
+    has: page.getByRole("heading", {
+      name: `Fictional team 1 ${invited.suffix}`,
+    }),
+  });
   await row.getByRole("button", { name: "Invite entry" }).click();
   await expect(
     row.getByText("Invited — place not reserved", { exact: true }),
@@ -282,7 +274,7 @@ test("loading, empty, denied, stale and uncertain exact retry remain truthful", 
     page.getByText("Loading entry terms and capacity…", { exact: true }),
   ).toBeVisible();
   release();
-  await page.unroute("**/api/v1/registration");
+  await page.unrouteAll({ behavior: "wait" });
   await page.getByLabel("Division", { exact: true }).selectOption(f.division);
   // Another command changes this admission after this tab read version zero.
   expect(
@@ -299,11 +291,9 @@ test("loading, empty, denied, stale and uncertain exact retry remain truthful", 
       })
     ).status(),
   ).toBe(200);
-  const first = page
-    .getByRole("listitem")
-    .filter({
-      has: page.getByRole("heading", { name: `Fictional team 1 ${f.suffix}` }),
-    });
+  const first = page.getByRole("listitem").filter({
+    has: page.getByRole("heading", { name: `Fictional team 1 ${f.suffix}` }),
+  });
   await first.getByRole("button", { name: "Request entry place" }).click();
   await expect(
     page.getByText(/Admission changed in another tab/),
@@ -350,7 +340,7 @@ test("loading, empty, denied, stale and uncertain exact retry remain truthful", 
   await expect(page.getByText(/Registration command recorded/)).toBeVisible();
   expect(requests).toHaveLength(2);
   expect(requests[1]).toBe(requests[0]);
-  await page.unroute("**/api/v1/registration");
+  await page.unrouteAll({ behavior: "wait" });
   await page.context().setOffline(true);
   await page
     .getByRole("button", { name: "Refresh capacity", exact: true })

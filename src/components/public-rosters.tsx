@@ -194,8 +194,11 @@ export function PublicRoster({
       <main id="main">
         {e.registrationConfigured ? (
           <p className="notice">
-            Admission: {e.admissionState}. Payment, lineup readiness and ranking
-            eligibility are separate.
+            Admission: {e.admissionState}
+            {e.admissionState === "pending"
+              ? "; this submission does not reserve a place"
+              : ""}
+            . Payment, lineup readiness and ranking eligibility are separate.
           </p>
         ) : (
           e.entryAdmission === "submitted_pending" && (
