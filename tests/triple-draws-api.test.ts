@@ -5,6 +5,7 @@ import { randomUUID } from "node:crypto";
 import pg from "pg";
 import { authRequest } from "./auth-request";
 import { drawFixtureEvent } from "./draws-fixture";
+import { configuredDrawTerms } from "./registration-draw-fixture";
 import { tripleResults, expectedTripleSources } from "./triple-draws-fixture";
 const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
 const base = process.env.BETTER_AUTH_URL!;
@@ -330,6 +331,188 @@ async function create() {
   }
   return { id, seeds };
 }
+test("configured triple16 uses its actual operated family and the complete accepted field under a capacity ceiling", async () => {
+  const { id, seeds } = await create();
+  const registration = (body: object) =>
+    post("/api/v1/registration", {
+      requestId: randomUUID(),
+      divisionId: id,
+      ...body,
+    });
+  let r = await registration({
+    action: "open",
+    version: 0,
+    terms: {
+      ...configuredDrawTerms,
+      capacity: 20,
+      format: "triple_knockout",
+      formatNotes: "Adopted application sixteen-team 2 A / 3 B / 3 C",
+    },
+  });
+  assert.equal(r.status, 200, await r.clone().text());
+  for (const entryId of seeds) {
+    r = await registration({ action: "request", entryId, version: 0 });
+    assert.equal(r.status, 200, await r.clone().text());
+    assert.equal((await r.json()).state, "accepted");
+  }
+  r = await post("/api/v1/divisions/" + id + "/draw", {
+    requestId: randomUUID(),
+    expectedVersion: 0,
+    action: "preview",
+    template: "application-tko16-q8-233-v1",
+    seedEntryIds: seeds,
+    reason: "Complete accepted configured triple field",
+  });
+  assert.equal(r.status, 200, await r.clone().text());
+  r = await post("/api/v1/divisions/" + id + "/draw", {
+    requestId: randomUUID(),
+    expectedVersion: 1,
+    action: "publish",
+    reason: "Publish compatible accepted triple field",
+  });
+  assert.equal(r.status, 200, await r.clone().text());
+  const data = await (
+    await fetch(base + "/api/v1/public/divisions/" + id + "/draw")
+  ).json();
+  assert.equal(data.games.length, 40);
+  const workspace = await (
+    await fetch(base + "/api/v1/registration", { headers: { cookie } })
+  ).json();
+  assert.equal(workspace.divisions.find((d: any) => d.id === id).remaining, 4);
+});
+async function openAndAdmit(
+  f: { id: string; seeds: string[] },
+  format = "triple_knockout",
+) {
+  const command = (body: object) =>
+    post("/api/v1/registration", {
+      requestId: randomUUID(),
+      divisionId: f.id,
+      ...body,
+    });
+  let r = await command({
+    action: "open",
+    version: 0,
+    terms: {
+      ...configuredDrawTerms,
+      capacity: 20,
+      format,
+      formatNotes: "Explicit accepted application configuration",
+    },
+  });
+  assert.equal(r.status, 200, await r.clone().text());
+  for (const entryId of f.seeds) {
+    r = await command({ action: "request", entryId, version: 0 });
+    assert.equal(r.status, 200, await r.clone().text());
+  }
+}
+const triplePreview = (seeds: string[], version = 0) => ({
+  requestId: randomUUID(),
+  expectedVersion: version,
+  action: "preview",
+  template: "application-tko16-q8-233-v1",
+  seedEntryIds: seeds,
+  reason: "Review current configured triple field",
+});
+const triplePublish = () => ({
+  requestId: randomUUID(),
+  expectedVersion: 1,
+  action: "publish",
+  reason: "Publish exact reviewed current field",
+});
+test("triple preview and publication reject a different registered family without changing its terms or historical receipt", async () => {
+  const first = await create();
+  await openAndAdmit(first, "single_knockout");
+  let r = await post(
+    "/api/v1/divisions/" + first.id + "/draw",
+    triplePreview(first.seeds),
+  );
+  assert.equal(r.status, 422);
+  assert.match((await r.json()).error, /format family/);
+  const f = await create(),
+    path = "/api/v1/divisions/" + f.id + "/draw",
+    original = triplePreview(f.seeds);
+  r = await post(path, original);
+  assert.equal(r.status, 200);
+  await openAndAdmit(f, "single_knockout");
+  r = await post(path, triplePublish());
+  assert.equal(r.status, 409);
+  assert.match((await r.json()).error, /format family/);
+  assert.equal((await post(path, original)).status, 200);
+  const terms = (
+    await pool.query(
+      "SELECT format FROM division_registration WHERE division_id=$1",
+      [f.id],
+    )
+  ).rows[0];
+  assert.equal(terms.format, "single_knockout");
+  assert.equal(
+    (await fetch(base + "/api/v1/public/divisions/" + f.id + "/draw")).status,
+    404,
+  );
+});
+test("triple preview and publication cannot omit a seventeenth accepted peer under capacity20", async () => {
+  for (const afterPreview of [false, true]) {
+    const f = await create();
+    await openAndAdmit(f);
+    const path = "/api/v1/divisions/" + f.id + "/draw",
+      original = triplePreview(f.seeds);
+    if (afterPreview) {
+      const r = await post(path, original);
+      assert.equal(r.status, 200);
+    }
+    const peer = f.id + "-17";
+    await pool.query(
+      "INSERT INTO event_entry(id,division_id,display_name) VALUES($1,$2,'Additional accepted peer')",
+      [peer, f.id],
+    );
+    let r = await post("/api/v1/registration", {
+      requestId: randomUUID(),
+      divisionId: f.id,
+      action: "request",
+      entryId: peer,
+      version: 0,
+    });
+    assert.equal(r.status, 200);
+    r = await post(
+      path,
+      afterPreview ? triplePublish() : triplePreview(f.seeds),
+    );
+    assert.equal(r.status, afterPreview ? 409 : 422);
+    assert.match((await r.json()).error, /complete current accepted field/);
+    if (afterPreview) assert.equal((await post(path, original)).status, 200);
+    assert.equal(
+      (await fetch(base + "/api/v1/public/divisions/" + f.id + "/draw")).status,
+      404,
+    );
+  }
+});
+test("triple publication rechecks selected admission independently from lineup version", async () => {
+  const f = await create();
+  await openAndAdmit(f);
+  const path = "/api/v1/divisions/" + f.id + "/draw",
+    original = triplePreview(f.seeds);
+  let r = await post(path, original);
+  assert.equal(r.status, 200);
+  // An owned fixture represents an independently amended admission; no future
+  // withdrawal/payment engine or application persistence response is mocked.
+  await pool.query(
+    "UPDATE event_entry SET admission_state='pending',admission_version=admission_version+1 WHERE id=$1",
+    [f.seeds[0]],
+  );
+  r = await post(path, triplePublish());
+  assert.equal(r.status, 409);
+  assert.match((await r.json()).error, /admission changed/);
+  const w = await (await fetch(base + path, { headers: { cookie } })).json();
+  assert.equal(w.entries.length, 15);
+  assert.equal(w.version, 1);
+  assert.equal(w.seeds[0].version, 0);
+  assert.equal((await post(path, original)).status, 200);
+  assert.equal(
+    (await fetch(base + "/api/v1/public/divisions/" + f.id + "/draw")).status,
+    404,
+  );
+});
 test("organizer previews and publishes the exact sixteen-team profile with stored loser and qualification feeds", async () => {
   const { id, seeds } = await create();
   const path = "/api/v1/divisions/" + id + "/draw";

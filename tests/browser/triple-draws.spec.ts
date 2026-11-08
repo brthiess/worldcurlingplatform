@@ -4,6 +4,7 @@ import "dotenv/config";
 import pg from "pg";
 import { randomUUID } from "node:crypto";
 import { drawFixtureEvent } from "../draws-fixture";
+import { configuredDrawTerms } from "../registration-draw-fixture";
 import { tripleResults } from "../triple-draws-fixture";
 import { signInApiWithRateWindow } from "./auth-fixture";
 const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
@@ -209,6 +210,18 @@ for (const [device, width, height] of [
       path: info.outputPath(device + "-selected-list.png"),
       fullPage: true,
     });
+    expect(
+      await page
+        .locator('a[href^="#draw-node-"]')
+        .evaluateAll((links) =>
+          links.every(
+            (link) =>
+              document.getElementById(
+                (link as HTMLAnchorElement).hash.slice(1),
+              ) !== null,
+          ),
+        ),
+    ).toBe(true);
     await page.getByRole("button", { name: "Bracket", exact: true }).click();
     await page.getByRole("region", { name: /Knockout bracket/ }).focus();
     await expect(
@@ -263,6 +276,10 @@ test("homepage main scenario retains event/draw across polling and back; actual 
   );
   await expect(page.getByRole("table")).toContainText("Fictional T16");
   await expect(page.locator(".next-draw")).toContainText("5:00");
+  await expect(page.locator(".next-draw a")).toHaveAttribute(
+    "href",
+    /event=main-triple-2026/,
+  );
   const data = await (
     await page.request.get("/api/v1/public/divisions/main-triple-sixteen/draw")
   ).json();
@@ -326,5 +343,112 @@ test("homepage main scenario retains event/draw across polling and back; actual 
     page.getByText("Connection interrupted.", { exact: false }),
   ).toHaveCount(0);
   expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+  expect(errors).toEqual([]);
+});
+test("configured triple16 organizer publishes only the admitted mixed-origin field belowcapacity20", async ({
+  page,
+}, info) => {
+  test.setTimeout(120000);
+  page.setDefaultTimeout(15000);
+  await page.setViewportSize({ width: 360, height: 800 });
+  const id = "ctko-" + randomUUID(),
+    entries: string[] = [],
+    errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  await pool.query(
+    "INSERT INTO division(id,event_id,name,discipline,format) VALUES($1,$2,'Configured triple browser','men_four','triple knockout')",
+    [id, event.id],
+  );
+  for (let n = 1; n <= 17; n++) {
+    const entry = id + "-" + n;
+    entries.push(entry);
+    await pool.query(
+      "INSERT INTO event_entry(id,division_id,display_name,entry_admission) VALUES($1,$2,$3,$4)",
+      [
+        entry,
+        id,
+        n === 17
+          ? "Pending configured peer"
+          : "Configured T" + String(n).padStart(2, "0"),
+        n % 2 ? "submitted_pending" : "organizer_recorded",
+      ],
+    );
+  }
+  expect(
+    (
+      await signInApiWithRateWindow(
+        page.request,
+        "organizer@demo.invalid",
+        process.env.DEMO_PASSWORD,
+      )
+    ).status(),
+  ).toBe(200);
+  const command = async (data: object) => {
+    const r = await page.request.post("/api/v1/registration", {
+      headers: {
+        Origin: process.env.BETTER_AUTH_URL!,
+        "X-WCP-Actor": "demo-organizer",
+      },
+      data: { requestId: randomUUID(), divisionId: id, ...data },
+    });
+    expect(r.status(), await r.text()).toBe(200);
+  };
+  await command({
+    action: "open",
+    version: 0,
+    terms: {
+      ...configuredDrawTerms,
+      format: "triple_knockout",
+      capacity: 20,
+      formatNotes: "Exact application16 2/3/3 profile",
+    },
+  });
+  for (const entryId of entries.slice(0, 16))
+    await command({ action: "request", entryId, version: 0 });
+  await page.goto("/admin/draws?division=" + id);
+  await page
+    .getByLabel("Competition profile", { exact: true })
+    .selectOption("application-tko16-q8-233-v1");
+  await expect(
+    page
+      .getByLabel("Seed 1", { exact: true })
+      .getByRole("option", { name: "Pending configured peer", exact: true }),
+  ).toHaveCount(0);
+  for (let n = 1; n <= 16; n++)
+    await page
+      .getByLabel("Seed " + n, { exact: true })
+      .selectOption(entries[n - 1]);
+  await page
+    .getByLabel("Revision reason", { exact: true })
+    .fill("Review complete accepted configured triple field");
+  await page.getByRole("button", { name: "Save preview", exact: true }).click();
+  await expect(page.getByRole("status")).toHaveText(
+    "Saved preview revision 1.",
+  );
+  await page
+    .getByLabel("Publication reason")
+    .fill("Publish compatible configured profile");
+  await page
+    .getByRole("button", { name: "Publish reviewed draw", exact: true })
+    .click();
+  await expect(page.getByRole("status")).toHaveText(
+    "Saved published revision 2.",
+  );
+  await page
+    .getByRole("link", { name: "Open public bracket and game list →" })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "Triple knockout bracket", exact: true }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Game list", exact: true }).click();
+  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+  await page.screenshot({
+    path: info.outputPath("phone-configured-triple.png"),
+  });
   expect(errors).toEqual([]);
 });

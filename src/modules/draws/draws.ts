@@ -211,11 +211,15 @@ export async function saveDraw(userId: string, id: string, input: unknown) {
           [id],
         )
       ).rows[0]?.format ?? null;
-    function registrationField(selectedIds: string[], status: number) {
+    function registrationField(
+      selectedIds: string[],
+      status: number,
+      template: string,
+    ) {
       try {
         validateRegistrationDrawField(
           registeredFamily,
-          "single_knockout",
+          template === TRIPLE_TEMPLATE ? "triple_knockout" : "single_knockout",
           fullField.filter((e) => e.admitted).map((e) => e.id),
           selectedIds,
         );
@@ -250,7 +254,7 @@ export async function saveDraw(userId: string, id: string, input: unknown) {
       } catch (e) {
         throw new DrawError((e as Error).message, 422);
       }
-      registrationField(x.seedEntryIds!, 422);
+      registrationField(x.seedEntryIds!, 422, generated.template);
       seeds = x.seedEntryIds!.map((entryId, i) => {
         const row = rows.find((r) => r.id === entryId)!;
         return { seed: i + 1, entryId, version: row.version, name: row.name };
@@ -292,6 +296,7 @@ export async function saveDraw(userId: string, id: string, input: unknown) {
       registrationField(
         seeds.map((s) => s.entryId),
         409,
+        graph.template,
       );
       if (
         (
