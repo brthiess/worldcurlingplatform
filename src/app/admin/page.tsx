@@ -95,6 +95,12 @@ export default function Admin() {
         Fictional review environment. Teams and results are demonstration
         records.
       </div>
+      <p>
+        <a href="/account">Personal account sign-in / registration →</a>
+      </p>
+      <p>
+        <a href="/account/profile">Player claims, review and profile →</a>
+      </p>
       {error && (
         <p className="error" role="alert">
           {error}
