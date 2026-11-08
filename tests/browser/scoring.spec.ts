@@ -6,8 +6,11 @@ import {
 } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 import { randomUUID } from "node:crypto";
-import { pool } from "../../src/db";
+import pg from "pg";
 import "dotenv/config";
+// Each browser suite owns its fixture connection lifecycle. Other files may
+// close the application module's pool in the same Playwright worker.
+const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
 let session: BrowserContext;
 test.beforeAll(async ({ browser }) => {
   session = await browser.newContext();
