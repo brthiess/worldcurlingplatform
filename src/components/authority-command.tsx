@@ -38,8 +38,9 @@ function valid(value: unknown): value is RetainedAuthorityCommand {
     typeof c.path !== "string" ||
     typeof c.actorId !== "string" ||
     !(
-      /^\/api\/v1\/(approval-delegations|role-grants)$/.test(c.path) ||
-      /^\/api\/v1\/applications\/[-\w]{1,80}$/.test(c.path)
+      /^\/api\/v1\/(approval-delegations|role-grants|division-finalizations)$/.test(
+        c.path,
+      ) || /^\/api\/v1\/applications\/[-\w]{1,80}$/.test(c.path)
     ) ||
     typeof c.body !== "string" ||
     typeof c.message !== "string" ||
@@ -217,7 +218,12 @@ export function AuthorityRecovery({
             <summary>Review retained command</summary>
             <dl style={{ overflowWrap: "anywhere" }}>
               <dt>Action</dt>
-              <dd>{body.action ?? "Assign scoring access"}</dd>
+              <dd>
+                {body.action ??
+                  (body.divisionId
+                    ? "Finalize division results"
+                    : "Assign scoring access")}
+              </dd>
               {body.authorityName && (
                 <>
                   <dt>Authority</dt>

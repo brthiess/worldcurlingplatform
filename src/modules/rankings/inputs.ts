@@ -13,6 +13,23 @@ import {
   type ReviewContext,
 } from "@/domain/ranking-inputs";
 type Reader = Pick<PoolClient, "query">;
+/** Competition receives scoped status only. Never expose private allocations,
+ * global starting entitlements, staff notes or source evidence to organizers. */
+export async function competitionRankingStatus(
+  c: Reader,
+  registrationId: string,
+) {
+  const r = await c.query(
+    "SELECT id FROM ranking_record WHERE registration_id=$1",
+    [registrationId],
+  );
+  if (!r.rowCount) return { reviewed: false, complete: false };
+  const row = await detail(c, r.rows[0].id);
+  return {
+    reviewed: row.state === "reviewed",
+    complete: row.currentReadiness?.complete === true,
+  };
+}
 async function staff(c: Reader, userId: string) {
   const r = await c.query(
     "SELECT id FROM role_grant WHERE user_id=$1 AND role='administrator' AND event_id IS NULL AND game_id IS NULL FOR SHARE",
