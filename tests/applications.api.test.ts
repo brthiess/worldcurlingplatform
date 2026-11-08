@@ -8,14 +8,25 @@ const base = process.env.BETTER_AUTH_URL!;
 const sessions = new Map<string, string>();
 async function login(role: string) {
   if (sessions.has(role)) return sessions.get(role)!;
-  const r = await fetch(`${base}/api/auth/sign-in/email`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Origin: base },
-    body: JSON.stringify({
-      email: `${role}@demo.invalid`,
-      password: process.env.DEMO_PASSWORD,
-    }),
-  });
+  const signIn = () =>
+    fetch(`${base}/api/auth/sign-in/email`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Origin: base },
+      body: JSON.stringify({
+        email: `${role}@demo.invalid`,
+        password: process.env.DEMO_PASSWORD,
+      }),
+    });
+  let r = await signIn();
+  if (r.status === 429) {
+    const wait = Math.min(
+      60000,
+      Math.max(1000, Number(r.headers.get("X-Retry-After") ?? 60) * 1000),
+    );
+    await new Promise((resolve) => setTimeout(resolve, wait));
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    r = await signIn();
+  }
   assert.equal(r.status, 200);
   const cookie = r.headers
     .getSetCookie()
