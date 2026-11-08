@@ -1,6 +1,6 @@
 # World Curling Platform
 
-Specification and planning package for a standalone platform to present to World Curling. Consolidated as of 2026-11-07, including seven demonstration workflows, six exceptional-scenario deferrals, and five accepted core product decisions. The main demonstration is a 16-team, four-player triple-knockout event. Application implementation has not started and is not authorized by this documentation update.
+Standalone curling platform and its authoritative planning package. The initial application slice runs a PostgreSQL-backed scores site and scoped demo workspaces. The overall offer retains seven demonstration workflows, six exceptional-scenario deferrals, and five accepted core product decisions; only verified tickets represent implemented behavior.
 
 ## Start here
 
@@ -24,4 +24,6 @@ Specification and planning package for a standalone platform to present to World
 - [Analytics reference review](docs/planning/analytics-reference.md)
 - [Original proposed schema v0.3](world-curling-platform-schema-v0.3.md)
 
-This repository currently contains design documents. No runnable application, database migrations, hosted service, or validated ranking implementation has been created yet. Accepted interview decisions are the user's direction for an offer, not World Curling endorsement.
+Local application setup and migrations are available. A hosted service and validated ranking implementation are not yet delivered. Accepted interview decisions are the user's direction for an offer, not World Curling endorsement.
+- [Run the application, seed demo personas, and verify it](docs/setup.md)
+- [WCP-001 verification evidence](docs/verification/WCP-001.md)

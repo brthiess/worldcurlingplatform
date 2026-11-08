@@ -1,2 +1,4 @@
-import { ScoresView } from '@/components/scores-view';
-export default function Home() { return <ScoresView />; }
+import { ScoresView } from "@/components/scores-view";
+export default function Home() {
+  return <ScoresView />;
+}
