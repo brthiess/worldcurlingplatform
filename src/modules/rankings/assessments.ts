@@ -5,6 +5,12 @@ import { EntryError, identifier } from "@/domain/entries";
 import { freezeContents } from "@/domain/finalization";
 import { rulesInput } from "@/domain/ranking-inputs";
 import { assessmentEngineSources } from "@/domain/event-assessment-sources";
+import { eventEngineIdentity } from "../../../scripts/event-engine-identity.mjs";
+const loadedEngineIdentity: ReturnType<typeof eventEngineIdentity> =
+  process.env.NODE_ENV === "production" &&
+  process.env.WCP_EVENT_ENGINE_BUILD_IDENTITY
+    ? JSON.parse(process.env.WCP_EVENT_ENGINE_BUILD_IDENTITY)
+    : eventEngineIdentity();
 import {
   assessmentEvidence,
   assessmentPolicy,
@@ -340,6 +346,7 @@ export async function queueEventAssessment(userId: string, raw: unknown) {
         engine: assessmentEngine,
         policy: assessmentPolicy,
         engineSources: assessmentEngineSources,
+        engineIdentity: loadedEngineIdentity,
         evidence,
         source: r,
         calculation: fieldFor(evidence, r),
@@ -439,6 +446,10 @@ export async function processEventAssessment(
       row.engine !== assessmentEngine
     )
       throw new Error("Frozen input digest or engine mismatch");
+    if (input.engineIdentity?.fingerprint !== loadedEngineIdentity.fingerprint)
+      throw new Error(
+        "Frozen engine implementation fingerprint does not match this worker. Retain this job; use the matching implementation or create an explicit new assessment revision.",
+      );
     const result = assessFourPlayer(input.calculation);
     const frozen = freezeContents({
       schema: "wcp.event-assessment-result.v1",

@@ -3,6 +3,8 @@ import { test, after } from "node:test";
 import assert from "node:assert/strict";
 import { randomUUID, createHash } from "node:crypto";
 import pg from "pg";
+import PgBoss from "pg-boss";
+import { freezeContents } from "../src/domain/finalization";
 import { authRequest } from "./auth-request";
 import { assessmentFixture } from "./event-assessments-fixture";
 const db = new pg.Pool({ connectionString: process.env.DATABASE_URL, max: 4 }),
@@ -371,4 +373,111 @@ test("queue and audit are atomic, failed real worker deliveries retry frozen inp
     ).rows[0].count,
     "1",
   );
+});
+test("same-label different engine implementation fails durably; retry never silently recalculates under new code", async () => {
+  const cookie = await login(),
+    send = (path: string, body?: unknown) => request(cookie, path, body),
+    f = await assessmentFixture(db, send);
+  const view = await (
+    await send(
+      `/api/v1/event-assessments?division=${f.divisionId}&rules=${f.rulesId}`,
+    )
+  ).json();
+  assert.equal(
+    (
+      await send("/api/v1/event-assessments", {
+        action: "calculate",
+        divisionId: f.divisionId,
+        version: 0,
+        requestId: randomUUID(),
+        sourceDigest: view.review.sourceDigest,
+        evidence: f.evidence,
+      })
+    ).status,
+    200,
+  );
+  const original = (await waitForJob(send, f)).selected,
+    input = JSON.parse(original.contents);
+  assert.match(input.engineIdentity.fingerprint, /^[a-f0-9]{64}$/);
+  assert.ok(
+    input.engineIdentity.files.some(
+      (x: any) => x.path === "src/domain/ranking-inputs.ts",
+    ),
+  );
+  const changed = freezeContents({
+      ...input,
+      engineIdentity: { ...input.engineIdentity, fingerprint: "0".repeat(64) },
+    }),
+    id = randomUUID(),
+    auditId = randomUUID(),
+    boss = new PgBoss({
+      connectionString: process.env.DATABASE_URL!,
+      schedule: false,
+      supervise: false,
+    });
+  boss.on("error", () => {});
+  await boss.start();
+  await boss.createQueue("ranking-four-event");
+  const c = await db.connect();
+  try {
+    await c.query("BEGIN");
+    await c.query(
+      "INSERT INTO audit_record(id,actor_id,action,resource_id) VALUES($1,'demo-administrator','fixture_historical_engine_revision',$2)",
+      [auditId, id],
+    );
+    await c.query(
+      "INSERT INTO event_assessment(id,division_id,version,replaces_id,finalization_version,rules_id,rules_version,contents,digest,engine,actor_id,request_id,command_digest,audit_id) VALUES($1,$2,2,$3,1,$4,1,$5,$6,$7,'demo-administrator',$8,$9,$10)",
+      [
+        id,
+        f.divisionId,
+        original.id,
+        f.rulesId,
+        changed.contents,
+        changed.digest,
+        input.engine,
+        randomUUID(),
+        "0".repeat(64),
+        auditId,
+      ],
+    );
+    const queueId = await boss.send(
+      "ranking-four-event",
+      { assessmentId: id },
+      {
+        retryLimit: 1,
+        retryDelay: 2,
+        db: { executeSql: (sql, values) => c.query(sql, values) },
+      },
+    );
+    await c.query(
+      "INSERT INTO event_calculation_job(assessment_id,queue_id,state) VALUES($1,$2,'queued')",
+      [id, queueId],
+    );
+    await c.query("COMMIT");
+  } catch (e) {
+    await c.query("ROLLBACK");
+    throw e;
+  } finally {
+    c.release();
+    await boss.stop();
+  }
+  const failed = (await waitForJob(send, f, "failed")).selected;
+  assert.match(failed.error, /implementation fingerprint/);
+  assert.equal(failed.resultContents, null);
+  assert.equal(failed.contents, changed.contents);
+  assert.equal(
+    (
+      await send("/api/v1/event-assessments", {
+        action: "retry",
+        divisionId: f.divisionId,
+        assessmentId: id,
+        version: 2,
+        requestId: randomUUID(),
+      })
+    ).status,
+    200,
+  );
+  const again = (await waitForJob(send, f, "failed")).selected;
+  assert.equal(again.resultContents, null);
+  assert.equal(again.digest, changed.digest);
 });
