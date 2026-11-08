@@ -118,6 +118,9 @@ export default function Admin() {
           <p>
             <a href="/admin/applications">Event applications</a>
           </p>
+          <p>
+            <a href="/admin/news">News sources and moderation</a>
+          </p>
           <button
             className="secondary"
             disabled={busy}
