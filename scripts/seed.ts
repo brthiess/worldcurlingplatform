@@ -20,13 +20,13 @@ try {
   if (unsafe.rowCount)
     throw new Error("Refusing to overwrite a non-demo event");
   await client.query(
-    "INSERT INTO event_series VALUES('prairie','Prairie Open'),('other','Northern Open') ON CONFLICT DO NOTHING",
+    "INSERT INTO event_series(id,name) VALUES('prairie','Prairie Open'),('other','Northern Open') ON CONFLICT DO NOTHING",
   );
   await client.query(
-    "INSERT INTO event_edition VALUES('prairie-2026','prairie','Prairie Open 2026','Prairie Curling Centre','Regina, Canada','America/Regina','2026-11-08','2026-11-10','fictional_demo',true),('other-2026','other','Northern Open 2026','Northern Ice','Calgary, Canada','America/Edmonton','2026-11-08','2026-11-10','fictional_demo',false) ON CONFLICT DO NOTHING",
+    "INSERT INTO event_edition(id,series_id,name,venue,location,timezone,starts_on,ends_on,origin,published,admission_status) VALUES('prairie-2026','prairie','Prairie Open 2026','Prairie Curling Centre','Regina, Canada','America/Regina','2026-11-08','2026-11-10','fictional_demo',true,'approved'),('other-2026','other','Northern Open 2026','Northern Ice','Calgary, Canada','America/Edmonton','2026-11-08','2026-11-10','fictional_demo',false,'draft') ON CONFLICT DO NOTHING",
   );
   await client.query(
-    "INSERT INTO division VALUES('prairie-men','prairie-2026', 'Men’s four-player','men_four','16-team triple knockout'),('other-men','other-2026','Men’s four-player','men_four','16-team triple knockout') ON CONFLICT DO NOTHING",
+    "INSERT INTO division(id,event_id,name,discipline,format) VALUES('prairie-men','prairie-2026', 'Men’s four-player','men_four','16-team triple knockout'),('other-men','other-2026','Men’s four-player','men_four','16-team triple knockout') ON CONFLICT DO NOTHING",
   );
   await client.query(
     "INSERT INTO draw_session VALUES('draw-1','prairie-men',1,'2026-11-08T09:00:00-06:00','completed'),('draw-2','prairie-men',2,'2026-11-08T13:00:00-06:00','live'),('draw-3','prairie-men',3,'2026-11-08T17:00:00-06:00','scheduled'),('other-draw','other-men',1,'2026-11-08T13:00:00-07:00','scheduled') ON CONFLICT DO NOTHING",
@@ -119,6 +119,18 @@ try {
       ],
     );
   }
+  await client.query(
+    "INSERT INTO organizing_organization(id,name,approval_administrator_id) VALUES('prairie-club','Prairie Curling Club','demo-administrator') ON CONFLICT DO NOTHING",
+  );
+  await client.query(
+    "INSERT INTO organization_organizer VALUES('prairie-club','demo-organizer') ON CONFLICT DO NOTHING",
+  );
+  await client.query(
+    "UPDATE event_series SET organization_id='prairie-club' WHERE id='prairie' AND organization_id IS NULL",
+  );
+  await client.query(
+    "UPDATE event_edition SET organization_id='prairie-club',city='Regina',country='Canada',responsible_administrator_id='demo-administrator' WHERE id='prairie-2026' AND organization_id IS NULL",
+  );
   await client.query("COMMIT");
   console.log(
     "Fictional scenario seeded (repeatable, preserves later changes). Demo persona emails: administrator/organizer/scorekeeper/reviewer @demo.invalid. Password comes only from local environment.",

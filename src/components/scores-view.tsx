@@ -80,7 +80,7 @@ export function ScoresView({
         const response = await fetch(
           gameId
             ? `/api/v1/public/games/${encodeURIComponent(gameId)}`
-            : `/api/v1/public/events/${encodeURIComponent(eventId)}`,
+            : `/api/v1/public/events/${encodeURIComponent(eventId)}${new URLSearchParams(window.location.search).get("division") ? "?division=" + encodeURIComponent(new URLSearchParams(window.location.search).get("division")!) : ""}`,
           { cache: "no-store", signal },
         );
         if (!response.ok)
@@ -170,10 +170,16 @@ export function ScoresView({
       {data && (
         <>
           <div className="notice">
-            <strong>Fictional demonstration.</strong>{" "}
+            <strong>
+              {data.event.origin === "fictional_demo"
+                ? "Fictional demonstration."
+                : data.event.origin === "historical_import"
+                  ? "Imported historical record."
+                  : "Newly operated event."}
+            </strong>{" "}
             {data.event.origin === "fictional_demo"
               ? "Teams, results and schedules are review fixtures."
-              : "Data origin: " + data.event.origin}{" "}
+              : "Edition details are maintained by the organizing authority."}{" "}
             This is an initial offer, not an official live service.
           </div>
           <section className="event" aria-label={data.event.name}>
@@ -182,22 +188,54 @@ export function ScoresView({
                 <p className="eyebrow">{data.event.division}</p>
                 <h2>
                   <a
-                    href={`/events/${data.event.id}${selected ? "?draw=" + selected : ""}`}
+                    href={`/events/${data.event.id}?${new URLSearchParams({ ...(data.selectedDivisionId ? { division: data.selectedDivisionId } : {}), ...(selected ? { draw: selected } : {}) })}`}
                   >
                     {data.event.name}
                   </a>
                 </h2>
                 <p className="muted">
-                  {data.event.venue} · {data.event.location}
+                  {data.event.venue || "Venue not confirmed"} ·{" "}
+                  {data.event.location}
                 </p>
                 <p className="muted">
                   {data.event.startsOn} – {data.event.endsOn} ·{" "}
                   {data.event.format}
                 </p>
               </div>
-              <span className="badge">Demo scenario</span>
+              <span className="badge">
+                {data.event.origin === "fictional_demo"
+                  ? "Demo scenario"
+                  : "Admitted edition"}
+              </span>
             </div>
             {!gameId && (
+              <div className="edition-divisions">
+                <h3>Divisions</h3>
+                <p>
+                  Public admission: admitted · Registration:{" "}
+                  {data.event.registrationStatus}
+                </p>
+                <ul className="division-links">
+                  {data.divisions.map((d) => (
+                    <li key={d.id}>
+                      <a
+                        aria-current={
+                          d.id === data.selectedDivisionId ? "page" : undefined
+                        }
+                        href={`/events/${data.event.id}?division=${encodeURIComponent(d.id)}`}
+                      >
+                        {d.name} · scores
+                      </a>
+                      <span> · Ranking eligibility: {d.rankingStatus}</span>
+                    </li>
+                  ))}
+                </ul>
+                {!data.selectedDivisionId && (
+                  <p>Select a division to view its competition.</p>
+                )}
+              </div>
+            )}
+            {!gameId && data.draws.length > 0 && (
               <div className="draw-toolbar">
                 <span>
                   <strong>
