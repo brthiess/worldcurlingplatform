@@ -1132,6 +1132,7 @@ footer {
   white-space: nowrap;
   border: 0;
 }
+
 .finalization-workspace { max-width: 1080px; }
 .finalization-workspace :is(select,input,textarea,fieldset) {min-width:0;max-width:100%;}
 .finalization-workspace select {display:block;width:100%;margin:10px 0 16px;}
@@ -1151,3 +1152,83 @@ footer {
 .final-snapshot {margin-top:24px;}
 .digest {display:block;font-size:.85rem;}
 .frozen-contents {white-space:pre-wrap;overflow-wrap:anywhere;font-size:.8rem;max-width:100%;background:#eef2f5;padding:14px;}
+
+.schedule-forms {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 28px;
+  align-items: start;
+}
+.schedule-workbench fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+.schedule-workbench legend {
+  font-weight: bold;
+  padding: 0;
+  margin-bottom: 16px;
+}
+.schedule-workbench input,
+.schedule-workbench select {
+  max-width: 100%;
+  width: 100%;
+  min-height: 44px;
+  font: inherit;
+  padding: 10px;
+}
+.schedule-workbench select {
+  text-overflow: ellipsis;
+}
+.schedule-workbench .form-card {
+  max-width: none;
+}
+.schedule-workbench section,
+.schedule-workbench form {
+  min-width: 0;
+}
+.schedule-list {
+  padding-left: 22px;
+}
+.schedule-list > li {
+  border-bottom: 1px solid #d1dce0;
+  padding: 16px 0;
+  overflow-wrap: anywhere;
+}
+.schedule-list li p {
+  margin: 10px 0;
+}
+.schedule-list h3 {
+  font-size: 18px;
+}
+.schedule-list ul {
+  padding-left: 20px;
+}
+.schedule-list ul li,
+.schedule-conflicts > li {
+  margin: 12px 0;
+}
+.draw-navigation {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  width: 100%;
+}
+.public-schedule {
+  padding: 20px;
+  border-bottom: 1px solid #d1dce0;
+}
+@media (max-width: 760px) {
+  .schedule-forms {
+    grid-template-columns: 1fr;
+  }
+  .schedule-workbench .form-card {
+    padding: 18px;
+  }
+  .draw-navigation button {
+    flex: 1 1 120px;
+  }
+}
+
+

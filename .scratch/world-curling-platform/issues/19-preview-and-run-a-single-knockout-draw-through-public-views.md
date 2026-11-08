@@ -4,7 +4,7 @@ number: 19
 title: "Preview and run a single-knockout draw through public views"
 parent: WCP-SPEC-001
 type: implementation
-status: ready-for-agent
+status: in-progress
 labels: [ready-for-agent]
 blocked_by: [WCP-018]
 source_spec_sha256: 045B46988225B6C8C0020B23C8C5D4EAA8E2E1916256148A0FDA26B5DA8673FD
@@ -18,7 +18,7 @@ published: 2026-11-07
 
 **Blocked by:** [18: Schedule draw sessions and show known conflicts](18-schedule-draw-sessions-and-show-known-conflicts.md).
 
-**Status:** ready-for-agent
+**Status:** in-progress
 
 ## Parent and scope
 

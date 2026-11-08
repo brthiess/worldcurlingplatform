@@ -84,6 +84,7 @@ export function ScoresView({
   const [error, setError] = useState("");
   const [updated, setUpdated] = useState<Date | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [showSchedule, setShowSchedule] = useState(false);
   const defaultDraw = useRef<string | null>(null);
   const load = useCallback(
     async (signal?: AbortSignal) => {
@@ -151,6 +152,7 @@ export function ScoresView({
       gameId ? g.id === gameId : g.drawId === selected,
     ) ?? [];
   const next = data?.draws.find((d) => d.id === data.selection.next);
+  const drawIndex = data?.draws.findIndex((d) => d.id === selected) ?? -1;
   return (
     <main id="main">
       <p className="eyebrow">Competition centre</p>
@@ -276,7 +278,73 @@ export function ScoresView({
                     ))}
                   </select>
                 </div>
+                <div className="draw-navigation" aria-label="Draw navigation">
+                  <button
+                    className="secondary"
+                    disabled={drawIndex <= 0}
+                    onClick={() => choose(data.draws[drawIndex - 1].id)}
+                  >
+                    Previous draw
+                  </button>
+                  <button
+                    className="secondary"
+                    disabled={
+                      drawIndex < 0 || drawIndex >= data.draws.length - 1
+                    }
+                    onClick={() => choose(data.draws[drawIndex + 1].id)}
+                  >
+                    Next draw
+                  </button>
+                  <button
+                    className="secondary"
+                    aria-expanded={showSchedule}
+                    onClick={() => setShowSchedule((v) => !v)}
+                  >
+                    {showSchedule ? "Hide schedule" : "Show schedule"}
+                  </button>
+                </div>
               </div>
+            )}
+            {!gameId && showSchedule && (
+              <section className="public-schedule">
+                <h3>Draw schedule</h3>
+                <p>
+                  Venue timezone: {data.event.timezone}. Scheduled times do not
+                  establish actual play.
+                </p>
+                <ol className="schedule-list">
+                  {data.draws.map((d) => (
+                    <li key={d.id}>
+                      <button
+                        className="secondary"
+                        aria-current={d.id === selected ? "true" : undefined}
+                        onClick={() => choose(d.id)}
+                      >
+                        Draw {d.number} · {d.state}
+                      </button>
+                      <p>
+                        {venueTime(d.startsAt, data.event.timezone)} ·{" "}
+                        {d.durationMinutes} minutes
+                      </p>
+                      <ul>
+                        {data.games
+                          .filter((g) => g.drawId === d.id)
+                          .map((g) => (
+                            <li key={g.id}>
+                              <a href={`/games/${g.id}`}>
+                                {g.nameA} vs {g.nameB}
+                              </a>{" "}
+                              · Sheet {g.sheet} · {g.state}
+                            </li>
+                          ))}
+                      </ul>
+                      {!data.games.some((g) => g.drawId === d.id) && (
+                        <p>No games assigned.</p>
+                      )}
+                    </li>
+                  ))}
+                </ol>
+              </section>
             )}
             <div className="games">
               {games.map((game) => (

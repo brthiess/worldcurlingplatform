@@ -922,14 +922,18 @@
       "file": "18-schedule-draw-sessions-and-show-known-conflicts.md",
       "id": "WCP-018",
       "path": "issues/18-schedule-draw-sessions-and-show-known-conflicts.md",
-      "status": "in-progress",
+      "status": "completed",
       "labels": [
         "ready-for-agent"
       ],
       "blocked_by": [
         "WCP-003",
         "WCP-006"
-      ]
+      ],
+      "completion": {
+        "commit": "e3df211d7d2a1561b497b5827bba8ba3bf0f264f",
+        "evidence": "docs/verification/WCP-018.md"
+      }
     },
     {
       "n": 19,
@@ -975,7 +979,7 @@
       "file": "19-preview-and-run-a-single-knockout-draw-through-public-views.md",
       "id": "WCP-019",
       "path": "issues/19-preview-and-run-a-single-knockout-draw-through-public-views.md",
-      "status": "ready-for-agent",
+      "status": "in-progress",
       "labels": [
         "ready-for-agent"
       ],

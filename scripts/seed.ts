@@ -30,10 +30,10 @@ try {
     "INSERT INTO division(id,event_id,name,discipline,format) VALUES('prairie-men','prairie-2026', 'Men’s four-player','men_four','16-team triple knockout'),('other-men','other-2026','Men’s four-player','men_four','16-team triple knockout') ON CONFLICT DO NOTHING",
   );
   await client.query(
-    "INSERT INTO draw_session VALUES('draw-1','prairie-men',1,'2026-11-08T09:00:00-06:00','completed'),('draw-2','prairie-men',2,'2026-11-08T13:00:00-06:00','live'),('draw-3','prairie-men',3,'2026-11-08T17:00:00-06:00','scheduled'),('other-draw','other-men',1,'2026-11-08T13:00:00-07:00','scheduled') ON CONFLICT DO NOTHING",
+    "INSERT INTO draw_session(id,division_id,number,starts_at,state) VALUES('draw-1','prairie-men',1,'2026-11-08T09:00:00-06:00','completed'),('draw-2','prairie-men',2,'2026-11-08T13:00:00-06:00','live'),('draw-3','prairie-men',3,'2026-11-08T17:00:00-06:00','scheduled'),('other-draw','other-men',1,'2026-11-08T13:00:00-07:00','scheduled') ON CONFLICT DO NOTHING",
   );
   await client.query(
-    "INSERT INTO draw_session VALUES('draw-4','prairie-men',4,'2026-11-09T09:00:00-06:00','scheduled') ON CONFLICT DO NOTHING",
+    "INSERT INTO draw_session(id,division_id,number,starts_at,state) VALUES('draw-4','prairie-men',4,'2026-11-09T09:00:00-06:00','scheduled') ON CONFLICT DO NOTHING",
   );
   const names = [
     "North",
