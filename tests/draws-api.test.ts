@@ -678,55 +678,61 @@ test("actor-bound commands and current scoring grants protect unscheduled publis
 });
 
 test("queued graph writer rechecks the division association after acquiring edition and division locks", async () => {
-  const cookie = await login(),
-    id = "association-" + randomUUID(),
-    seeds: string[] = [];
-  await pool.query(
-    "INSERT INTO division(id,event_id,name,discipline,format) VALUES($1,$2,'Queued scope fixture','men_four','single knockout')",
-    [id, event.id],
-  );
-  for (let n = 1; n <= 6; n++) {
-    const en = id + "-" + n;
-    seeds.push(en);
+  const cookie = await login();
+  for (const receiptExists of [false, true]) {
+    const id = "association-" + randomUUID(),
+      seeds: string[] = [];
     await pool.query(
-      "INSERT INTO event_entry(id,division_id,display_name) VALUES($1,$2,$3)",
-      [en, id, "Queued team " + n],
+      "INSERT INTO division(id,event_id,name,discipline,format) VALUES($1,$2,'Queued scope fixture','men_four','single knockout')",
+      [id, event.id],
     );
-  }
-  const c = await pool.connect();
-  await c.query("BEGIN");
-  await c.query("SELECT id FROM event_edition WHERE id=$1 FOR UPDATE", [
-    event.id,
-  ]);
-  const pending = fetch(base + "/api/v1/divisions/" + id + "/draw", {
-    method: "POST",
-    headers: { cookie, Origin: base, "Content-Type": "application/json" },
-    body: JSON.stringify({
+    for (let n = 1; n <= 6; n++) {
+      const en = id + "-" + n;
+      seeds.push(en);
+      await pool.query(
+        "INSERT INTO event_entry(id,division_id,display_name) VALUES($1,$2,$3)",
+        [en, id, "Queued team " + n],
+      );
+    }
+    const original = {
       requestId: randomUUID(),
       expectedVersion: 0,
       action: "preview",
       seedEntryIds: seeds,
       reason: "Queued original edition",
-    }),
-  });
-  try {
-    await waitForEditionBarrier();
-    await c.query("UPDATE division SET event_id='other-2026' WHERE id=$1", [
-      id,
+    };
+    const send = () =>
+      fetch(base + "/api/v1/divisions/" + id + "/draw", {
+        method: "POST",
+        headers: { cookie, Origin: base, "Content-Type": "application/json" },
+        body: JSON.stringify(original),
+      });
+    if (receiptExists) assert.equal((await send()).status, 200);
+    const c = await pool.connect();
+    await c.query("BEGIN");
+    await c.query("SELECT id FROM event_edition WHERE id=$1 FOR UPDATE", [
+      event.id,
     ]);
-  } finally {
-    await c.query("COMMIT");
-    c.release();
+    const pending = send();
+    try {
+      await waitForEditionBarrier();
+      await c.query("UPDATE division SET event_id='other-2026' WHERE id=$1", [
+        id,
+      ]);
+    } finally {
+      await c.query("COMMIT");
+      c.release();
+    }
+    const rejected = await pending;
+    assert.equal(rejected.status, 409, await rejected.clone().text());
+    assert.equal(
+      (
+        await pool.query(
+          "SELECT count(*)::integer AS n FROM draw_revision WHERE division_id=$1",
+          [id],
+        )
+      ).rows[0].n,
+      receiptExists ? 1 : 0,
+    );
   }
-  const rejected = await pending;
-  assert.equal(rejected.status, 409, await rejected.clone().text());
-  assert.equal(
-    (
-      await pool.query(
-        "SELECT count(*)::integer AS n FROM draw_revision WHERE division_id=$1",
-        [id],
-      )
-    ).rows[0].n,
-    0,
-  );
 });

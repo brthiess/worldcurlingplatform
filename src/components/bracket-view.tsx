@@ -8,7 +8,7 @@ export function BracketView({ eventId }: { eventId: string }) {
     [loading, setLoading] = useState(true),
     [selected, setSelected] = useState(""),
     [view, setView] = useState("bracket"),
-    [updated, setUpdated] = useState("");
+    [updated, setUpdated] = useState<Date | null>(null);
   const load = useCallback(
     async (signal?: AbortSignal) => {
       setLoading(true);
@@ -41,7 +41,7 @@ export function BracketView({ eventId }: { eventId: string }) {
           throw new Error("This division does not belong to this event.");
         setData(next);
         setError("");
-        setUpdated(new Date().toLocaleTimeString());
+        setUpdated(new Date());
       } catch (e) {
         if ((e as Error).name !== "AbortError") setError((e as Error).message);
       } finally {
@@ -118,7 +118,18 @@ export function BracketView({ eventId }: { eventId: string }) {
           )}
           <p className="legend">
             Published revision {data.version} · Template {data.template},
-            version {data.templateVersion}. Last successful update {updated}.
+            version {data.templateVersion}. Last successful update{" "}
+            {updated
+              ? new Intl.DateTimeFormat("en-CA", {
+                  month: "short",
+                  day: "numeric",
+                  hour: "numeric",
+                  minute: "2-digit",
+                  timeZone: data.division.timezone,
+                  timeZoneName: "short",
+                }).format(updated)
+              : "awaiting update"}{" "}
+            · {data.division.timezone}.
           </p>
           <div className="draw-controls">
             <div>

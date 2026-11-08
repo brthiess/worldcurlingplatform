@@ -5,6 +5,7 @@ import { randomUUID } from "node:crypto";
 import pg from "pg";
 import { signInApiWithRateWindow } from "./auth-fixture";
 import { drawFixtureEvent } from "../draws-fixture";
+test.use({ timezoneId: "Asia/Tokyo" });
 const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
 let event: Awaited<ReturnType<typeof drawFixtureEvent>>;
 test.beforeAll(async () => {
@@ -41,6 +42,7 @@ for (const [device, width, height] of [
   }, info) => {
     test.setTimeout(120000);
     await page.setViewportSize({ width, height });
+    await page.clock.setFixedTime(new Date("2026-11-08T19:00:00Z"));
     const { id, entries } = await fixture(),
       errors: string[] = [],
       consoleErrors: string[] = [],
@@ -107,6 +109,9 @@ for (const [device, width, height] of [
         exact: true,
       }),
     ).toBeVisible();
+    await expect(page.getByText(/Last successful update/)).toContainText(
+      "Last successful update Nov 8, 1:00 p.m. CST · America/Regina",
+    );
     await page.getByLabel("Follow a team").selectOption(entries[3]);
     await expect(
       page.getByRole("article", { name: "Q2 · selected team", exact: true }),
