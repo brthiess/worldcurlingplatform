@@ -8,8 +8,10 @@ export function scoreCell(score: Score) {
   return { text: "?", label: "Score unknown" };
 }
 export function selectDraws(draws: DrawSummary[]) {
-  const sorted = [...draws].sort((a, b) =>
-    a.startsAt.localeCompare(b.startsAt),
+  const sorted = [...draws].sort(
+    (a, b) =>
+      Date.parse(a.startsAt) - Date.parse(b.startsAt) ||
+      a.id.localeCompare(b.id),
   );
   const live = sorted.filter((d) => d.state === "live").at(-1);
   const completed = sorted.filter((d) => d.state === "completed").at(-1);

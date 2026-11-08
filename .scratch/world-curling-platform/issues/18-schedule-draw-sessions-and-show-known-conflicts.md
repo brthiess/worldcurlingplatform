@@ -4,7 +4,7 @@ number: 18
 title: "Schedule draw sessions and show known conflicts"
 parent: WCP-SPEC-001
 type: implementation
-status: in-progress
+status: completed
 labels: [ready-for-agent]
 blocked_by: [WCP-003, WCP-006]
 source_spec_sha256: 045B46988225B6C8C0020B23C8C5D4EAA8E2E1916256148A0FDA26B5DA8673FD
@@ -18,7 +18,7 @@ published: 2026-11-07
 
 **Blocked by:** [03: Confirm results and make ordinary auditable corrections](03-confirm-results-and-make-ordinary-auditable-corrections.md); [06: Manually enter teams and resolve core-composition identities](06-manually-enter-teams-and-resolve-core-composition-identities.md).
 
-**Status:** in-progress
+**Status:** completed
 
 ## Parent and scope
 
@@ -31,13 +31,13 @@ published: 2026-11-07
 
 ## Acceptance criteria
 
-- [ ] Persist session/sheet/time revisions using explicit venue time zones and show current/latest/next draw consistently.
-- [ ] Detect overlapping sheets, entries and known player assignments across divisions; do not introduce a schedule optimizer.
-- [ ] Keep playing/status evidence distinct from a scheduled start having passed.
-- [ ] **Unit testing:** Test overlap/availability decisions, session ordering, current/latest/next selection and timezone-aware schedule boundaries.
-- [ ] **Database/API verification:** Save/revise schedules through scoped commands; verify PostgreSQL relationships/history and public schedule projections agree.
-- [ ] **Frontend quality:** Provide a usable organizer scheduling form/grid and public previous/next draw controls with explicit time labels, unclipped phone actions and clear conflict feedback.
-- [ ] Record actual verification commands/results and relevant browser/screenshots or API evidence. Report meaningful uncovered branches or limitations; do not claim checks that were not run.
+- [x] Persist session/sheet/time revisions using explicit venue time zones and show current/latest/next draw consistently.
+- [x] Detect overlapping sheets, entries and known player assignments across divisions; do not introduce a schedule optimizer.
+- [x] Keep playing/status evidence distinct from a scheduled start having passed.
+- [x] **Unit testing:** Test overlap/availability decisions, session ordering, current/latest/next selection and timezone-aware schedule boundaries.
+- [x] **Database/API verification:** Save/revise schedules through scoped commands; verify PostgreSQL relationships/history and public schedule projections agree.
+- [x] **Frontend quality:** Provide a usable organizer scheduling form/grid and public previous/next draw controls with explicit time labels, unclipped phone actions and clear conflict feedback.
+- [x] Record actual verification commands/results and relevant browser/screenshots or API evidence. Report meaningful uncovered branches or limitations; do not claim checks that were not run.
 
 ## Slice boundary
 
