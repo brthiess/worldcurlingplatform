@@ -1,13 +1,17 @@
 import "dotenv/config";
+import { authRequest } from "./auth-request";
 import { test, after } from "node:test";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import pg from "pg";
-const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
+const pool = new pg.Pool({
+  connectionString: process.env.DATABASE_URL,
+  max: 2,
+});
 const base = process.env.BETTER_AUTH_URL!;
 after(() => pool.end());
 async function login(role = "scorekeeper") {
-  const r = await fetch(`${base}/api/auth/sign-in/email`, {
+  const r = await authRequest(`${base}/api/auth/sign-in/email`, {
     method: "POST",
     headers: { Origin: base, "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -399,3 +403,4 @@ test("real PostgreSQL scoring: start, scores, concurrency, retries, scope, sourc
     await pool.query("DELETE FROM game WHERE id=$1", [id]);
   }
 });
+

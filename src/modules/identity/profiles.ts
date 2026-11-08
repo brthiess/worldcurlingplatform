@@ -9,7 +9,7 @@ import {
 } from "@/domain/profiles";
 export async function publicPlayers(id?: string) {
   const result = await pool.query(
-    "SELECT id,name,origin,biography,handedness FROM player WHERE ($1::text IS NULL OR id=$1) ORDER BY name,id",
+    "SELECT id,name,origin,biography,handedness,CASE WHEN photo_asset_id IS NOT NULL THEN '/api/v1/public/photos/' || photo_asset_id ELSE NULL END AS \"photoUrl\" FROM player WHERE ($1::text IS NULL OR id=$1) ORDER BY name,id",
     [id ?? null],
   );
   return id ? (result.rows[0] ?? null) : result.rows;
