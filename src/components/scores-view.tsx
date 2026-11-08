@@ -146,7 +146,11 @@ export function ScoresView({
       {gameId && (
         <a
           className="back"
-          href={`/?draw=${encodeURIComponent(data?.games[0]?.drawId ?? "draw-2")}`}
+          href={
+            data
+              ? `/events/${data.event.id}?${new URLSearchParams({ ...(data.selectedDivisionId ? { division: data.selectedDivisionId } : {}), ...(data.games[0]?.drawId ? { draw: data.games[0].drawId } : {}) })}`
+              : "/events"
+          }
         >
           ← Back to scores
         </a>
@@ -305,8 +309,12 @@ export function ScoresView({
                 </article>
               ))}
             </div>
-            {!games.length && (
-              <p className="empty">No games are scheduled for this draw yet.</p>
+            {!games.length && data.selectedDivisionId && (
+              <p className="empty">
+                {data.draws.length
+                  ? "No games are scheduled for this draw yet."
+                  : "No games have been scheduled for this division yet."}
+              </p>
             )}
             {!gameId && next && (
               <div className="next-draw">

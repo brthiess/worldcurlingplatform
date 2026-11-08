@@ -1,6 +1,7 @@
 import { test, expect } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 import "dotenv/config";
+import { randomUUID } from "node:crypto";
 for (const [label, width, height] of [
   ["phone", 360, 800],
   ["tablet", 768, 1024],
@@ -67,6 +68,10 @@ for (const [label, width, height] of [
     await expect(
       page.getByText("Venue not confirmed", { exact: true }),
     ).toBeVisible();
+    await page.screenshot({
+      path: info.outputPath(`${label}-review.png`),
+      fullPage: true,
+    });
     await page
       .getByRole("button", { name: "Approve onto calendar", exact: true })
       .click();
@@ -90,6 +95,10 @@ for (const [label, width, height] of [
     await expect(
       page.getByRole("heading", { name: "Divisions", exact: true }),
     ).toBeVisible();
+    await page.screenshot({
+      path: info.outputPath(`${label}-edition.png`),
+      fullPage: true,
+    });
     await page
       .getByRole("link", { name: "Women · scores", exact: true })
       .click();
@@ -114,3 +123,112 @@ for (const [label, width, height] of [
     expect(errors).toEqual([]);
   });
 }
+test("next-year copy, loading, unsent save retry, stale version recovery and calendar empty states", async ({
+  page,
+  context,
+}, info) => {
+  await page.setViewportSize({ width: 360, height: 800 });
+  await page.goto("/admin");
+  await page.getByLabel("Demo persona").selectOption("organizer");
+  await page.getByLabel("Demo password").fill(process.env.DEMO_PASSWORD!);
+  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "Your workspace" }),
+  ).toBeVisible();
+  let release: () => void = () => {};
+  const gate = new Promise<void>((resolve) => (release = resolve));
+  await page.route("**/api/v1/applications", async (route) => {
+    if (route.request().method() === "GET") await gate;
+    await route.continue();
+  });
+  await page.goto("/admin/applications");
+  await expect(page.getByText("Loading event applications…")).toBeVisible();
+  release();
+  await page
+    .getByRole("button", { name: "Review Prairie Open 2026", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Create next year's edition", exact: true })
+    .click();
+  await expect(page.getByLabel("Start date", { exact: true })).toHaveValue(
+    "2027-11-08",
+  );
+  const name = `Copied next edition ${Date.now()}`;
+  await page.getByLabel("Edition name", { exact: true }).fill(name);
+  await page.getByLabel("Edition name", { exact: true }).focus();
+  await page.keyboard.press("Tab");
+  await expect(page.getByLabel("Start date", { exact: true })).toBeFocused();
+  await page.getByRole("button", { name: "Save draft", exact: true }).click();
+  await expect(
+    page.getByText("Saved to the database.", { exact: true }),
+  ).toBeVisible();
+  await page.getByLabel("City", { exact: true }).fill("Moose Jaw");
+  await expect(
+    page.getByRole("button", { name: "Submit for review", exact: true }),
+  ).toBeDisabled();
+  await context.setOffline(true);
+  await page.getByRole("button", { name: "Save changes", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Retry last save", exact: true }),
+  ).toBeVisible();
+  await context.setOffline(false);
+  await page
+    .getByRole("button", { name: "Retry last save", exact: true })
+    .click();
+  await expect(
+    page.getByText("Saved to the database.", { exact: true }),
+  ).toBeVisible();
+  const workspace = await (
+    await page.request.get("/api/v1/applications")
+  ).json();
+  const id = workspace.applications.find(
+    (a: { name: string }) => a.name === name,
+  ).id;
+  const detail = await (
+    await page.request.get(`/api/v1/applications/${id}`)
+  ).json();
+  const otherSave = await page.request.post(`/api/v1/applications/${id}`, {
+    headers: { Origin: process.env.BETTER_AUTH_URL! },
+    data: {
+      requestId: randomUUID(),
+      action: "edit",
+      version: detail.version,
+      application: { ...detail, city: "Yorkton" },
+    },
+  });
+  expect(otherSave.status()).toBe(200);
+  await page.getByLabel("City", { exact: true }).fill("Stale city");
+  await page.getByRole("button", { name: "Save changes", exact: true }).click();
+  await expect(page.getByText(/This application changed/)).toBeVisible();
+  await page
+    .getByRole("button", { name: "Reload current version", exact: true })
+    .click();
+  await expect(page.getByLabel("City", { exact: true })).toHaveValue("Yorkton");
+  await page.screenshot({
+    path: info.outputPath("phone-next-edition-history.png"),
+    fullPage: true,
+  });
+  const original = await (
+    await page.request.get("/api/v1/public/events/prairie-2026")
+  ).json();
+  expect(original.event.startsOn).toBe("2026-11-08");
+  expect(original.event.location).toBe("Regina, Canada");
+  await page.goto("/events");
+  await page
+    .getByLabel("Search events")
+    .fill("No event could have this unique name 00000000");
+  await expect(
+    page.getByText("No admitted editions match these filters."),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Clear filters", exact: true })
+    .click();
+  await expect(
+    page.getByRole("link", { name: "Prairie Open 2026", exact: true }),
+  ).toBeVisible();
+  await page.getByLabel("From date").fill("2028-12-31");
+  await page.getByLabel("Through date").fill("2027-01-01");
+  await expect(
+    page.getByText("Through date must be on or after the from date."),
+  ).toBeVisible();
+});

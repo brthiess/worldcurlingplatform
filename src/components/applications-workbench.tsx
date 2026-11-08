@@ -159,7 +159,11 @@ export function ApplicationsWorkbench() {
       const w = await fetch("/api/v1/applications", { cache: "no-store" });
       if (w.ok) setWorkspace(await w.json());
     } catch (e) {
-      setError((e as Error).message || "The save could not be confirmed.");
+      setError(
+        e instanceof TypeError
+          ? "Your save could not be confirmed. Reconnect and retry the last save."
+          : (e as Error).message || "The save could not be confirmed.",
+      );
     } finally {
       setBusy(false);
     }
@@ -212,6 +216,7 @@ export function ApplicationsWorkbench() {
       </div>
     );
   }
+  const dirty = !!detail && JSON.stringify(form) !== JSON.stringify(detail);
   return (
     <main id="main" className="applications">
       <p className="eyebrow">Event operations</p>
@@ -223,6 +228,15 @@ export function ApplicationsWorkbench() {
       {error && (
         <div className="error" role="alert">
           {error}{" "}
+          {detail && (
+            <button
+              className="secondary"
+              disabled={busy}
+              onClick={() => void open(detail.id)}
+            >
+              Reload current version
+            </button>
+          )}
           {pending && (
             <button
               className="secondary"
@@ -606,7 +620,7 @@ export function ApplicationsWorkbench() {
                         </p>
                         {["draft", "rejected"].includes(detail.status) && (
                           <button
-                            disabled={busy || !!pending}
+                            disabled={busy || !!pending || dirty}
                             onClick={() => command("submit")}
                           >
                             Submit for review
@@ -628,14 +642,14 @@ export function ApplicationsWorkbench() {
                             )}
                             <div className="application-actions">
                               <button
-                                disabled={busy || !!pending}
+                                disabled={busy || !!pending || dirty}
                                 onClick={() => command("approve")}
                               >
                                 Approve onto calendar
                               </button>
                               <button
                                 className="secondary"
-                                disabled={busy || !!pending}
+                                disabled={busy || !!pending || dirty}
                                 onClick={() => command("reject")}
                               >
                                 Return to organizer

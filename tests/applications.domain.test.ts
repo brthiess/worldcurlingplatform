@@ -79,6 +79,13 @@ test("next edition is a fresh application in the same series and leaves original
   assert.deepEqual(input, original);
 });
 test("invalid dates, reversed dates, unsupported disciplines and unsafe text receive field errors", () => {
+  assert.deepEqual(validateApplication({ ...input, newSeriesName: " " }), {
+    newSeriesName: "Enter a new recurring series name (1–160 characters).",
+  });
+  assert.deepEqual(
+    validateApplication({ ...input, newSeriesName: "Prairie Open" }),
+    {},
+  );
   assert.deepEqual(validateApplication({ ...input, endsOn: "2027-01-01" }), {
     endsOn: "End date must be on or after the start date.",
   });

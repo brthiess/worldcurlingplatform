@@ -48,20 +48,30 @@ async function snapshot(client: Queryable, id: string) {
   return { ...result.rows[0], divisions: divisions.rows };
 }
 export async function applicationDetail(userId: string, id: string) {
-  const rights = await authority(pool, userId, id);
-  if (!rights.admin && !rights.organizer)
-    fail(403, "This application is outside your assigned scope.");
-  const app = await snapshot(pool, id);
-  if (!app) fail(404, "Application not found.");
-  const history = await pool.query(
-    `SELECT h.version,h.action,h.reason,h.snapshot,h.created_at AS "createdAt",u.name AS "actorName",a.action AS "auditAction" FROM event_application_history h JOIN auth_user u ON u.id=h.actor_id JOIN audit_record a ON a.id=h.id WHERE h.event_id=$1 ORDER BY h.version`,
-    [id],
-  );
-  return {
-    ...app,
-    canReview: rights.admin && app.reviewerId === userId,
-    history: history.rows,
-  };
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN ISOLATION LEVEL REPEATABLE READ");
+    const rights = await authority(client, userId, id);
+    if (!rights.admin && !rights.organizer)
+      fail(403, "This application is outside your assigned scope.");
+    const app = await snapshot(client, id);
+    if (!app) fail(404, "Application not found.");
+    const history = await client.query(
+      `SELECT h.version,h.action,h.reason,h.snapshot,h.created_at AS "createdAt",u.name AS "actorName",a.action AS "auditAction" FROM event_application_history h JOIN auth_user u ON u.id=h.actor_id JOIN audit_record a ON a.id=h.id WHERE h.event_id=$1 ORDER BY h.version`,
+      [id],
+    );
+    await client.query("COMMIT");
+    return {
+      ...app,
+      canReview: rights.admin && app.reviewerId === userId,
+      history: history.rows,
+    };
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
 }
 export async function applicationWorkspace(userId: string) {
   const rights = await authority(pool, userId);
@@ -126,6 +136,9 @@ export async function applicationCommand(
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
+    await client.query("SELECT pg_advisory_xact_lock(hashtextextended($1,0))", [
+      `application-request:${userId}:${c.requestId}`,
+    ]);
     // One command per resource at a time, including initial creation and retries.
     await client.query("SELECT pg_advisory_xact_lock(hashtextextended($1,0))", [
       `application:${id}`,
