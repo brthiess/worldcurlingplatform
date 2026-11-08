@@ -11,7 +11,10 @@
     "WCP-001"
   ],
   "tickets_started": [
-    "WCP-001"
+    "WCP-001",
+    "WCP-002",
+    "WCP-004",
+    "WCP-012"
   ],
   "tickets_completed": [
     "WCP-001"
@@ -28,7 +31,10 @@
     "last_verified_remote_integration_commit": "72e4144ca18a0c657acd80096d67a5e9b3002620",
     "integration_branch": "integration/world-curling-platform",
     "worktrees_created": [
-      ".worktrees/WCP-001"
+      ".worktrees/WCP-001",
+      ".worktrees/WCP-002",
+      ".worktrees/WCP-004",
+      ".worktrees/WCP-012"
     ],
     "initialized": true,
     "baseline_commit": "f6d6d8d"
@@ -60,12 +66,13 @@
     "Close only reviewed integrated tickets with meaningful unit/PostgreSQL/API/frontend/browser evidence.",
     "Continue unblocked work and report provider/deployment limitations honestly."
   ],
-  "updated_at": "2026-11-08T16:10:45.286395+00:00",
-  "active_tickets": [],
-  "frontier": [
+  "updated_at": "2026-11-08T16:10:50.163579+00:00",
+  "active_tickets": [
     "WCP-002",
     "WCP-004",
-    "WCP-012",
+    "WCP-012"
+  ],
+  "frontier": [
     "WCP-044",
     "WCP-045"
   ],
@@ -85,6 +92,30 @@
       "reason": null,
       "commit": "4304b15",
       "evidence": "docs/verification/WCP-001.md"
+    },
+    {
+      "time": "2026-11-08T16:10:49.743080+00:00",
+      "ticket": "WCP-002",
+      "status": "in-progress",
+      "reason": null,
+      "commit": null,
+      "evidence": null
+    },
+    {
+      "time": "2026-11-08T16:10:49.961105+00:00",
+      "ticket": "WCP-004",
+      "status": "in-progress",
+      "reason": null,
+      "commit": null,
+      "evidence": null
+    },
+    {
+      "time": "2026-11-08T16:10:50.163579+00:00",
+      "ticket": "WCP-012",
+      "status": "in-progress",
+      "reason": null,
+      "commit": null,
+      "evidence": null
     }
   ],
   "research": {
