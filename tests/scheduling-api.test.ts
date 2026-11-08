@@ -314,15 +314,16 @@ test("declared rotating-five and referenced game lineups detect cross-division c
     players.slice(5, 8),
     "Cross-division four",
   );
+  const opponentPlayers = Array.from({ length: 4 }, () => randomUUID());
   const opponent = await createEntry(
     f.a,
-    players.slice(0, 4),
-    [],
+    opponentPlayers,
+    opponentPlayers,
     "Known opponent",
   );
   const games = [randomUUID(), randomUUID(), randomUUID()];
   await pool.query(
-    "INSERT INTO game(id,draw_id,sheet,phase,state,entry_a,entry_b,slot_a,slot_b) VALUES($1,$4,'A','Schedule test','scheduled',$6,$6,'A','A'),($2,$5,'A','Schedule test','scheduled',$7,$7,'B','B'),($3,$4,'B','Same-entry check','scheduled',$6,$6,'A','A')",
+    "INSERT INTO game(id,draw_id,sheet,phase,state,entry_a,entry_b,slot_a,slot_b) VALUES($1,$4,'A','Schedule test','scheduled',$6,NULL,'A','Opponent pending'),($2,$5,'A','Schedule test','scheduled',$7,NULL,'B','Opponent pending'),($3,$4,'B','Same-entry check','scheduled',$6,NULL,'A','Opponent pending')",
     [...games, f.d1, f.d2, first.entryId, second.entryId],
   );
   let data = await (await request(f.eventId, cookie)).json();

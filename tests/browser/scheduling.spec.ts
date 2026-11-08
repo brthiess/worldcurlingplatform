@@ -18,7 +18,20 @@ for (const [name, width, height] of [
     test.setTimeout(120000);
     await page.setViewportSize({ width, height });
     const errors: string[] = [];
+    const networkErrors: string[] = [],
+      consoleErrors: string[] = [];
     page.on("pageerror", (e) => errors.push(e.message));
+    page.on("console", (message) => {
+      if (message.type() === "error") consoleErrors.push(message.text());
+    });
+    page.on("response", (response) => {
+      if (response.status() >= 500)
+        networkErrors.push(`${response.status()} ${response.url()}`);
+    });
+    page.on("requestfailed", (request) => {
+      if (request.failure()?.errorText !== "net::ERR_ABORTED")
+        networkErrors.push(request.failure()?.errorText ?? request.url());
+    });
     const login = await signInApiWithRateWindow(
       page.request,
       "organizer@demo.invalid",
@@ -88,6 +101,8 @@ for (const [name, width, height] of [
       fullPage: true,
     });
     expect(errors).toEqual([]);
+    expect(consoleErrors).toEqual([]);
+    expect(networkErrors).toEqual([]);
   });
 }
 
@@ -98,7 +113,9 @@ test("organizer recovery, keyboard assignment/conflicts, empty state and accepte
   await page.setViewportSize({ width: 360, height: 800 });
   const eventId = randomUUID(),
     divisionId = randomUUID(),
+    secondDivisionId = randomUUID(),
     drawId = randomUUID(),
+    alternateDrawId = randomUUID(),
     gameId = randomUUID(),
     otherGame = randomUUID();
   await pool.query(
@@ -106,8 +123,8 @@ test("organizer recovery, keyboard assignment/conflicts, empty state and accepte
     [eventId],
   );
   await pool.query(
-    "INSERT INTO division(id,event_id,name,discipline,format) VALUES($1,$2,'Browser four-player','men_four','Existing games')",
-    [divisionId, eventId],
+    "INSERT INTO division(id,event_id,name,discipline,format) VALUES($1,$2,'Browser four-player','men_four','Existing games'),($3,$2,'Second division','women_four','Existing games')",
+    [divisionId, eventId, secondDivisionId],
   );
   await pool.query(
     "INSERT INTO role_grant(id,user_id,role,event_id) VALUES($1,'demo-organizer','organizer',$2)",
@@ -139,8 +156,8 @@ test("organizer recovery, keyboard assignment/conflicts, empty state and accepte
   ).toBeVisible();
   await page.unroute(`**/api/v1/events/${eventId}/schedule`);
   await pool.query(
-    "INSERT INTO draw_session(id,division_id,number,starts_at,state) VALUES($1,$2,1,'2026-11-08T15:00:00Z','scheduled')",
-    [drawId, divisionId],
+    "INSERT INTO draw_session(id,division_id,number,starts_at,state) VALUES($1,$2,1,'2026-11-08T15:00:45.999Z','scheduled'),($3,$2,2,'2026-11-09T17:00:00Z','scheduled')",
+    [drawId, secondDivisionId, alternateDrawId],
   );
   await pool.query(
     "INSERT INTO game(id,draw_id,sheet,phase,state,slot_a,slot_b) VALUES($1,$3,'A','Browser assignment','scheduled','Phone side A','Phone side B'),($2,$3,'B','Browser conflict','scheduled','Other side A','Other side B')",
@@ -148,6 +165,14 @@ test("organizer recovery, keyboard assignment/conflicts, empty state and accepte
   );
   await page.getByRole("button", { name: "Reload accepted schedule" }).click();
   await expect(page.getByLabel("Game", { exact: true })).toBeVisible();
+  await page.getByLabel("Session to edit").selectOption(drawId);
+  await expect(page.getByLabel("Venue date and time")).toHaveValue(
+    "2026-11-08T09:00",
+  );
+  await expect(page.getByLabel("UTC offset")).toHaveValue("-06:00");
+  await expect(page.getByLabel("Duration in minutes")).toHaveValue("120");
+  await expect(page.locator("#session-division")).toHaveValue(secondDivisionId);
+  await expect(page.getByLabel("Event edition")).toHaveValue(eventId);
   await page.getByLabel("Game", { exact: true }).selectOption(gameId);
   await page.getByLabel("Sheet", { exact: true }).fill("B");
   await page.locator("#assignment-reason").fill("Phone reassignment");
@@ -163,6 +188,7 @@ test("organizer recovery, keyboard assignment/conflicts, empty state and accepte
     path: testInfo.outputPath("phone-known-conflict.png"),
     fullPage: true,
   });
+  await page.getByLabel("Session to edit").selectOption("");
   await page.getByLabel("Draw number").fill("2");
   await page.getByLabel("Venue date and time").fill("2026-11-09T09:00");
   await page.getByLabel("UTC offset").fill("-06:00");
@@ -201,12 +227,34 @@ test("organizer recovery, keyboard assignment/conflicts, empty state and accepte
         reason: "Other organizer",
         action: "assign",
         gameId,
-        drawId,
+        drawId: alternateDrawId,
         sheet: "C",
       },
     },
   );
   expect(external.status()).toBe(200);
+  const changedSession = await page.request.post(
+    `/api/v1/events/${eventId}/schedule`,
+    {
+      headers: { Origin: process.env.BETTER_AUTH_URL! },
+      data: {
+        requestId: randomUUID(),
+        expectedVersion: 3,
+        reason: "Other organizer revises venue slot",
+        action: "session",
+        session: {
+          id: drawId,
+          divisionId: secondDivisionId,
+          number: 7,
+          localStart: "2026-11-09T10:45",
+          utcOffset: "-06:00",
+          durationMinutes: 165,
+        },
+      },
+    },
+  );
+  expect(changedSession.status()).toBe(200);
+  await page.getByLabel("Session to edit").selectOption(drawId);
   await page.getByLabel("Draw number").fill("3");
   await page.getByLabel("Venue date and time").fill("2026-11-09T12:00");
   await page.getByLabel("UTC offset").fill("-06:00");
@@ -220,6 +268,37 @@ test("organizer recovery, keyboard assignment/conflicts, empty state and accepte
   await expect(page.getByLabel("Draw number")).toBeDisabled();
   await page.getByRole("button", { name: "Reload accepted schedule" }).click();
   await expect(page.getByLabel("Draw number")).toBeEnabled();
+  await expect(page.getByLabel("Sheet", { exact: true })).toHaveValue("C");
+  await expect(page.locator("#assignment-reason")).toHaveValue("");
+  await expect(page.getByLabel("Target session")).toHaveValue(alternateDrawId);
+  await expect(page.getByLabel("Draw number")).toHaveValue("7");
+  await expect(page.getByLabel("Venue date and time")).toHaveValue(
+    "2026-11-09T10:45",
+  );
+  await expect(page.getByLabel("UTC offset")).toHaveValue("-06:00");
+  await expect(page.getByLabel("Duration in minutes")).toHaveValue("165");
+  await expect(page.locator("#session-division")).toHaveValue(secondDivisionId);
+  await expect(page.getByLabel("Event edition")).toHaveValue(eventId);
+  // Deliberate drafts survive ordinary editing; explicit reload resets even at the same version.
+  await page.getByLabel("Venue date and time").fill("2026-11-09T11:11");
+  await page.getByLabel("UTC offset").fill("-05:00");
+  await page.getByLabel("Duration in minutes").fill("60");
+  await page.getByLabel("Sheet", { exact: true }).fill("D");
+  await page.getByLabel("Target session").selectOption(drawId);
+  await expect(page.getByLabel("Venue date and time")).toHaveValue(
+    "2026-11-09T11:11",
+  );
+  await expect(page.getByLabel("UTC offset")).toHaveValue("-05:00");
+  await expect(page.getByLabel("Duration in minutes")).toHaveValue("60");
+  await expect(page.getByLabel("Target session")).toHaveValue(drawId);
+  await page.getByRole("button", { name: "Reload accepted schedule" }).click();
+  await expect(page.getByLabel("Sheet", { exact: true })).toHaveValue("C");
+  await expect(page.getByLabel("Target session")).toHaveValue(alternateDrawId);
+  await expect(page.getByLabel("Venue date and time")).toHaveValue(
+    "2026-11-09T10:45",
+  );
+  await expect(page.getByLabel("UTC offset")).toHaveValue("-06:00");
+  await expect(page.getByLabel("Duration in minutes")).toHaveValue("165");
   await page.route(`**/api/v1/events/${eventId}/schedule`, (route) =>
     route.fulfill({
       status: 503,
@@ -308,4 +387,8 @@ test("a delayed edition read cannot replace a more recently selected schedule", 
   ).toBeVisible();
   await expect(page.getByLabel("Event edition")).toHaveValue("prairie-2026");
   await page.unroute(`**/api/v1/events/${eventId}/schedule`);
+  await page.goto("/admin/schedule?event=outside-assigned-editions");
+  await expect(page.locator('.error[role="alert"]')).toContainText(
+    "This edition is outside your editable scope. Choose an assigned edition.",
+  );
 });

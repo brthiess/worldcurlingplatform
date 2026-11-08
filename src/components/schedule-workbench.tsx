@@ -19,6 +19,7 @@ function time(instant: string, zone: string) {
 }
 export function ScheduleWorkbench() {
   const loadSequence = useRef(0);
+  const [acceptedFormRevision, setAcceptedFormRevision] = useState(0);
   const [events, setEvents] = useState<{ id: string; name: string }[]>([]),
     [eventId, setEventId] = useState(""),
     [data, setData] = useState<Data | null>(null),
@@ -42,6 +43,7 @@ export function ScheduleWorkbench() {
       if (sequence !== loadSequence.current) return;
       if (!r.ok) throw new Error(next.error);
       setData(next);
+      setAcceptedFormRevision((revision) => revision + 1);
       setError("");
       setStale(false);
       setPending(null);
@@ -77,7 +79,13 @@ export function ScheduleWorkbench() {
         if (list.some((e) => e.id === id)) {
           setEventId(id);
           await load(id);
-        } else setLoading(false);
+        } else {
+          if (list.length)
+            setError(
+              "This edition is outside your editable scope. Choose an assigned edition.",
+            );
+          setLoading(false);
+        }
       } catch (e) {
         if (active) {
           setError((e as Error).message);
@@ -112,6 +120,7 @@ export function ScheduleWorkbench() {
         throw new Error(next.error);
       }
       setData(next);
+      setAcceptedFormRevision((revision) => revision + 1);
       setPending(null);
       setStale(false);
       setStatus(
@@ -191,6 +200,9 @@ export function ScheduleWorkbench() {
                 void load(e.target.value);
               }}
             >
+              <option value="" disabled>
+                Choose an assigned edition
+              </option>
               {events.map((e) => (
                 <option key={e.id} value={e.id}>
                   {e.name}
@@ -284,7 +296,7 @@ export function ScheduleWorkbench() {
               </select>
               <form
                 className="form-card"
-                key={`${sessionId}-${data.version}`}
+                key={`${sessionId}-${acceptedFormRevision}`}
                 onSubmit={(e) => submit(e, "session")}
                 onChange={() => setStatus("Unsaved schedule edit.")}
               >
@@ -376,6 +388,7 @@ export function ScheduleWorkbench() {
                 </p>
               ) : (
                 <form
+                  key={acceptedFormRevision}
                   className="form-card"
                   onSubmit={(e) => submit(e, "assign")}
                   onChange={() => setStatus("Unsaved schedule edit.")}
