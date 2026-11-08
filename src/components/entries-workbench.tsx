@@ -649,6 +649,7 @@ export function EntriesWorkbench() {
                           <button
                             type="button"
                             className="secondary"
+                            aria-label={`Add ${p.name} (${p.id})`}
                             onClick={() =>
                               addPlayer({
                                 playerId: p.id,

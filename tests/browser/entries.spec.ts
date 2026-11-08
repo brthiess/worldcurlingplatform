@@ -1,10 +1,18 @@
 import { test, expect, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 import { randomUUID } from "node:crypto";
-async function organizerSignIn(page:Page){
- await page.goto('/admin');await page.getByLabel('Demo persona').selectOption('organizer');await page.getByLabel('Demo password').fill(process.env.DEMO_PASSWORD!);
- const signIn=async()=>{const response=page.waitForResponse(r=>r.url().includes('/api/auth/sign-in/email'));await page.getByRole('button',{name:'Sign in',exact:true}).click();return response;};
- let response=await signIn();if(response.status()===429){await page.waitForTimeout(Math.min(60000,Math.max(1000,Number(response.headers()['x-retry-after']??60)*1000)));await page.waitForTimeout(250);response=await signIn();}expect(response.status()).toBe(200);await expect(page.getByRole('heading',{name:'Your workspace'})).toBeVisible();
+import { signInWithRateWindow } from "./auth-fixture";
+async function organizerSignIn(page: Page) {
+  await page.goto("/admin");
+  await page.getByLabel("Demo persona").selectOption("organizer");
+  await page.getByLabel("Demo password").fill(process.env.DEMO_PASSWORD!);
+  await signInWithRateWindow(
+    page,
+    page.getByRole("button", { name: "Sign in", exact: true }),
+  );
+  await expect(
+    page.getByRole("heading", { name: "Your workspace" }),
+  ).toBeVisible();
 }
 for (const [label, width] of [
   ["phone", 360],
@@ -108,6 +116,27 @@ for (const [label, width] of [
       path: info.outputPath(`${label}-public-team.png`),
       fullPage: true,
     });
+    await page
+      .getByRole("link", { name: "Prairie Open 2026", exact: true })
+      .first()
+      .click();
+    await expect(page).toHaveURL(/division=prairie-men/);
+    await page.getByRole("link", { name, exact: true }).click();
+    await expect(
+      page.getByRole("heading", { name, exact: true }),
+    ).toBeVisible();
+    await page
+      .getByRole("link", { name: `${name} Guest`, exact: true })
+      .click();
+    await expect(
+      page.getByRole("heading", { name: `${name} Guest`, exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByText(
+        "Provisional player identity. Relationship to possible existing records remains unresolved.",
+        { exact: true },
+      ),
+    ).toBeVisible();
     expect(errors).toEqual([]);
     expect(networkErrors).toEqual([]);
   });
@@ -187,7 +216,7 @@ test("existing-team and player selection, loading, empty search, keyboard, uncer
     .getByLabel("Search existing players", { exact: true })
     .fill("Alex Demo");
   await page
-    .getByRole("button", { name: "Add Alex Demo", exact: true })
+    .getByRole("button", { name: "Add Alex Demo (demo-player)", exact: true })
     .click();
   await page.getByLabel("Entry name", { exact: true }).fill(`${name} return`);
   expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
@@ -294,4 +323,25 @@ test("existing-team and player selection, loading, empty search, keyboard, uncer
       () => document.documentElement.scrollWidth <= innerWidth,
     ),
   ).toBe(true);
+  let failRead = true;
+  await page.route("**/api/v1/public/teams", async (route) => {
+    if (failRead) {
+      failRead = false;
+      await route.abort("failed");
+    } else await route.continue();
+  });
+  await page.goto("/teams");
+  await expect(
+    page.getByRole("heading", { name: "Roster unavailable" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Retry roster", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "Teams", exact: true }),
+  ).toBeVisible();
+  await page
+    .getByLabel("Search teams or core players", { exact: true })
+    .fill("No possible team identity here 0000000");
+  await expect(
+    page.getByText("No teams match this search.", { exact: true }),
+  ).toBeVisible();
 });

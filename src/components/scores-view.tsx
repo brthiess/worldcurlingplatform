@@ -390,7 +390,12 @@ export function ScoresView({
               {refreshing ? "Refreshing…" : "Refresh scores"}
             </button>
           </div>
-          {!gameId && <EventEntryLinks eventId={data.event.id} />}
+          {!gameId && (
+            <EventEntryLinks
+              eventId={data.event.id}
+              divisionId={data.selectedDivisionId ?? undefined}
+            />
+          )}
         </>
       )}
     </main>

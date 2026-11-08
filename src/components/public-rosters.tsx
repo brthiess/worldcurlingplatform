@@ -20,6 +20,7 @@ type Entry = {
   id: string;
   name: string;
   eventId: string;
+  divisionId: string;
   eventName: string;
   discipline: string;
   status: string;
@@ -37,7 +38,13 @@ type Team = {
   discipline: string;
   core: Player[];
   registrations: Registration[];
-  entries: { id: string; name: string; eventId: string; eventName: string }[];
+  entries: {
+    id: string;
+    name: string;
+    eventId: string;
+    eventName: string;
+    divisionId: string;
+  }[];
 };
 const disciplineName = (d: string) =>
   ({
@@ -179,7 +186,10 @@ export function PublicRoster({
     const e = data as Entry;
     return (
       <main id="main">
-        <a className="back" href={`/events/${e.eventId}`}>
+        <a
+          className="back"
+          href={`/events/${e.eventId}?division=${e.divisionId}`}
+        >
           ← {e.eventName}
         </a>
         <p className="eyebrow">Event entry · {disciplineName(e.discipline)}</p>
@@ -260,7 +270,9 @@ export function PublicRoster({
                 <a href={`/entries/${e.id}`}>{e.name}</a>
               </h3>
               <p>
-                <a href={`/events/${e.eventId}`}>{e.eventName}</a>
+                <a href={`/events/${e.eventId}?division=${e.divisionId}`}>
+                  {e.eventName}
+                </a>
               </p>
             </li>
           ))}
@@ -269,9 +281,23 @@ export function PublicRoster({
     </main>
   );
 }
-export function EventEntryLinks({ eventId }: { eventId: string }) {
+export function EventEntryLinks({
+  eventId,
+  divisionId,
+}: {
+  eventId: string;
+  divisionId?: string;
+}) {
   const [entries, setEntries] = useState<
-      { id: string; name: string; version: number; status: string }[] | null
+      | {
+          id: string;
+          name: string;
+          version: number;
+          status: string;
+          divisionId: string;
+          divisionName: string;
+        }[]
+      | null
     >(null),
     [error, setError] = useState(false);
   useEffect(() => {
@@ -300,20 +326,23 @@ export function EventEntryLinks({ eventId }: { eventId: string }) {
         </p>
       ) : entries === null ? (
         <p role="status">Loading entries…</p>
-      ) : !entries.length ? (
+      ) : !entries.some((e) => !divisionId || e.divisionId === divisionId) ? (
         <p className="empty">No entries recorded.</p>
       ) : (
         <ul className="entry-link-list">
-          {entries.map((e) => (
-            <li key={e.id}>
-              <a href={`/entries/${e.id}`}>{e.name}</a>
-              <span className="muted">
-                {e.version
-                  ? `${e.status} · lineup v${e.version}`
-                  : "Provisional · no lineup recorded"}
-              </span>
-            </li>
-          ))}
+          {entries
+            .filter((e) => !divisionId || e.divisionId === divisionId)
+            .map((e) => (
+              <li key={e.id}>
+                <a href={`/entries/${e.id}`}>{e.name}</a>
+                <span className="muted">
+                  {e.divisionName} ·{" "}
+                  {e.version
+                    ? `${e.status} · lineup v${e.version}`
+                    : "Provisional · no lineup recorded"}
+                </span>
+              </li>
+            ))}
         </ul>
       )}
     </section>

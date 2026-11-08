@@ -3,11 +3,12 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import pg from "pg";
+import { authRequest } from "./auth-request";
 const base = process.env.BETTER_AUTH_URL!;
 const sessions = new Map<string, string>();
 async function login(role: string) {
   if (sessions.has(role)) return sessions.get(role)!;
-  const r = await fetch(base + "/api/auth/sign-in/email", {
+  const r = await authRequest(base + "/api/auth/sign-in/email", {
     method: "POST",
     headers: { Origin: base, "Content-Type": "application/json" },
     body: JSON.stringify({
