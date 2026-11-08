@@ -3,7 +3,11 @@ import { authRequest } from "./auth-request";
 import { test, after } from "node:test";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
-import { pool } from "../src/db";
+import pg from "pg";
+const pool = new pg.Pool({
+  connectionString: process.env.DATABASE_URL,
+  max: 2,
+});
 const base = process.env.BETTER_AUTH_URL!;
 after(() => pool.end());
 async function login(role = "scorekeeper") {

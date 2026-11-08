@@ -2,8 +2,12 @@ import { signInWithRateWindow } from "./auth-fixture";
 import { test, expect } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 import { readFile, readdir, mkdir } from "node:fs/promises";
-import { pool } from "../../src/db";
+import pg from "pg";
 import "dotenv/config";
+const pool = new pg.Pool({
+  connectionString: process.env.DATABASE_URL,
+  max: 2,
+});
 async function mail(email: string, kind: string) {
   const files = (await readdir(".runtime/mail")).sort().reverse();
   for (const file of files) {

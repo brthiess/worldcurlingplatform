@@ -5,7 +5,11 @@ import assert from "node:assert/strict";
 import sharp from "sharp";
 import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { pool } from "../src/db";
+import pg from "pg";
+const pool = new pg.Pool({
+  connectionString: process.env.DATABASE_URL,
+  max: 2,
+});
 const base = process.env.BETTER_AUTH_URL!;
 async function login(role: string) {
   const signIn = () =>
