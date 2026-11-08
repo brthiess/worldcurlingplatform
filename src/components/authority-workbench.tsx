@@ -42,7 +42,7 @@ type Delegations = {
 };
 type Staff = {
   events: { id: string; name: string }[];
-  games: { id: string; eventId: string; sheet: string; drawNumber: number }[];
+  games: { id: string; eventId: string; sheet: string; drawNumber: number|null }[];
   grants: {
     id: string;
     name: string;
@@ -410,7 +410,7 @@ export function AuthorityWorkbench() {
                           .filter((g) => g.eventId === eventId)
                           .map((g) => (
                             <option value={g.id} key={g.id}>
-                              Draw {g.drawNumber} · Sheet {g.sheet} · {g.id}
+                              {g.drawNumber===null?'Not scheduled':`Draw ${g.drawNumber}`} · {g.sheet?`Sheet ${g.sheet}`:'Sheet not assigned'} · {g.id}
                             </option>
                           ))}
                       </select>
