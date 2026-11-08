@@ -65,10 +65,12 @@ test("public players are independent of accounts; approved claims permit only th
     "biography",
     "handedness",
     "id",
+    "identityStatus",
     "name",
     "origin",
     "photoUrl",
   ]);
+  assert.equal(publicPlayer.identityStatus, "identified");
   const cookie = fixtureData.cookie,
     admin = await login("administrator"),
     organizer = await login("organizer");

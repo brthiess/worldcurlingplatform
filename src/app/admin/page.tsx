@@ -121,6 +121,9 @@ export default function Admin() {
           <p>
             <a href="/admin/authority">Authority & event staff</a>
           </p>
+          <p>
+            <a href="/admin/entries">Manual team entries</a>
+          </p>
           <button
             className="secondary"
             disabled={busy}
