@@ -5,7 +5,10 @@ import { readDrawFieldEntries } from "@/modules/entries/draw-field";
 import {
   singleKnockout,
   SINGLE_TEMPLATE,
+  tripleKnockout,
+  TRIPLE_TEMPLATE,
   validateDrawFieldIdentity,
+  sourceLabel,
   type DrawSource,
 } from "@/domain/draws";
 export class DrawError extends Error {
@@ -123,9 +126,11 @@ export async function saveDraw(userId: string, id: string, input: unknown) {
     expectedVersion: number;
     action: "preview" | "publish";
     seedEntryIds?: string[];
+    template?: string;
     reason: string;
   };
   if (
+    (x?.template !== undefined && ![SINGLE_TEMPLATE,TRIPLE_TEMPLATE].includes(x.template)) ||
     !x ||
     typeof x.requestId !== "string" ||
     !/^[a-zA-Z0-9-]{1,80}$/.test(x.requestId) ||
@@ -153,7 +158,7 @@ export async function saveDraw(userId: string, id: string, input: unknown) {
     expectedVersion: x.expectedVersion,
     action: x.action,
     reason: x.reason.trim(),
-    ...(x.action === "preview" ? { seedEntryIds: x.seedEntryIds } : {}),
+    ...(x.action === "preview" ? { seedEntryIds: x.seedEntryIds, ...(x.template ? {template:x.template} : {}) } : {}),
   };
   const c = await pool.connect();
   try {
@@ -193,7 +198,7 @@ export async function saveDraw(userId: string, id: string, input: unknown) {
     if (x.action === "preview") {
       let generated: ReturnType<typeof singleKnockout>;
       try {
-        generated = singleKnockout(x.seedEntryIds!);
+        generated = x.template===TRIPLE_TEMPLATE ? tripleKnockout(x.seedEntryIds!) : singleKnockout(x.seedEntryIds!);
       } catch (e) {
         throw new DrawError((e as Error).message);
       }
@@ -270,7 +275,7 @@ export async function saveDraw(userId: string, id: string, input: unknown) {
       divisionId: id,
       version: before.version + 1,
       state: x.action === "preview" ? "preview" : "published",
-      template: SINGLE_TEMPLATE,
+      template: graph.template,
       templateVersion: 1,
       seeds,
       graph,
@@ -299,7 +304,7 @@ export async function saveDraw(userId: string, id: string, input: unknown) {
         id,
         response.version,
         response.state,
-        SINGLE_TEMPLATE,
+        graph.template,
         JSON.stringify(graph),
         userId,
         x.requestId,
@@ -330,23 +335,22 @@ export async function saveDraw(userId: string, id: string, input: unknown) {
             g.key,
             side,
             "seed" in source ? source.seed : null,
-            "winner" in source ? source.winner : null,
-            "winner" in source ? "winner" : null,
+            "winner" in source ? source.winner : "loser" in source ? source.loser : null,
+            "winner" in source ? "winner" : "loser" in source ? "loser" : null,
           ],
         );
       }
     if (x.action === "publish") {
       const participant = (source: DrawSource) =>
         "seed" in source ? seeds.find((s) => s.seed === source.seed)! : null;
-      const label = (source: DrawSource) =>
-        "seed" in source ? `Seed ${source.seed}` : `Winner of ${source.winner}`;
+      const label = sourceLabel;
       for (const g of graph.games)
         await c.query(
           "INSERT INTO game(id,division_id,draw_id,sheet,phase,state,entry_a,entry_b,slot_a,slot_b) VALUES($1,$2,NULL,'',$3,'scheduled',$4,$5,$6,$7)",
           [
             g.id,
             id,
-            `Single knockout · ${g.key}`,
+            `${graph.template===TRIPLE_TEMPLATE ? (g.stage==="P" ? "Playoffs" : `${g.stage} path`) : "Single knockout"} · ${g.key}`,
             participant(g.a)?.entryId ?? null,
             participant(g.b)?.entryId ?? null,
             label(g.a),
@@ -356,19 +360,20 @@ export async function saveDraw(userId: string, id: string, input: unknown) {
       for (const g of graph.games)
         for (const side of ["a", "b"] as const) {
           const source = g[side];
-          if ("winner" in source)
+          if (!("seed" in source))
             await c.query(
-              "INSERT INTO game_assignment_dependency(upstream_game_id,downstream_game_id,side,route) VALUES($1,$2,$3,'winner')",
+              "INSERT INTO game_assignment_dependency(upstream_game_id,downstream_game_id,side,route) VALUES($1,$2,$3,$4)",
               [
-                graph.games.find((n) => n.key === source.winner)!.id,
+                graph.games.find((n) => n.key === ("winner" in source ? source.winner : source.loser))!.id,
                 g.id,
                 side,
+                "winner" in source ? "winner" : "loser",
               ],
             );
         }
       await c.query(
-        "UPDATE division SET format='Single knockout · eight slots, six or eight seeded entries' WHERE id=$1",
-        [id],
+        "UPDATE division SET format=$2 WHERE id=$1",
+        [id,graph.template===TRIPLE_TEMPLATE ? "Triple knockout · sixteen entries · 2 A / 3 B / 3 C qualifiers · fixed playoffs" : "Single knockout · eight slots, six or eight seeded entries"],
       );
     }
     await c.query("COMMIT");
@@ -407,9 +412,13 @@ export async function publicDraw(id: string) {
         [id],
       )
     ).rows;
+    const terminals = (await c.query(
+      'SELECT n.key,g.id AS "gameId",t.entry_id AS "entryId",t.kind,t.label,t.place,t.result_version AS "resultVersion" FROM draw_node n JOIN game g ON g.id=n.game_id JOIN draw_terminal_result t ON t.upstream_game_id=g.id WHERE n.division_id=$1 AND n.revision=$2 AND t.result_version=(SELECT max(r.version) FROM game_result_version r WHERE r.game_id=g.id) ORDER BY n.key,t.route',
+      [id,current.version],
+    )).rows;
     await c.query("COMMIT");
     const source = (s: DrawSource): DrawSource =>
-      "seed" in s ? { seed: s.seed } : { winner: s.winner };
+      "seed" in s ? { seed: s.seed } : "loser" in s ? { loser: s.loser } : { winner: s.winner, ...(s.qualifier ? {qualifier:s.qualifier} : {}) };
     const graph = current.graph
       ? {
           template: current.graph.template,
@@ -419,6 +428,8 @@ export async function publicDraw(id: string) {
             round: g.round,
             a: source(g.a),
             b: source(g.b),
+            ...(g.stage ? {stage:g.stage} : {}),
+            ...(g.terminals ? {terminals:g.terminals} : {}),
           })),
           byes: current.graph.byes.map((b) => ({
             seed: b.seed,
@@ -443,6 +454,7 @@ export async function publicDraw(id: string) {
       graph,
       division: row,
       games,
+      terminals,
       history,
     };
   } catch (e) {

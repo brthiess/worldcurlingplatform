@@ -1,0 +1,87 @@
+// Literal independent reviewed fixture, draw-research.md / review-draw.py.
+// Neither expected routes nor results are derived from the application generator.
+export const expectedTripleSources = `
+A01 1 16
+A02 8 9
+A03 4 13
+A04 5 12
+A05 2 15
+A06 7 10
+A07 3 14
+A08 6 11
+A09 WA01 WA02
+A10 WA03 WA04
+A11 WA05 WA06
+A12 WA07 WA08
+A13 WA09 WA10
+A14 WA11 WA12
+B01 LA01 LA02
+B02 LA03 LA04
+B03 LA05 LA06
+B04 LA07 LA08
+B05 WB01 LA10
+B06 WB02 LA09
+B07 WB03 LA12
+B08 WB04 LA11
+B09 LA13 WB07
+B10 LA14 WB05
+B11 WB06 WB08
+C01 LB01 LB02
+C02 LB03 LB04
+C03 WC01 LB07
+C04 WC02 LB05
+C05 LB06 LB08
+C06 WC03 LB10
+C07 WC04 LB11
+C08 WC05 LB09
+P01 QA1 QC3
+P02 QB1 QB2
+P03 QA2 QC2
+P04 QB3 QC1
+P05 WP01 WP02
+P06 WP03 WP04
+P07 WP05 WP06`.trim();
+export const tripleResults = `
+A01 1 16 1
+A02 8 9 8
+A03 4 13 4
+A04 5 12 5
+A05 2 15 2
+A06 7 10 7
+A07 3 14 3
+A08 6 11 6
+A09 1 8 1
+A10 4 5 4
+A11 2 7 2
+A12 3 6 3
+A13 1 4 1
+A14 2 3 2
+B01 16 9 16
+B02 13 12 13
+B03 15 10 15
+B04 14 11 14
+B05 16 5 5
+B06 13 8 8
+B07 15 6 6
+B08 14 7 7
+B09 4 6 4
+B10 3 5 3
+B11 8 7 8
+C01 9 12 9
+C02 10 11 10
+C03 9 15 9
+C04 10 16 16
+C05 13 14 13
+C06 9 5 5
+C07 16 7 16
+C08 13 6 13
+P01 1 13 1
+P02 4 3 3
+P03 2 16 16
+P04 8 5 5
+P05 1 3 1
+P06 16 5 16
+P07 1 16 16`.trim().split("\n").map(row => {
+  const [key,a,b,w] = row.split(" ");
+  return {key, a:Number(a), b:Number(b), winner:Number(w)};
+});

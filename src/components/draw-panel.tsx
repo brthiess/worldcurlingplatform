@@ -1,5 +1,5 @@
 import type { PublicDraw } from "@/modules/draws/draws";
-import { selectedDrawPath } from "@/domain/draws";
+import { selectedDrawPath, sourceLabel } from "@/domain/draws";
 type Props = {
   data: Pick<PublicDraw, "graph" | "seeds">;
   games?: PublicDraw["games"];
@@ -109,7 +109,7 @@ export function DrawPanel({
                           ("seed" in source
                             ? data.seeds.find((s) => s.seed === source.seed)
                                 ?.name
-                            : `Winner of ${source.winner}`);
+                            : sourceLabel(source));
                         const total =
                           game?.[side === "a" ? "totalA" : "totalB"];
                         return (
