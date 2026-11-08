@@ -37,4 +37,4 @@ A stale platform season snapshot, unreviewed/inapplicable rule version, missing 
 
 ## Errors
 
-401 sign-in required;403 current staff/Origin required;404 record/version absent;400 malformed or invalid exact evidence;409 stale/conflicting command;422 attempted review with required unresolved evidence;503 save acknowledgement uncertain. After503/network loss retry the original command before editing. The UI freezes all editing/navigation controls during that uncertainty, and offers explicit read retry, source/registration refresh, current platform-snapshot rebasing and immutable history inspection.
+401 sign-in required;403 current staff/Origin required;404 record/version absent;400 malformed or invalid exact evidence;409 stale/conflicting command;422 attempted review with required unresolved evidence;503 save acknowledgement uncertain. After503/network loss retry the original command before editing. The UI freezes review editing controls and review-area navigation during that uncertainty, and offers explicit read retry, source/registration refresh, current platform-snapshot rebasing and immutable history inspection.
