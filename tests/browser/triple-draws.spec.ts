@@ -452,3 +452,104 @@ test("configured triple16 organizer publishes only the admitted mixed-origin fie
   });
   expect(errors).toEqual([]);
 });
+test("never committed triple preview retains its exact profile and sixteen seeds across reload and retry", async ({
+  page,
+}, info) => {
+  test.setTimeout(120000);
+  page.setDefaultTimeout(15000);
+  await page.setViewportSize({ width: 360, height: 800 });
+  const id = "retry-tko-" + randomUUID(),
+    entries: string[] = [],
+    bodies: string[] = [],
+    actors: string[] = [];
+  await pool.query(
+    "INSERT INTO division(id,event_id,name,discipline,format) VALUES($1,$2,'Retry triple browser','men_four','triple knockout')",
+    [id, event.id],
+  );
+  for (let n = 1; n <= 16; n++) {
+    const entry = id + "-" + n;
+    entries.push(entry);
+    await pool.query(
+      "INSERT INTO event_entry(id,division_id,display_name) VALUES($1,$2,$3)",
+      [entry, id, "Retry T" + String(n).padStart(2, "0")],
+    );
+  }
+  expect(
+    (
+      await signInApiWithRateWindow(
+        page.request,
+        "organizer@demo.invalid",
+        process.env.DEMO_PASSWORD,
+      )
+    ).status(),
+  ).toBe(200);
+  await page.goto("/admin/draws?division=" + id);
+  await page
+    .getByLabel("Competition profile", { exact: true })
+    .selectOption("application-tko16-q8-233-v1");
+  for (let n = 1; n <= 16; n++)
+    await page
+      .getByLabel("Seed " + n, { exact: true })
+      .selectOption(entries[n - 1]);
+  await page
+    .getByLabel("Revision reason", { exact: true })
+    .fill("Retain exact never committed triple preview");
+  let interrupted = false;
+  await page.route("**/api/v1/divisions/" + id + "/draw", async (route) => {
+    if (route.request().method() === "POST") {
+      bodies.push(route.request().postData()!);
+      actors.push(route.request().headers()["x-wcp-actor"]);
+      if (!interrupted) {
+        interrupted = true;
+        await route.abort("failed");
+        return;
+      }
+    }
+    await route.continue();
+  });
+  await page.getByRole("button", { name: "Save preview", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Retry same request", exact: true }),
+  ).toBeVisible();
+  await page.reload();
+  await expect(
+    page.getByRole("button", { name: "Retry same request", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByLabel("Competition profile", { exact: true }),
+  ).toHaveValue("application-tko16-q8-233-v1");
+  await expect(page.getByLabel("Field size", { exact: true })).toHaveValue(
+    "16",
+  );
+  await expect(page.getByLabel("Seed 16", { exact: true })).toHaveValue(
+    entries[15],
+  );
+  await expect(
+    page.getByRole("button", { name: "Save preview", exact: true }),
+  ).toBeDisabled();
+  await page
+    .getByRole("button", { name: "Retry same request", exact: true })
+    .click();
+  await expect(page.getByRole("status")).toHaveText(
+    "Saved preview revision 1.",
+  );
+  await expect(
+    page.getByLabel("Competition profile", { exact: true }),
+  ).toHaveValue("application-tko16-q8-233-v1");
+  await expect(page.getByLabel("Field size", { exact: true })).toHaveValue(
+    "16",
+  );
+  await expect(page.getByLabel("Seed 16", { exact: true })).toHaveValue(
+    entries[15],
+  );
+  expect(bodies).toHaveLength(2);
+  expect(bodies[1]).toBe(bodies[0]);
+  expect(actors).toEqual(["demo-organizer", "demo-organizer"]);
+  await expect(
+    page.getByRole("region", { name: "Saved draw preview" }),
+  ).toContainText("QC2");
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.screenshot({
+    path: info.outputPath("phone-recovered-triple-profile.png"),
+  });
+});
