@@ -107,6 +107,10 @@ def main():
         state['tickets_completed'] = [t['id'] for t in tickets.values() if t['status'] == 'completed']
         state['active_tickets'] = [t['id'] for t in tickets.values() if t['status'] == 'in-progress']
         state['frontier'] = frontier(tickets)
+        worktrees = state.setdefault('git', {}).setdefault('worktrees_created', [])
+        ticket_worktree = f'.worktrees/{args.ticket}'
+        if (ROOT / ticket_worktree).is_dir() and ticket_worktree not in worktrees:
+            worktrees.append(ticket_worktree)
         state['verification'] = {
             'policy': 'Only completed tickets have reviewed required-check evidence; each record is limited to its ticket scope.',
             'records': {t['id']: t['completion'] for t in tickets.values()
