@@ -14,6 +14,138 @@ async function organizerSignIn(page: Page) {
     page.getByRole("heading", { name: "Your workspace" }),
   ).toBeVisible();
 }
+async function expectEntryEditingFrozen(page: Page) {
+  await expect(page.getByLabel("Division", { exact: true })).toBeDisabled();
+  await expect(
+    page.getByRole("button", { name: "New entry", exact: true }),
+  ).toBeDisabled();
+  for (const control of await page
+    .locator(
+      ".application-form input, .application-form select, .application-form textarea, .application-form button, .application-queue button",
+    )
+    .all()) {
+    await expect(control).toBeDisabled();
+  }
+}
+
+test("a committed create with a lost response freezes every entry control and retries the original division exactly once", async ({
+  page,
+}, info) => {
+  test.setTimeout(120000);
+  await page.setViewportSize({ width: 360, height: 900 });
+  await organizerSignIn(page);
+  const otherDivisionId = randomUUID();
+  const fixture = await page.request.post("/api/v1/applications", {
+    headers: { Origin: process.env.BETTER_AUTH_URL! },
+    data: {
+      id: randomUUID(),
+      requestId: randomUUID(),
+      action: "create",
+      application: {
+        organizationId: "prairie-club",
+        seriesId: "prairie",
+        name: "Browser uncertain-create alternate division",
+        startsOn: "2029-11-08",
+        endsOn: "2029-11-10",
+        city: "Regina",
+        country: "Canada",
+        venue: "",
+        timezone: "America/Regina",
+        divisions: [
+          {
+            id: otherDivisionId,
+            name: "Alternate division",
+            discipline: "men_four",
+          },
+        ],
+      },
+    },
+  });
+  expect(fixture.status()).toBe(201);
+  await page.goto("/admin/entries");
+  await page
+    .getByLabel("Division", { exact: true })
+    .selectOption("prairie-men");
+  const name = `Browser uncertain create ${randomUUID()}`;
+  await page.getByLabel("Entry name", { exact: true }).fill(name);
+  await page
+    .getByLabel("Search existing players", { exact: true })
+    .fill("Alex Demo");
+  await page
+    .getByRole("button", { name: "Add Alex Demo (demo-player)", exact: true })
+    .click();
+  await page
+    .getByLabel("New player name", { exact: true })
+    .fill("Unsubmitted draft player");
+  const commands: string[] = [];
+  let acceptedId = "";
+  await page.route("**/api/v1/entries", async (route) => {
+    if (route.request().method() !== "POST") {
+      await route.continue();
+      return;
+    }
+    commands.push(route.request().postData()!);
+    if (commands.length === 1) {
+      const accepted = await route.fetch();
+      expect(accepted.status()).toBe(201);
+      const saved = await accepted.json();
+      acceptedId = saved.id;
+      expect(saved.version).toBe(1);
+      expect(saved.divisionId).toBe("prairie-men");
+      await route.abort("failed");
+    } else await route.continue();
+  });
+  await page.getByRole("button", { name: "Save entry", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Retry last save", exact: true }),
+  ).toBeVisible();
+  await expectEntryEditingFrozen(page);
+  await expect(
+    page
+      .getByLabel("Division", { exact: true })
+      .selectOption(otherDivisionId, { timeout: 400 }),
+  ).rejects.toThrow(/Timeout/);
+  await expect(page.getByLabel("Division", { exact: true })).toHaveValue(
+    "prairie-men",
+  );
+  await expect(
+    page.getByRole("button", { name: "Retry last save", exact: true }),
+  ).toBeVisible();
+  await page.screenshot({
+    path: info.outputPath("phone-uncertain-create-frozen.png"),
+    fullPage: true,
+  });
+  await page
+    .getByRole("button", { name: "Retry last save", exact: true })
+    .click();
+  await expect(
+    page.getByText("Saved to the database.", { exact: true }),
+  ).toBeVisible();
+  expect(commands).toHaveLength(2);
+  expect(commands[1]).toBe(commands[0]);
+  await expect(
+    page.getByRole("link", { name: "View public entry", exact: true }),
+  ).toHaveAttribute("href", `/entries/${acceptedId}`);
+  const persisted = await (
+    await page.request.get(`/api/v1/entries/${acceptedId}`)
+  ).json();
+  expect(persisted.version).toBe(1);
+  expect(persisted.divisionId).toBe("prairie-men");
+  expect(persisted.name).toBe(name);
+  expect(
+    (
+      await page.request.get(`/api/v1/entries/${acceptedId}?version=2`)
+    ).status(),
+  ).toBe(404);
+  const workspace = await (await page.request.get("/api/v1/entries")).json();
+  expect(
+    workspace.entries.filter((entry: { name: string }) => entry.name === name),
+  ).toHaveLength(1);
+  await page.screenshot({
+    path: info.outputPath("phone-uncertain-create-recovered.png"),
+    fullPage: true,
+  });
+});
 for (const [label, width] of [
   ["phone", 360],
   ["tablet", 768],
@@ -302,6 +434,7 @@ test("existing-team and player selection, loading, empty search, keyboard, uncer
     page.getByRole("button", { name: "Retry last save", exact: true }),
   ).toBeVisible();
   await expect(page.getByLabel("Entry name", { exact: true })).toBeDisabled();
+  await expectEntryEditingFrozen(page);
   await page
     .getByRole("button", { name: "Retry last save", exact: true })
     .click();

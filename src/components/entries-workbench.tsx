@@ -329,7 +329,7 @@ export function EntriesWorkbench() {
             <select
               id="entry-division"
               value={divisionId}
-              disabled={busy || editing}
+              disabled={busy || editing || !!retry}
               onChange={(e) => {
                 setDivisionId(e.target.value);
                 setTeamId(undefined);
