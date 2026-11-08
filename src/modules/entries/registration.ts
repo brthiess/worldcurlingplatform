@@ -199,10 +199,9 @@ export async function registrationCommand(userId: string, raw: unknown) {
         );
       if (
         (
-          await c.query(
-            "SELECT g.id FROM game g JOIN draw_session ds ON ds.id=g.draw_id WHERE ds.division_id=$1 LIMIT 1",
-            [divisionId],
-          )
+          await c.query("SELECT id FROM game WHERE division_id=$1 LIMIT 1", [
+            divisionId,
+          ])
         ).rowCount
       )
         throw new EntryError(

@@ -7,6 +7,7 @@ import {
   occupiedPlaces,
   canEnterDraw,
   paymentDisposition,
+  validateRegistrationDrawField,
 } from "../src/domain/registration";
 
 test("opening requires capacity, entry requirements, explicit fee terms and documented format", () => {
@@ -29,6 +30,58 @@ test("opening requires capacity, entry requirements, explicit fee terms and docu
       key,
     );
   }
+});
+
+test("configured draws match the registered family and complete accepted field without treating capacity as field size", () => {
+  const six = ["A", "B", "C", "D", "E", "F"];
+  assert.doesNotThrow(() =>
+    validateRegistrationDrawField(
+      "single_knockout",
+      "single_knockout",
+      six,
+      [...six].reverse(),
+    ),
+  );
+  assert.throws(
+    () =>
+      validateRegistrationDrawField(
+        "triple_knockout",
+        "single_knockout",
+        six,
+        six,
+      ),
+    /format family/i,
+  );
+  assert.throws(
+    () =>
+      validateRegistrationDrawField(
+        "single_knockout",
+        "single_knockout",
+        [...six, "G", "H"],
+        six,
+      ),
+    /complete current accepted field/i,
+  );
+  assert.throws(
+    () =>
+      validateRegistrationDrawField("single_knockout", "single_knockout", six, [
+        "A",
+        "B",
+        "C",
+        "D",
+        "E",
+        "pending",
+      ]),
+    /complete current accepted field/i,
+  );
+  assert.doesNotThrow(() =>
+    validateRegistrationDrawField(
+      null,
+      "single_knockout",
+      [...six, "G", "H"],
+      six,
+    ),
+  );
 });
 
 test("open and reviewed entry keep acceptance, reservation deadline and payment distinct", () => {

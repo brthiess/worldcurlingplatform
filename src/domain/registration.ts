@@ -131,3 +131,26 @@ export function canEnterDraw(entry: {
     ? entry.admissionState === "accepted"
     : entry.entryAdmission === "organizer_recorded";
 }
+/** Registration capacity is a ceiling. Each operated engine owns its actual field sizes. */
+export function validateRegistrationDrawField(
+  registeredFamily: string | null,
+  operatedFamily: string,
+  acceptedEntryIds: readonly string[],
+  selectedEntryIds: readonly string[],
+) {
+  if (registeredFamily === null) return;
+  if (registeredFamily !== operatedFamily)
+    throw new EntryError(
+      "The registered format family does not match this operated draw profile. Prepare a compatible profile; the opened terms are retained.",
+      422,
+    );
+  const selected = new Set(selectedEntryIds);
+  if (
+    acceptedEntryIds.length !== selectedEntryIds.length ||
+    acceptedEntryIds.some((id) => !selected.has(id))
+  )
+    throw new EntryError(
+      "Select the complete current accepted field. Admission changed or accepted entries were omitted; reload and prepare a new preview.",
+      422,
+    );
+}
