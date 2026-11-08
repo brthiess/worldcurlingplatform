@@ -2,6 +2,17 @@ import { createHash, randomUUID } from "node:crypto";
 import type { PoolClient } from "pg";
 import { pool } from "@/db";
 import {
+  routeApplication,
+  responsibleReviewer,
+  activeDelegations,
+  isAdministrator,
+} from "@/modules/identity/authority";
+import {
+  matchesApprovalScope,
+  approvalActionPolicy,
+  approvalOverride,
+} from "@/domain/authority";
+import {
   applicationTransition,
   validateApplication,
   type ApplicationInput,
@@ -37,7 +48,7 @@ async function authority(client: Queryable, userId: string, eventId?: string) {
 }
 async function snapshot(client: Queryable, id: string) {
   const result = await client.query(
-    `SELECT e.id,e.series_id AS "seriesId",e.organization_id AS "organizationId",e.name,e.starts_on::text AS "startsOn",e.ends_on::text AS "endsOn",e.city,e.country,e.venue,e.timezone,e.origin,e.admission_status AS status,e.registration_status AS "registrationStatus",e.version,e.responsible_administrator_id AS "reviewerId",u.name AS "reviewerName",o.name AS "organizationName",s.name AS "seriesName" FROM event_edition e JOIN event_series s ON s.id=e.series_id LEFT JOIN organizing_organization o ON o.id=e.organization_id LEFT JOIN auth_user u ON u.id=e.responsible_administrator_id WHERE e.id=$1`,
+    `SELECT e.id,e.series_id AS "seriesId",e.organization_id AS "organizationId",e.name,e.starts_on::text AS "startsOn",e.ends_on::text AS "endsOn",e.city,e.country,e.venue,e.timezone,e.origin,e.category,e.approval_delegation_id AS "delegationId",e.approval_authority_name AS "authorityName",e.admission_status AS status,e.registration_status AS "registrationStatus",e.version,e.responsible_administrator_id AS "reviewerId",u.name AS "reviewerName",o.name AS "organizationName",s.name AS "seriesName" FROM event_edition e JOIN event_series s ON s.id=e.series_id LEFT JOIN organizing_organization o ON o.id=e.organization_id LEFT JOIN auth_user u ON u.id=e.responsible_administrator_id WHERE e.id=$1`,
     [id],
   );
   if (!result.rowCount) return null;
@@ -52,18 +63,28 @@ export async function applicationDetail(userId: string, id: string) {
   try {
     await client.query("BEGIN ISOLATION LEVEL REPEATABLE READ");
     const rights = await authority(client, userId, id);
-    if (!rights.admin && !rights.organizer)
-      fail(403, "This application is outside your assigned scope.");
     const app = await snapshot(client, id);
+    const reviewer = app
+      ? await responsibleReviewer(client, userId, app)
+      : false;
+    if (!rights.admin && !rights.organizer && !reviewer)
+      fail(403, "This application is outside your assigned scope.");
     if (!app) fail(404, "Application not found.");
     const history = await client.query(
-      `SELECT h.version,h.action,h.reason,h.snapshot,h.created_at AS "createdAt",u.name AS "actorName",a.action AS "auditAction" FROM event_application_history h JOIN auth_user u ON u.id=h.actor_id JOIN audit_record a ON a.id=h.id WHERE h.event_id=$1 ORDER BY h.version`,
+      `SELECT h.version,h.request_id AS "requestId",h.action,h.reason,h.snapshot,h.created_at AS "createdAt",u.name AS "actorName",a.action AS "auditAction" FROM event_application_history h JOIN auth_user u ON u.id=h.actor_id JOIN audit_record a ON a.id=h.id WHERE h.event_id=$1 ORDER BY h.version`,
       [id],
     );
     await client.query("COMMIT");
     return {
       ...app,
-      canReview: rights.admin && app.reviewerId === userId,
+      canReview: reviewer,
+      canEdit: rights.admin || rights.organizer,
+      canReassign: rights.admin,
+      responsibilityActive: await responsibleReviewer(
+        client,
+        app.reviewerId,
+        app,
+      ),
       history: history.rows,
     };
   } catch (error) {
@@ -84,13 +105,22 @@ export async function applicationWorkspace(userId: string) {
     [organizations.rows.map((o) => o.id)],
   );
   const apps = await pool.query(
-    `SELECT e.id,e.name,e.starts_on::text AS "startsOn",e.admission_status AS status,e.version,u.name AS "reviewerName" FROM event_edition e LEFT JOIN auth_user u ON u.id=e.responsible_administrator_id WHERE e.organization_id IS NOT NULL AND ($2 OR EXISTS(SELECT 1 FROM role_grant r WHERE r.user_id=$1 AND r.role='organizer' AND r.event_id=e.id AND r.game_id IS NULL)) ORDER BY e.starts_on DESC,e.id`,
+    `SELECT e.id,e.name,e.starts_on::text AS "startsOn",e.admission_status AS status,e.version,e.approval_authority_name AS "authorityName",u.name AS "reviewerName",EXISTS(SELECT 1 FROM role_grant r WHERE r.user_id=$1 AND r.role='organizer' AND r.event_id=e.id AND r.game_id IS NULL) AS "isOrganizer" FROM event_edition e LEFT JOIN auth_user u ON u.id=e.responsible_administrator_id WHERE e.organization_id IS NOT NULL AND ($2 OR e.responsible_administrator_id=$1 OR EXISTS(SELECT 1 FROM role_grant r WHERE r.user_id=$1 AND r.role='organizer' AND r.event_id=e.id AND r.game_id IS NULL)) ORDER BY e.starts_on DESC,e.id`,
     [userId, rights.admin],
   );
+  const visible = [];
+  for (const row of apps.rows) {
+    if (
+      rights.admin ||
+      row.isOrganizer ||
+      (await responsibleReviewer(pool, userId, (await snapshot(pool, row.id))!))
+    )
+      visible.push(row);
+  }
   return {
     organizations: organizations.rows,
     series: series.rows,
-    applications: apps.rows,
+    applications: visible,
     isAdministrator: rights.admin,
   };
 }
@@ -122,9 +152,16 @@ export async function applicationCommand(
     !/^[a-zA-Z0-9-]{1,80}$/.test(id) ||
     typeof c.requestId !== "string" ||
     !/^[a-zA-Z0-9-]{1,80}$/.test(c.requestId) ||
-    !["create", "edit", "submit", "approve", "reject"].includes(
-      String(c.action),
-    ) ||
+    ![
+      "create",
+      "edit",
+      "submit",
+      "approve",
+      "reject",
+      "reassign",
+      "override_approve",
+      "override_reject",
+    ].includes(String(c.action)) ||
     creating !== (c.action === "create")
   )
     fail(400, "Provide a valid command and unique request identifier.");
@@ -155,8 +192,20 @@ export async function applicationCommand(
       );
       if (!rights.admin && !membership.rowCount)
         fail(403, "Organizer membership in this organization is required.");
-    } else if (!rights.admin && !rights.organizer)
-      fail(403, "This application is outside your assigned scope.");
+    } else {
+      const candidate = await snapshot(client, id);
+      const reviewing = ["approve", "reject"].includes(String(c.action));
+      if (
+        !rights.admin &&
+        !rights.organizer &&
+        !(
+          reviewing &&
+          candidate &&
+          (await responsibleReviewer(client, userId, candidate))
+        )
+      )
+        fail(403, "This application is outside your assigned scope.");
+    }
     const duplicate = await client.query(
       "SELECT command_digest,event_id FROM event_application_history WHERE actor_id=$1 AND request_id=$2",
       [userId, c.requestId],
@@ -182,15 +231,21 @@ export async function applicationCommand(
         "This application changed. Reload and review the current version before saving.",
       );
     const action = String(c.action);
-    if (
-      ["approve", "reject"].includes(action) &&
-      (!rights.admin || existing?.reviewerId !== userId)
-    )
-      fail(
-        403,
-        "Only the responsible World Curling administrator can review this application.",
-      );
+    const transitionAction = action.startsWith("override_")
+      ? action.slice(9)
+      : action;
     const reason = typeof c.reason === "string" ? c.reason.trim() : "";
+    const policy = approvalActionPolicy(
+      {
+        isAdministrator: rights.admin,
+        isOrganizer: rights.organizer || creating,
+        isResponsibleReviewer:
+          !!existing && (await responsibleReviewer(client, userId, existing)),
+      },
+      action,
+      reason,
+    );
+    if (policy) fail(policy.status, policy.error);
     if (reason.length > 1000 || /[\u0000-\u001f]/.test(reason))
       fail(400, "Use at most 1000 characters for the review reason.");
     if (action === "reject" && !reason)
@@ -199,7 +254,35 @@ export async function applicationCommand(
         "Give the organizer a reason for rejection.",
         { reason: "Enter a rejection reason." },
       );
-    if (creating || action === "edit") {
+    if (action === "reassign") {
+      let reviewerId: string,
+        delegationId: string | null = null,
+        authorityName = "World Curling";
+      if (c.delegationId === null) {
+        if (
+          typeof c.reviewerId !== "string" ||
+          !(await isAdministrator(client, c.reviewerId))
+        )
+          fail(400, "Select an active World Curling administrator.");
+        reviewerId = c.reviewerId as string;
+      } else {
+        const grant = (await activeDelegations(client)).find(
+          (g) => g.id === c.delegationId,
+        );
+        if (!grant || !matchesApprovalScope(grant.scope, existing!))
+          fail(
+            400,
+            "Select an active delegation matching all application dimensions or a named exception.",
+          );
+        reviewerId = grant!.reviewerId;
+        delegationId = grant!.id;
+        authorityName = grant!.authorityName;
+      }
+      await client.query(
+        "UPDATE event_edition SET responsible_administrator_id=$2,approval_delegation_id=$3,approval_authority_name=$4,version=version+1 WHERE id=$1",
+        [id, reviewerId, delegationId, authorityName],
+      );
+    } else if (creating || action === "edit") {
       const errors = validateApplication(c.application);
       if (Object.keys(errors).length)
         throw new ApplicationError(
@@ -262,6 +345,21 @@ export async function applicationCommand(
             organization.rows[0].approval_administrator_id,
           ],
         );
+        const routing = await routeApplication(
+          client,
+          { ...input, id, country: input.country.trim() },
+          organization.rows[0].approval_administrator_id,
+        );
+        await client.query(
+          "UPDATE event_edition SET responsible_administrator_id=$2,approval_delegation_id=$3,approval_authority_name=$4,category=$5 WHERE id=$1",
+          [
+            id,
+            routing.reviewerId,
+            routing.delegationId,
+            routing.authorityName,
+            input.category ?? "open",
+          ],
+        );
         await client.query(
           `INSERT INTO role_grant(id,user_id,role,event_id,game_id) VALUES($1,$2,'organizer',$3,NULL)`,
           [randomUUID(), userId, id],
@@ -281,6 +379,10 @@ export async function applicationCommand(
             input.country.trim(),
           ],
         );
+        await client.query("UPDATE event_edition SET category=$2 WHERE id=$1", [
+          id,
+          input.category ?? "open",
+        ]);
       }
       const active = await client.query(
         `SELECT d.id,d.discipline FROM division d WHERE d.event_id=$1 AND (EXISTS(SELECT 1 FROM draw_session ds WHERE ds.division_id=d.id) OR EXISTS(SELECT 1 FROM event_entry en WHERE en.division_id=d.id))`,
@@ -314,7 +416,7 @@ export async function applicationCommand(
       }
     } else {
       const errors = validateApplication(existing);
-      if (Object.keys(errors).length && action !== "reject")
+      if (Object.keys(errors).length && transitionAction !== "reject")
         throw new ApplicationError(
           400,
           "Complete the application before submitting or approving.",
@@ -322,7 +424,9 @@ export async function applicationCommand(
         );
       let next;
       try {
-        next = applicationTransition(existing!.status, action);
+        next = action.startsWith("override_")
+          ? approvalOverride(existing!.status, transitionAction)
+          : applicationTransition(existing!.status, transitionAction);
       } catch {
         fail(409, "This application transition is not allowed.");
       }

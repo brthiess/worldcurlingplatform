@@ -6,7 +6,7 @@ Execution began 2026-11-08. This file describes the bounded acceptance inventory
 |---|---|---|---|
 | Application foundation | PostgreSQL persistence, scoped demo sign-in, public scores, web/worker runtime | WCP-001 | Verified locally; see WCP-001.md and WCP-001-merge.md |
 | Fan follows main event (D-01) | 16-team four-player triple knockout; stored A/B/C routes, qualifiers, phone list/bracket | 002,003,017–020,046 | Live scores/results locally verified (002,003); discovery/draws pending |
-| Event admission (D-02) | Dated editions/divisions, responsible approver, explicit delegation; registration/ranking separate | 004,005,046 | Edition/application locally verified (004); delegation pending |
+| Event admission (D-02) | Dated editions/divisions, responsible approver, explicit delegation; registration/ranking separate | 004,005,046 | Edition/application, delegation and scoped staff authority locally verified (004,005); hosted demonstration pending |
 | Mobile scoring (D-03) | Assigned scorekeeper starts/scores/confirms/corrects; stale/idempotent commands and honest save status | 002,003,026,046 | Four-player scoring, confirmation, lineups and ordinary corrections locally verified (002,003); mixed doubles pending |
 | Entry/payment (D-04) | Existing/assembled/provisional lineups, team-season authority, holds/withdrawal, sandbox checkout/refunds | 006–011,028,029,046 | Manual identity/season/event lineups locally verified (006); representation/capacity/payments pending |
 | Profile/media (D-05) | Staff-approved claims; biography/handedness; reviewed immutable private photo replacement | 012,013,047 | Accounts/claims/photos locally verified (012,013); hosted demonstration pending |

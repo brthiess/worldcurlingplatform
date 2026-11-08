@@ -131,13 +131,13 @@ test("organizer recovery, keyboard assignment/conflicts, empty state and accepte
   await page.goto(`/admin/schedule?event=${eventId}`);
   await expect(page.getByText("Loading stored schedule…")).toBeVisible();
   release();
-  await page.unroute(`**/api/v1/events/${eventId}/schedule`);
   await expect(page.getByText("No sessions scheduled yet.")).toBeVisible();
   await expect(
     page.getByText(
       "No existing games in this edition. Games are prepared separately.",
     ),
   ).toBeVisible();
+  await page.unroute(`**/api/v1/events/${eventId}/schedule`);
   await pool.query(
     "INSERT INTO draw_session(id,division_id,number,starts_at,state) VALUES($1,$2,1,'2026-11-08T15:00:00Z','scheduled')",
     [drawId, divisionId],

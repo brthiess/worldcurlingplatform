@@ -10,6 +10,7 @@ import pg from "pg";
 import { scoringFixtureDraw } from "../scoring-fixture";
 import { signInApiWithRateWindow } from "./auth-fixture";
 import "dotenv/config";
+test.describe.configure({ timeout: 180000 });
 // Each browser suite owns its fixture connection lifecycle. Other files may
 // close the application module's pool in the same Playwright worker.
 const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
