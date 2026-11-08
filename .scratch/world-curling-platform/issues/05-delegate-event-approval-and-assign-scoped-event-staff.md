@@ -4,7 +4,7 @@ number: 5
 title: "Delegate event approval and assign scoped event staff"
 parent: WCP-SPEC-001
 type: implementation
-status: ready-for-agent
+status: in-progress
 labels: [ready-for-agent]
 blocked_by: [WCP-004]
 source_spec_sha256: 045B46988225B6C8C0020B23C8C5D4EAA8E2E1916256148A0FDA26B5DA8673FD
@@ -18,7 +18,7 @@ published: 2026-11-07
 
 **Blocked by:** [04: Submit and approve next year's event onto the calendar](04-submit-and-approve-next-year-s-event-onto-the-calendar.md).
 
-**Status:** ready-for-agent
+**Status:** in-progress
 
 ## Parent and scope
 

@@ -103,13 +103,17 @@
       "file": "02-save-live-end-scores-from-a-mobile-scorekeeper-screen.md",
       "id": "WCP-002",
       "path": "issues/02-save-live-end-scores-from-a-mobile-scorekeeper-screen.md",
-      "status": "in-progress",
+      "status": "completed",
       "labels": [
         "ready-for-agent"
       ],
       "blocked_by": [
         "WCP-001"
-      ]
+      ],
+      "completion": {
+        "commit": "6318770",
+        "evidence": "docs/verification/WCP-002.md"
+      }
     },
     {
       "n": 3,
@@ -257,7 +261,7 @@
       "file": "05-delegate-event-approval-and-assign-scoped-event-staff.md",
       "id": "WCP-005",
       "path": "issues/05-delegate-event-approval-and-assign-scoped-event-staff.md",
-      "status": "ready-for-agent",
+      "status": "in-progress",
       "labels": [
         "ready-for-agent"
       ],
