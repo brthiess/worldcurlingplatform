@@ -46,8 +46,16 @@ test("staff complete ordinary sourced controls, queue real awards and review res
   await signIn(page);
   const f = await createFixture(page);
   const errors: string[] = [],
-    server: string[] = [];
+    server: string[] = [],
+    consoleErrors: string[] = [],
+    failedRequests: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
+  page.on("console", (message) => {
+    if (message.type() === "error") consoleErrors.push(message.text());
+  });
+  page.on("requestfailed", (request) => {
+    failedRequests.push(`${request.method()} ${new URL(request.url()).pathname}`);
+  });
   page.on("response", (r) => {
     if (r.status() >= 500)
       server.push(`${r.status()} ${new URL(r.url()).pathname}`);
@@ -238,6 +246,14 @@ test("staff complete ordinary sourced controls, queue real awards and review res
     await page.screenshot({
       path: info.outputPath(`${name}-event-awards.png`),
     });
+    if (name === "phone") {
+      await page
+        .getByRole("heading", { name: "Event awards", exact: true })
+        .scrollIntoViewIfNeeded();
+      await page.screenshot({
+        path: info.outputPath("phone-award-details.png"),
+      });
+    }
     await page
       .getByRole("heading", { name: "Reviewed inputs", exact: true })
       .scrollIntoViewIfNeeded();
@@ -255,6 +271,8 @@ test("staff complete ordinary sourced controls, queue real awards and review res
   ).toBeFocused();
   expect(errors).toEqual([]);
   expect(server).toEqual([]);
+  expect(consoleErrors).toEqual([]);
+  expect(failedRequests).toEqual([]);
 });
 test("assessment workspace shows loading/error and denies organizer access", async ({
   page,
