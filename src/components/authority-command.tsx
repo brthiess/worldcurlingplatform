@@ -38,7 +38,7 @@ function valid(value: unknown): value is RetainedAuthorityCommand {
     typeof c.path !== "string" ||
     typeof c.actorId !== "string" ||
     !(
-      /^\/api\/v1\/(approval-delegations|role-grants|team-representation|entries|division-finalizations|event-assessments)$/.test(
+      /^\/api\/v1\/(approval-delegations|role-grants|team-representation|entries|division-finalizations|event-assessments|registration)$/.test(
         c.path,
       ) ||
       /^\/api\/v1\/entries\/[-\w]{1,80}$/.test(c.path) ||
@@ -344,3 +344,4 @@ export function AuthorityRecovery({
     </>
   );
 }
+

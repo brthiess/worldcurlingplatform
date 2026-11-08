@@ -4,7 +4,7 @@ number: 9
 title: "Open division entries with capacity and expiring holds"
 parent: WCP-SPEC-001
 type: implementation
-status: in-progress
+status: completed
 labels: [ready-for-agent]
 blocked_by: [WCP-008]
 source_spec_sha256: 045B46988225B6C8C0020B23C8C5D4EAA8E2E1916256148A0FDA26B5DA8673FD
@@ -18,7 +18,7 @@ published: 2026-11-07
 
 **Blocked by:** [08: Grant team-season representatives self-entry authority](08-grant-team-season-representatives-self-entry-authority.md).
 
-**Status:** in-progress
+**Status:** completed
 
 ## Parent and scope
 
@@ -31,13 +31,13 @@ published: 2026-11-07
 
 ## Acceptance criteria
 
-- [ ] Require capacity, entry requirements, fee/payment terms and a documented format selection before opening; zero-fee fixtures can exercise the flow before online checkout exists.
-- [ ] Keep acceptance, roster readiness, payment and ranking eligibility separate; reviewed acceptance creates a defined payment window.
-- [ ] Expired holds release capacity, and competing accept/reserve operations cannot exceed capacity; exceptional late payment is only flagged, not automatically settled.
-- [ ] **Unit testing:** Test mode/state transitions, prerequisite validation, reservation deadlines and capacity counting under a controlled clock.
-- [ ] **Database/API verification:** Use concurrent PostgreSQL transactions to prove holds/acceptance cannot overbook, plus expiry/retry and scoped action checks.
-- [ ] **Frontend quality:** Give organizers and entrants clear open/reviewed/invited/held/expired states, remaining-capacity feedback and validation errors without a false paid/eligible badge.
-- [ ] Record actual verification commands/results and relevant browser/screenshots or API evidence. Report meaningful uncovered branches or limitations; do not claim checks that were not run.
+- [x] Require capacity, entry requirements, fee/payment terms and a documented format selection before opening; zero-fee fixtures can exercise the flow before online checkout exists.
+- [x] Keep acceptance, roster readiness, payment and ranking eligibility separate; reviewed acceptance creates a defined payment window.
+- [x] Expired holds release capacity, and competing accept/reserve operations cannot exceed capacity; exceptional late payment is only flagged, not automatically settled.
+- [x] **Unit testing:** Test mode/state transitions, prerequisite validation, reservation deadlines and capacity counting under a controlled clock.
+- [x] **Database/API verification:** Use concurrent PostgreSQL transactions to prove holds/acceptance cannot overbook, plus expiry/retry and scoped action checks.
+- [x] **Frontend quality:** Give organizers and entrants clear open/reviewed/invited/held/expired states, remaining-capacity feedback and validation errors without a false paid/eligible badge.
+- [x] Record actual verification commands/results and relevant browser/screenshots or API evidence. Report meaningful uncovered branches or limitations; do not claim checks that were not run.
 
 ## Slice boundary
 
