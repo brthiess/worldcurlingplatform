@@ -276,7 +276,7 @@ test("assessment workspace shows loading/error and denies organizer access", asy
   await page.unroute("**/api/v1/event-assessments");
   await page.route("**/api/v1/event-assessments", (route) => route.abort());
   await page.reload();
-  await expect(page.getByRole("alert")).toBeVisible();
+  await expect(page.getByRole("main").getByRole("alert")).toBeVisible();
   await page.unroute("**/api/v1/event-assessments");
   await page
     .getByRole("button", { name: "Retry assessment workspace" })
@@ -285,7 +285,7 @@ test("assessment workspace shows loading/error and denies organizer access", asy
   await page.context().clearCookies();
   await signIn(page, "organizer");
   await page.goto("/admin/event-assessments");
-  await expect(page.getByRole("alert")).toContainText(
+  await expect(page.getByRole("main").getByRole("alert")).toContainText(
     "administrator authority",
   );
   await expect(page.getByLabel("Division", { exact: true })).toHaveCount(0);
@@ -363,7 +363,7 @@ test("lost committed acknowledgement survives reload, retries exact bytes, then 
   await page
     .getByRole("button", { name: "Queue revised assessment", exact: true })
     .click();
-  await expect(page.getByRole("alert")).toContainText(
+  await expect(page.getByRole("main").getByRole("alert")).toContainText(
     "Source evidence changed",
   );
   await expect(
