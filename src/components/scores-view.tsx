@@ -321,8 +321,15 @@ export function ScoresView({
                 <strong>Next: Draw {next.number}</strong>
                 <span>{venueTime(next.startsAt, data.event.timezone)}</span>
                 <a
-                  href={`?draw=${next.id}`}
+                  href={`?${new URLSearchParams({ ...(data.selectedDivisionId ? { division: data.selectedDivisionId } : {}), draw: next.id })}`}
                   onClick={(event) => {
+                    if (
+                      event.metaKey ||
+                      event.ctrlKey ||
+                      event.shiftKey ||
+                      event.altKey
+                    )
+                      return;
                     event.preventDefault();
                     choose(next.id);
                   }}
