@@ -4,6 +4,7 @@ type Player = {
   playerId: string;
   name: string;
   identityStatus: string;
+  origin?: string;
   role?: string;
   position?: string;
   participation?: string;
@@ -233,6 +234,9 @@ export function PublicRoster({
         {disciplineName(t.discipline)} · core composition
       </p>
       <h1>{t.name}</h1>
+      {t.core.every((p) => p.origin === "fictional_demo") && (
+        <p className="notice">Fictional demonstration team.</p>
+      )}
       <p>
         Names, positions, alternates and temporary substitutes can change while
         this regular core identity stays the same.

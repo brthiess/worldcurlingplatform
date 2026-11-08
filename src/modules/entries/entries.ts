@@ -9,6 +9,21 @@ import {
   type LineupMember,
 } from "@/domain/entries";
 type Reader = Pick<PoolClient, "query">;
+export type EventLineup = {
+  entryId: string;
+  version: number;
+  status: "declared" | "provisional";
+  teamId: string | null;
+  registrationId: string | null;
+  registrationVersion: number | null;
+  name: string;
+  coreKnown: boolean;
+  recordedAt: Date | null;
+  members: (LineupMember & {
+    name: string;
+    identityStatus: "identified" | "provisional";
+  })[];
+};
 async function authorize(c: Reader, userId: string, eventId: string) {
   const r = await c.query(
     "SELECT role FROM role_grant WHERE user_id=$1 AND ((role='administrator' AND event_id IS NULL AND game_id IS NULL) OR (role='organizer' AND event_id=$2 AND game_id IS NULL)) FOR SHARE",
@@ -37,13 +52,13 @@ export async function readEventLineup(
   c: Reader,
   entryId: string,
   version?: number,
-) {
+): Promise<EventLineup | null> {
   const r = await c.query(
     'SELECT e.id AS "entryId",v.version,v.status,v.team_id AS "teamId",v.registration_id AS "registrationId",v.registration_version AS "registrationVersion",v.display_name AS name,v.core_known AS "coreKnown",v.created_at AS "recordedAt" FROM event_entry e JOIN event_lineup_version v ON v.entry_id=e.id AND v.version=coalesce($2,e.version) WHERE e.id=$1',
     [entryId, version ?? null],
   );
   if (!r.rowCount) return null;
-  const row = r.rows[0];
+  const row = r.rows[0] as Omit<EventLineup, "members">;
   const m = await c.query(
     'SELECT m.player_id AS "playerId",p.name,p.identity_status AS "identityStatus",m.role,m.position,m.participation FROM event_lineup_member m JOIN player p ON p.id=m.player_id WHERE m.entry_id=$1 AND m.version=$2 ORDER BY m.ordinal',
     [entryId, row.version],
@@ -91,7 +106,11 @@ async function detail(c: Reader, id: string, version?: number) {
     core: core.rows,
     lineup,
     registration: lineup.registrationId
-      ? await roster(c, lineup.registrationId, lineup.registrationVersion)
+      ? await roster(
+          c,
+          lineup.registrationId,
+          lineup.registrationVersion ?? undefined,
+        )
       : null,
   };
 }
@@ -341,6 +360,8 @@ export async function saveEntry(
       );
     const status =
       !input.coreKnown ||
+      input.members.filter((m) => m.role === "core" || m.role === "substitute")
+        .length < (d.rows[0].discipline === "mixed_doubles" ? 2 : 4) ||
       players.rows.some((p) => p.identity_status === "provisional")
         ? "provisional"
         : "declared";
@@ -440,7 +461,7 @@ export async function publicTeams(id?: string, q = "") {
     const result = [];
     for (const t of teams.rows) {
       const core = await c.query(
-        'SELECT p.id AS "playerId",p.name,p.identity_status AS "identityStatus" FROM team_core_member m JOIN player p ON p.id=m.player_id WHERE m.team_id=$1 ORDER BY p.id',
+        'SELECT p.id AS "playerId",p.name,p.origin,p.identity_status AS "identityStatus" FROM team_core_member m JOIN player p ON p.id=m.player_id WHERE m.team_id=$1 ORDER BY p.name,p.id',
         [t.id],
       );
       if (

@@ -122,6 +122,59 @@ function assembled() {
     registerSeason: { season: "2026-27", version: 0 },
   };
 }
+
+test("a known core can identify a team while its incomplete event lineup remains provisional", async () => {
+  const cookie = await login("organizer"),
+    entry = assembled();
+  const r = await request("/api/v1/entries", cookie, {
+    id: randomUUID(),
+    requestId: randomUUID(),
+    version: 0,
+    entry: { ...entry, members: [], registerSeason: undefined },
+  });
+  assert.equal(r.status, 201);
+  const saved = await r.json();
+  assert.equal(saved.core.length, 4);
+  assert(saved.teamId);
+  assert.equal(saved.status, "provisional");
+  assert.deepEqual(saved.lineup.members, []);
+});
+
+test("an audit failure rolls back players, identity, season and entry; exact retry later commits one complete version", async () => {
+  const cookie = await login("organizer"),
+    id = randomUUID(),
+    e = assembled(),
+    command = { id, version: 0, requestId: randomUUID(), entry: e };
+  const db = new pg.Pool({ connectionString: process.env.DATABASE_URL }),
+    suffix = randomUUID().replaceAll("-", ""),
+    name = `wcp006_audit_${suffix}`;
+  try {
+    await db.query(
+      `CREATE FUNCTION ${name}() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.resource_id='${id}' THEN RAISE EXCEPTION 'WCP006 injected audit failure'; END IF; RETURN NEW; END $$`,
+    );
+    await db.query(
+      `CREATE TRIGGER ${name} BEFORE INSERT ON audit_record FOR EACH ROW EXECUTE FUNCTION ${name}()`,
+    );
+    const failed = await request("/api/v1/entries", cookie, command);
+    assert.equal(failed.status, 503);
+    assert.equal(
+      (await request(`/api/v1/public/players/${e.corePlayerIds[0]}`)).status,
+      404,
+    );
+    assert.equal((await request(`/api/v1/entries/${id}`, cookie)).status, 404);
+  } finally {
+    await db.query(`DROP TRIGGER IF EXISTS ${name} ON audit_record`);
+    await db.query(`DROP FUNCTION IF EXISTS ${name}()`);
+    await db.end();
+  }
+  const r = await request("/api/v1/entries", cookie, command);
+  assert.equal(r.status, 201);
+  const saved = await r.json();
+  assert.equal(saved.version, 1);
+  assert.equal(saved.core.length, 4);
+  assert.equal(saved.registration.version, 1);
+  assert.equal((await request("/api/v1/entries", cookie, command)).status, 201);
+});
 test("organizer assembles account-free players, creates/reuses team and season roster, and preserves versioned temporary event substitutes", async () => {
   const cookie = await login("organizer"),
     id = randomUUID(),

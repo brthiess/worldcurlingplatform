@@ -1,6 +1,11 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 import { randomUUID } from "node:crypto";
+async function organizerSignIn(page:Page){
+ await page.goto('/admin');await page.getByLabel('Demo persona').selectOption('organizer');await page.getByLabel('Demo password').fill(process.env.DEMO_PASSWORD!);
+ const signIn=async()=>{const response=page.waitForResponse(r=>r.url().includes('/api/auth/sign-in/email'));await page.getByRole('button',{name:'Sign in',exact:true}).click();return response;};
+ let response=await signIn();if(response.status()===429){await page.waitForTimeout(Math.min(60000,Math.max(1000,Number(response.headers()['x-retry-after']??60)*1000)));await page.waitForTimeout(250);response=await signIn();}expect(response.status()).toBe(200);await expect(page.getByRole('heading',{name:'Your workspace'})).toBeVisible();
+}
 for (const [label, width] of [
   ["phone", 360],
   ["tablet", 768],
@@ -9,6 +14,7 @@ for (const [label, width] of [
   test(`organizer assembles a core, uses a temporary substitute, and follows truthful public summaries at ${label}`, async ({
     page,
   }, info) => {
+    test.setTimeout(100000);
     await page.setViewportSize({ width, height: 900 });
     const errors: string[] = [];
     const networkErrors: string[] = [];
@@ -20,13 +26,7 @@ for (const [label, width] of [
       if (r.failure()?.errorText !== "net::ERR_ABORTED")
         networkErrors.push(r.failure()?.errorText ?? r.url());
     });
-    await page.goto("/admin");
-    await page.getByLabel("Demo persona").selectOption("organizer");
-    await page.getByLabel("Demo password").fill(process.env.DEMO_PASSWORD!);
-    await page.getByRole("button", { name: "Sign in", exact: true }).click();
-    await expect(
-      page.getByRole("heading", { name: "Your workspace" }),
-    ).toBeVisible();
+    await organizerSignIn(page);
     await page
       .getByRole("link", { name: "Manual team entries", exact: true })
       .click();
@@ -117,15 +117,9 @@ test("existing-team and player selection, loading, empty search, keyboard, uncer
   page,
   context,
 }, info) => {
-  test.setTimeout(60000);
+  test.setTimeout(120000);
   await page.setViewportSize({ width: 360, height: 900 });
-  await page.goto("/admin");
-  await page.getByLabel("Demo persona").selectOption("organizer");
-  await page.getByLabel("Demo password").fill(process.env.DEMO_PASSWORD!);
-  await page.getByRole("button", { name: "Sign in", exact: true }).click();
-  await expect(
-    page.getByRole("heading", { name: "Your workspace" }),
-  ).toBeVisible();
+  await organizerSignIn(page);
   const name = `Returning browser ${Date.now()}`,
     ids = Array.from({ length: 4 }, () => randomUUID());
   const entry = {
@@ -262,6 +256,35 @@ test("existing-team and player selection, loading, empty search, keyboard, uncer
   await expect(page.getByLabel("Entry name", { exact: true })).toHaveValue(
     "Concurrent saved name",
   );
+  let loseResponse = true;
+  await page.route(`**/api/v1/entries/${id}`, async (route) => {
+    if (route.request().method() === "POST" && loseResponse) {
+      loseResponse = false;
+      const accepted = await route.fetch();
+      expect(accepted.status()).toBe(200);
+      await route.abort("failed");
+    } else await route.continue();
+  });
+  await page
+    .getByLabel("Entry name", { exact: true })
+    .fill("Accepted response lost");
+  await page.getByRole("button", { name: "Save entry", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Retry last save", exact: true }),
+  ).toBeVisible();
+  await expect(page.getByLabel("Entry name", { exact: true })).toBeDisabled();
+  await page
+    .getByRole("button", { name: "Retry last save", exact: true })
+    .click();
+  await expect(
+    page.getByText("Saved to the database.", { exact: true }),
+  ).toBeVisible();
+  const retried = await (
+    await page.request.get(`/api/v1/entries/${id}`)
+  ).json();
+  expect(retried.version).toBe(3);
+  expect(retried.registration.version).toBe(1);
+  expect(retried.name).toBe("Accepted response lost");
   await page.screenshot({
     path: info.outputPath("phone-existing-team-recovered.png"),
     fullPage: true,

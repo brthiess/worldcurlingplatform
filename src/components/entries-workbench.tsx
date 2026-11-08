@@ -228,6 +228,7 @@ export function EntriesWorkbench() {
           setStale(true);
           setRetry(null);
         } else if (r.status >= 500) setRetry({ path, body });
+        else setRetry(null);
         throw new Error(result.error);
       }
       applyEntry(result);
@@ -319,7 +320,7 @@ export function EntriesWorkbench() {
         <div className="application-layout">
           <aside className="application-queue">
             <h2>Edition entries</h2>
-            <button onClick={startNew} disabled={busy}>
+            <button onClick={startNew} disabled={busy || !!retry}>
               New entry
             </button>
             <label className="field-label" htmlFor="entry-division">
@@ -357,7 +358,7 @@ export function EntriesWorkbench() {
                     </p>
                     <button
                       className="secondary"
-                      disabled={busy}
+                      disabled={busy || !!retry}
                       onClick={() => void openEntry(e.id)}
                     >
                       Edit {e.name}
@@ -380,7 +381,7 @@ export function EntriesWorkbench() {
                 save();
               }}
             >
-              <fieldset disabled={busy}>
+              <fieldset disabled={busy || !!retry}>
                 <label htmlFor="entry-name">Entry name</label>
                 <input
                   id="entry-name"
