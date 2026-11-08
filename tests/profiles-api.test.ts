@@ -1,7 +1,8 @@
 import "dotenv/config";
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { pool } from "../src/db";
+import pg from "pg";
+const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
 import { hashPassword } from "better-auth/crypto";
 const base = process.env.BETTER_AUTH_URL!;
 async function call(path: string, body?: unknown, cookie = "") {
