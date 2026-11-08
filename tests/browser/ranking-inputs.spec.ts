@@ -308,6 +308,98 @@ test("staff inspect sources/checkpoints and five regulars versus an alternate, r
   await expect(
     page.getByRole("button", { name: "Open v2 · reviewed", exact: true }),
   ).toBeFocused();
+  await page.setViewportSize({ width: 360, height: 1000 });
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.screenshot({ path: info.outputPath("phone-review-top.png") });
+  await page
+    .getByRole("heading", { name: "Starting-input readiness", exact: true })
+    .scrollIntoViewIfNeeded();
+  await page.screenshot({ path: info.outputPath("phone-readiness.png") });
+  await page.route("**/api/v1/ranking-inputs?*", (route) =>
+    route.abort("failed"),
+  );
+  await page
+    .getByRole("button", { name: "Open v1 · draft", exact: true })
+    .click();
+  await expect(
+    page.getByRole("button", { name: "Retry evidence read", exact: true }),
+  ).toBeVisible();
+  await page.unroute("**/api/v1/ranking-inputs?*");
+  await page
+    .getByRole("button", { name: "Retry evidence read", exact: true })
+    .click();
+  await expect(
+    page.getByText(
+      "Historical revision. Open v2 to amend the latest evidence.",
+      { exact: true },
+    ),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Open v2 · reviewed", exact: true })
+    .click();
+  const amendment = await page.request.post("/api/v1/entries", {
+    headers: { Origin: process.env.BETTER_AUTH_URL! },
+    data: {
+      id: randomUUID(),
+      requestId: randomUUID(),
+      version: 0,
+      entry: {
+        divisionId: "prairie-men",
+        name: created.name,
+        teamId: created.teamId,
+        registrationId: created.registration.id,
+        coreKnown: true,
+        corePlayerIds: ids.slice(0, 5),
+        members: ids.map((playerId, i) => ({
+          playerId,
+          role: i < 5 ? "core" : "alternate",
+          position: "Revised staff roster note",
+          participation: "declared",
+        })),
+        newPlayers: [],
+        registerSeason: { season: "2026-27", version: 1 },
+      },
+    },
+  });
+  expect(amendment.status()).toBe(201);
+  await page
+    .getByRole("button", {
+      name: "Refresh registrations and rule editions",
+      exact: true,
+    })
+    .click();
+  await page
+    .getByRole("button", { name: "Reload latest evidence", exact: true })
+    .click();
+  await expect(
+    page.getByText(
+      "Blocker: The season roster has changed since this input was reviewed.",
+      { exact: true },
+    ),
+  ).toBeVisible();
+  await page
+    .getByRole("button", {
+      name: "Use current platform season snapshot v2 and recheck evidence",
+      exact: true,
+    })
+    .click();
+  await page
+    .getByRole("button", { name: "Save draft evidence", exact: true })
+    .click();
+  await expect(
+    page.getByText("Required starting evidence is complete.", { exact: true }),
+  ).toBeVisible();
+  const latest = await (
+    await page.request.get(`/api/v1/ranking-inputs?id=${reviewId}`)
+  ).json();
+  expect(latest.version).toBe(3);
+  expect(latest.data.rosterVersion).toBe(2);
+  expect(latest.data.rankingPlayerIds).toHaveLength(5);
+  const oldReview = await (
+    await page.request.get(`/api/v1/ranking-inputs?id=${reviewId}&version=2`)
+  ).json();
+  expect(oldReview.savedReadiness.complete).toBe(true);
+  expect(oldReview.data.rosterVersion).toBe(1);
   expect(pageErrors).toEqual([]);
 });
 

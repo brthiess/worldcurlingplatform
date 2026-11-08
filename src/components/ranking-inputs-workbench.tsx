@@ -193,6 +193,10 @@ export function RankingInputsWorkbench() {
     [retry, setRetry] = useState<Command | null>(null),
     [dirty, setDirty] = useState(false);
   const [extraPlayers, setExtraPlayers] = useState<Member[]>([]);
+  const [failedRead, setFailedRead] = useState<{
+    id: string;
+    version?: number;
+  } | null>(null);
   const frozen = busy || !!retry;
   async function load() {
     setLoading(true);
@@ -207,7 +211,13 @@ export function RankingInputsWorkbench() {
               ? "World Curling staff authority is required."
               : "Ranking review could not be loaded. Retry the read.",
         );
-      setWorkspace(await r.json());
+      const next: Workspace = await r.json();
+      setWorkspace(next);
+      setRegistration((previous) =>
+        previous
+          ? (next.registrations.find((r) => r.id === previous.id) ?? previous)
+          : null,
+      );
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -218,6 +228,7 @@ export function RankingInputsWorkbench() {
     void load();
   }, []);
   function clear() {
+    setFailedRead(null);
     setExtraPlayers([]);
     setRecord(null);
     setRule(null);
@@ -253,6 +264,7 @@ export function RankingInputsWorkbench() {
     setDirty(false);
   }
   async function open(id: string, v?: number) {
+    setFailedRead(null);
     setBusy(true);
     setError("");
     setMessage("Loading recorded evidence…");
@@ -273,6 +285,7 @@ export function RankingInputsWorkbench() {
           : "Recorded evidence loaded.",
       );
     } catch (e) {
+      setFailedRead({ id, version: v });
       setError((e as Error).message);
       setMessage("");
     } finally {
@@ -494,6 +507,14 @@ export function RankingInputsWorkbench() {
           Retry original save
         </button>
       )}
+      {failedRead && (
+        <button
+          disabled={frozen}
+          onClick={() => void open(failedRead.id, failedRead.version)}
+        >
+          Retry evidence read
+        </button>
+      )}
       {loading ? (
         <p role="status">Loading rule editions and team-seasons…</p>
       ) : !workspace ? (
@@ -515,6 +536,9 @@ export function RankingInputsWorkbench() {
               }}
             >
               Team-season review
+            </button>
+            <button className="secondary" onClick={() => void load()}>
+              Refresh registrations and rule editions
             </button>
             <button
               className={tab === "rules" ? "" : "secondary"}
@@ -920,8 +944,10 @@ export function RankingInputsWorkbench() {
                     </h2>
                     <p>
                       Platform core: {registration.platformCore.length}{" "}
-                      regulars. Season roster v{input.rosterVersion}. Event
-                      lineups and profile ownership cannot amend this evidence.
+                      regulars. Input references platform season roster v
+                      {input.rosterVersion}; current platform roster is v
+                      {registration.version}. Event lineups and profile
+                      ownership cannot amend this evidence.
                     </p>
                     <ul className="public-roster">
                       {rosterMembers.map((m) => (
