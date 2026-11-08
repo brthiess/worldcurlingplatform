@@ -14,7 +14,8 @@
     "WCP-001",
     "WCP-002",
     "WCP-004",
-    "WCP-012"
+    "WCP-012",
+    "WCP-045"
   ],
   "tickets_completed": [
     "WCP-001"
@@ -56,7 +57,7 @@
   "external_inputs": [
     {
       "ticket": "WCP-045",
-      "status": "not_supplied",
+      "status": "user_left_hosting_and_domain_pending_2026-11-08",
       "required": "Domain/DNS, hosting access and reviewed quote; provider credentials when exercised"
     }
   ],
@@ -66,15 +67,14 @@
     "Close only reviewed integrated tickets with meaningful unit/PostgreSQL/API/frontend/browser evidence.",
     "Continue unblocked work and report provider/deployment limitations honestly."
   ],
-  "updated_at": "2026-11-08T16:10:50.163579+00:00",
+  "updated_at": "2026-11-08T16:25:51.756875+00:00",
   "active_tickets": [
     "WCP-002",
     "WCP-004",
     "WCP-012"
   ],
   "frontier": [
-    "WCP-044",
-    "WCP-045"
+    "WCP-044"
   ],
   "events": [
     {
@@ -114,6 +114,14 @@
       "ticket": "WCP-012",
       "status": "in-progress",
       "reason": null,
+      "commit": null,
+      "evidence": null
+    },
+    {
+      "time": "2026-11-08T16:25:51.756875+00:00",
+      "ticket": "WCP-045",
+      "status": "blocked",
+      "reason": "User explicitly left hosting pending and domain pending on 2026-11-08; no Render workspace selected, domain/DNS or reviewed provisioning quote. Continue local implementation and other unblocked tickets.",
       "commit": null,
       "evidence": null
     }

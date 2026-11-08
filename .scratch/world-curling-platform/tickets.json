@@ -2324,13 +2324,14 @@
       "file": "45-host-the-working-review-environment-on-the-supplied-domain.md",
       "id": "WCP-045",
       "path": "issues/45-host-the-working-review-environment-on-the-supplied-domain.md",
-      "status": "ready-for-agent",
+      "status": "blocked",
       "labels": [
         "ready-for-agent"
       ],
       "blocked_by": [
         "WCP-001"
-      ]
+      ],
+      "execution_blocker": "User explicitly left hosting pending and domain pending on 2026-11-08; no Render workspace selected, domain/DNS or reviewed provisioning quote. Continue local implementation and other unblocked tickets."
     },
     {
       "n": 46,
