@@ -853,6 +853,136 @@ test("a queued command cannot carry old organizer authority into a division's ch
     );
   }
 });
+test("an exact saved receipt rechecks its locked edition scope while valid dirty-source retries remain read-only", async () => {
+  const cookie = await login("organizer"),
+    admin = await login("administrator"),
+    f = await fixture(cookie),
+    eventId = await finalizationFixtureEvent(pool),
+    target = randomUUID();
+  const path = `/api/v1/division-finalizations?division=${f.divisionId}`;
+  const reviewed = await (await request(path, cookie)).json();
+  const original = {
+    divisionId: f.divisionId,
+    version: 0,
+    sourceDigest: reviewed.sourceDigest,
+    requestId: randomUUID(),
+    placements: f.entries.map((entryId, i) => ({ entryId, place: i + 1 })),
+    rulesReference: "Receipt fixture competition rules edition 1",
+    note: "Original finalization for exact receipt replay",
+  };
+  const body = JSON.stringify(original);
+  const replay = () =>
+    fetch(base + "/api/v1/division-finalizations", {
+      method: "POST",
+      headers: { cookie, Origin: base, "Content-Type": "application/json" },
+      body,
+    });
+  const saved = await replay();
+  assert.equal(saved.status, 200, await saved.clone().text());
+  const receipt = await saved.json();
+  const before = await (await request(path, admin)).json(),
+    immutable = before.selected;
+  const auditCount = async () =>
+    Number(
+      (
+        await pool.query(
+          "SELECT count(*) AS n FROM audit_record WHERE action='division_finalized' AND resource_id=$1",
+          [f.divisionId],
+        )
+      ).rows[0].n,
+    );
+  assert.equal(await auditCount(), 1);
+  assert.deepEqual(await (await replay()).json(), receipt);
+  const correction = await request(
+    `/api/v1/games/${f.gameId}/scoring`,
+    await login("scorekeeper"),
+    {
+      requestId: randomUUID(),
+      expectedVersion: 1,
+      action: "correct",
+      hammer: null,
+      outcome: "forfeit",
+      winnerEntryId: f.entries[1],
+      reason: "Ordinary correction after the recorded receipt",
+      ends: [],
+    },
+  );
+  assert.equal(correction.status, 200, await correction.clone().text());
+  assert.equal((await (await request(path, cookie)).json()).dirty, true);
+  const dirtyReplay = await replay();
+  assert.equal(dirtyReplay.status, 200);
+  assert.deepEqual(await dirtyReplay.json(), receipt);
+  await pool.query(
+    "INSERT INTO event_edition(id,series_id,name,venue,location,timezone,starts_on,ends_on,origin,published,admission_status) VALUES($1,'finalization-test','Receipt moved destination','Review ice','Fictional location','UTC','2041-01-01','2041-01-02','fictional_demo',true,'approved')",
+    [target],
+  );
+  const blocker = await pool.connect();
+  let queued!: Promise<Response>;
+  try {
+    await blocker.query("BEGIN");
+    await blocker.query("SELECT id FROM event_edition WHERE id=$1 FOR UPDATE", [
+      eventId,
+    ]);
+    const pid = (await blocker.query("SELECT pg_backend_pid() AS pid")).rows[0]
+      .pid;
+    queued = replay();
+    let reached = false;
+    for (let attempt = 0; attempt < 100; attempt++) {
+      if (
+        (
+          await pool.query(
+            "SELECT pid FROM pg_stat_activity WHERE datname=current_database() AND $1=ANY(pg_blocking_pids(pid))",
+            [pid],
+          )
+        ).rowCount
+      ) {
+        reached = true;
+        break;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
+    assert.equal(
+      reached,
+      true,
+      "The exact saved receipt must wait at the real edition barrier",
+    );
+    await blocker.query("UPDATE division SET event_id=$2 WHERE id=$1", [
+      f.divisionId,
+      target,
+    ]);
+    await blocker.query("COMMIT");
+    const denied = await queued;
+    // Read current authority and all immutable evidence before asserting the
+    // rejection, so a failed red still reports the exact reproduced boundary.
+    const currentStatus = (await request(path, cookie)).status;
+    const after = await (await request(path, admin)).json();
+    assert.equal(currentStatus, 403);
+    assert.equal(after.version, 1);
+    assert.equal(after.history.length, 1);
+    assert.equal(after.selected.contents, immutable.contents);
+    assert.equal(after.selected.digest, immutable.digest);
+    assert.equal(after.selected.auditId, immutable.auditId);
+    assert.equal(await auditCount(), 1);
+    assert.equal(denied.status, 409, await denied.clone().text());
+  } finally {
+    await blocker.query("ROLLBACK");
+    blocker.release();
+    await pool.query("UPDATE division SET event_id=$2 WHERE id=$1", [
+      f.divisionId,
+      eventId,
+    ]);
+    if (queued) await queued;
+  }
+  const restored = await replay();
+  assert.equal(restored.status, 200);
+  assert.deepEqual(await restored.json(), receipt);
+  const final = await (await request(path, admin)).json();
+  assert.equal(final.dirty, true);
+  assert.equal(final.history.length, 1);
+  assert.equal(final.selected.contents, immutable.contents);
+  assert.equal(final.selected.digest, immutable.digest);
+  assert.equal(await auditCount(), 1);
+});
 for (const first of ["amendment", "finalization"] as const) {
   test(`entry/finalization race: ${first} first preserves current source and immutable snapshots`, async () => {
     const cookie = await login("organizer"),

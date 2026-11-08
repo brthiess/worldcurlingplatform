@@ -284,6 +284,25 @@ export async function saveFinalization(userId: string, raw: unknown) {
       rulesReference: input.rulesReference.trim(),
     };
     const commandDigest = freezeContents(command).digest;
+    // A saved receipt is still a currently authorized operation. Lock the same
+    // scope as a new command before replay, without requiring its old source
+    // digest or version to remain current after later ordinary corrections.
+    await c.query(
+      "SELECT id FROM event_entry WHERE division_id=$1 ORDER BY id FOR SHARE",
+      [input.divisionId],
+    );
+    const lockedDivision = (
+      await c.query("SELECT event_id FROM division WHERE id=$1 FOR UPDATE", [
+        input.divisionId,
+      ])
+    ).rows[0];
+    if (!lockedDivision)
+      throw new FinalizationError("Division not found.", 404);
+    if (lockedDivision.event_id !== event?.event_id)
+      throw new FinalizationError(
+        "The division changed editions. Reload its current scope before finalizing.",
+        409,
+      );
     const receipt = (
       await c.query(
         "SELECT division_id,version,command_digest,digest FROM division_finalization WHERE actor_id=$1 AND request_id=$2",
@@ -303,12 +322,6 @@ export async function saveFinalization(userId: string, raw: unknown) {
         digest: receipt.digest,
       };
     }
-    // Entry commands lock an existing entry before their division. Match that
-    // order, then lock the division to exclude new-entry FK inserts.
-    await c.query(
-      "SELECT id FROM event_entry WHERE division_id=$1 ORDER BY id FOR SHARE",
-      [input.divisionId],
-    );
     const s = await source(c, input.divisionId, true);
     if (s.division.eventId !== event?.event_id)
       throw new FinalizationError(

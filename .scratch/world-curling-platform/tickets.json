@@ -1396,14 +1396,18 @@
       "file": "27-finalize-division-results-and-preserve-revised-snapshots.md",
       "id": "WCP-027",
       "path": "issues/27-finalize-division-results-and-preserve-revised-snapshots.md",
-      "status": "in-progress",
+      "status": "completed",
       "labels": [
         "ready-for-agent"
       ],
       "blocked_by": [
         "WCP-003",
         "WCP-006"
-      ]
+      ],
+      "completion": {
+        "commit": "ab139bd7252b8b74545d7f957349148a8136310a",
+        "evidence": "docs/verification/WCP-027-merge.md"
+      }
     },
     {
       "n": 28,
@@ -1709,7 +1713,7 @@
       "file": "33-calculate-four-player-event-assessments-and-point-awards.md",
       "id": "WCP-033",
       "path": "issues/33-calculate-four-player-event-assessments-and-point-awards.md",
-      "status": "ready-for-agent",
+      "status": "in-progress",
       "labels": [
         "ready-for-agent"
       ],

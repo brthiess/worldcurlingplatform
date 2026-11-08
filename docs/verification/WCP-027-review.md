@@ -1,5 +1,7 @@
 # WCP-027 independent review — rejected pending receipt authority fix
 
+**Historical rejection resolved:** corrected receipt validation and the accepted WCP-008 union were independently verified and integrated. See [WCP-027 final merge acceptance](WCP-027-merge.md). The red finding and overlapping-run limitations below remain unchanged as historical evidence.
+
 Reviewed candidate `52000f7216a22e73556154f9b0c2cf0874e585b9` from `ticket/WCP-027` against accepted integration `bc8d47ce184e2c5b24fbc2a425650d8cec1dc26a`. The primary merge checkpoint is `75cc3afa1005eb3b7b0f31b5fdb6c1219a663d4e`; its tree and the candidate tree are both `e8af39107a3fad34cb7c5e8f700cc1352edfc213`. This merge is **not acceptance**. The ticket must remain open; the original implementer owns the correction and a fresh independent review is required.
 
 ## Blocking finding: exact receipt replay bypasses locked association recheck

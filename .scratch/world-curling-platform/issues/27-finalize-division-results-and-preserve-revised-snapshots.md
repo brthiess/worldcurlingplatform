@@ -4,7 +4,7 @@ number: 27
 title: "Finalize division results and preserve revised snapshots"
 parent: WCP-SPEC-001
 type: implementation
-status: in-progress
+status: completed
 labels: [ready-for-agent]
 blocked_by: [WCP-003, WCP-006]
 source_spec_sha256: 045B46988225B6C8C0020B23C8C5D4EAA8E2E1916256148A0FDA26B5DA8673FD
@@ -18,7 +18,7 @@ published: 2026-11-07
 
 **Blocked by:** [03: Confirm results and make ordinary auditable corrections](03-confirm-results-and-make-ordinary-auditable-corrections.md); [06: Manually enter teams and resolve core-composition identities](06-manually-enter-teams-and-resolve-core-composition-identities.md).
 
-**Status:** in-progress
+**Status:** completed
 
 ## Parent and scope
 
@@ -31,13 +31,13 @@ published: 2026-11-07
 
 ## Acceptance criteria
 
-- [ ] Record required outcomes, final placements, referenced entries/lineups/rules and exact frozen contents for each division independently.
-- [ ] Do not treat sporting finalization as ranking approval or an eligibility waiver; expose ranking-specific issues separately.
-- [ ] Allow the scorekeeper's correction without an admin gate, flag changed results and create a replacement finalization; defer transitive historical reassessment.
-- [ ] **Unit testing:** Test finalization prerequisites, placement validation, revision/dirty-state transitions and snapshot-content stability.
-- [ ] **Database/API verification:** Finalize two divisions independently, correct and refinalize one, and prove old contents/digests remain unchanged with atomic audit evidence.
-- [ ] **Frontend quality:** Deliver an understandable final-results review/finalize screen and changed-since-finalization notice with working revision/history access.
-- [ ] Record actual verification commands/results and relevant browser/screenshots or API evidence. Report meaningful uncovered branches or limitations; do not claim checks that were not run.
+- [x] Record required outcomes, final placements, referenced entries/lineups/rules and exact frozen contents for each division independently.
+- [x] Do not treat sporting finalization as ranking approval or an eligibility waiver; expose ranking-specific issues separately.
+- [x] Allow the scorekeeper's correction without an admin gate, flag changed results and create a replacement finalization; defer transitive historical reassessment.
+- [x] **Unit testing:** Test finalization prerequisites, placement validation, revision/dirty-state transitions and snapshot-content stability.
+- [x] **Database/API verification:** Finalize two divisions independently, correct and refinalize one, and prove old contents/digests remain unchanged with atomic audit evidence.
+- [x] **Frontend quality:** Deliver an understandable final-results review/finalize screen and changed-since-finalization notice with working revision/history access.
+- [x] Record actual verification commands/results and relevant browser/screenshots or API evidence. Report meaningful uncovered branches or limitations; do not claim checks that were not run.
 
 ## Slice boundary
 
