@@ -1637,7 +1637,7 @@
       "file": "32-review-official-rosters-wctrs-sources-and-starting-entitlements.md",
       "id": "WCP-032",
       "path": "issues/32-review-official-rosters-wctrs-sources-and-starting-entitlements.md",
-      "status": "ready-for-agent",
+      "status": "in-progress",
       "labels": [
         "ready-for-agent"
       ],
@@ -2281,13 +2281,17 @@
       "file": "44-aggregate-approved-curling-news-into-working-source-links.md",
       "id": "WCP-044",
       "path": "issues/44-aggregate-approved-curling-news-into-working-source-links.md",
-      "status": "in-progress",
+      "status": "completed",
       "labels": [
         "ready-for-agent"
       ],
       "blocked_by": [
         "WCP-001"
-      ]
+      ],
+      "completion": {
+        "commit": "bb8ffe4d9fe5e26e172ec47fbb6a1db58c2cde6d",
+        "evidence": "docs/verification/WCP-044.md"
+      }
     },
     {
       "n": 45,
