@@ -80,4 +80,19 @@ test("reserved fetch addresses and impossible calendar dates are rejected", () =
   const xml =
     "<rss><channel><item><title>Bad date</title><link>https://publisher.example/bad-date</link><pubDate>2026-02-30T10:00:00Z</pubDate></item></channel></rss>";
   assert.deepEqual(normalizeFeed(xml, "P", new Date("2026-11-08")), []);
+  for (const date of [
+    "Tue, 31 Feb 2026 10:00:00 GMT",
+    "31 Apr 2026 10:00:00 +0200",
+    "Thu, 29 Feb 2025 23:00:00 -0500",
+  ]) {
+    assert.deepEqual(
+      normalizeFeed(
+        xml.replace("2026-02-30T10:00:00Z", date),
+        "P",
+        new Date("2026-11-08"),
+      ),
+      [],
+      date,
+    );
+  }
 });
