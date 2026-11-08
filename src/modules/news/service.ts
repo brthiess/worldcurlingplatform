@@ -35,7 +35,10 @@ function reason(value: unknown) {
     value.length > 500
   )
     throw new NewsError("Provide a reason between 5 and 500 characters.");
-  return safeText(value, 500);
+  const text = safeText(value, 500);
+  if (text.length < 5)
+    throw new NewsError("Provide a meaningful plain-text reason.");
+  return text;
 }
 function version(value: unknown) {
   if (!Number.isSafeInteger(value) || Number(value) < 1)

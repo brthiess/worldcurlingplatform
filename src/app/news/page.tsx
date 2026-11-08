@@ -31,7 +31,7 @@ export default function News() {
       setData(await r.json());
       setError("");
     } catch (e) {
-      setError((e as Error).message);
+      setError("News is temporarily unavailable. Try again shortly.");
     } finally {
       setBusy(false);
     }
@@ -67,8 +67,8 @@ export default function News() {
           </p>
           {data.sources.some((s) => s.failed || s.stale) && (
             <div className="notice" role="status">
-              Some sources have not refreshed successfully in the last 24 hours.
-              Previously fetched stories may remain available.
+              Some sources are stale or their latest fetch failed. Previously
+              fetched stories may remain available.
             </div>
           )}
           {data.items.length ? (

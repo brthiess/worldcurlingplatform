@@ -85,6 +85,12 @@ test("real pg-boss retries a failing approved HTTP fixture then persists exactly
       (await publicNews(pool)).items.filter((i) => i.url === story).length,
       1,
     );
+    await manageSource(pool, "demo-administrator", {
+      id: source.id,
+      version: 1,
+      approved: false,
+      reason: "Controlled retry acceptance finished",
+    });
   } finally {
     await boss.stop({ graceful: true, timeout: 5000 });
     await new Promise<void>((r) => server.close(() => r()));

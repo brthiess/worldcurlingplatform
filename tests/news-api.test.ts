@@ -119,4 +119,27 @@ test("public news omits staff data and global administrators alone manage approv
     audits.rows.map((r) => r.action),
     ["source-created", "source-approved"],
   );
+  assert.equal(
+    (
+      await call("/api/v1/news", admin, {
+        action: "source",
+        id: first.id,
+        version: 2,
+        approved: false,
+        reason: "Controlled API acceptance finished",
+      })
+    ).status,
+    200,
+  );
+});
+test("administrator input must retain a meaningful plain-text reason", async () => {
+  const cookie = await login("administrator");
+  const r = await call("/api/v1/news", cookie, {
+    action: "source",
+    publisher: "Reason fixture",
+    feedUrl: "https://publisher.example/reason-" + crypto.randomUUID(),
+    approved: true,
+    reason: "<script>doSomething()</script>",
+  });
+  assert.equal(r.status, 400);
 });

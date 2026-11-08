@@ -41,6 +41,10 @@ export async function fetchFeed(value: string) {
     throw new NewsError("Feed destination is not public.");
   const address = addresses[0];
   return new Promise<string>((resolve, reject) => {
+    const deadline = setTimeout(
+      () => request.destroy(new NewsError("Feed request timed out.")),
+      10000,
+    );
     const request = (local ? http : https).get(
       url,
       {
@@ -49,12 +53,14 @@ export async function fetchFeed(value: string) {
             "application/rss+xml, application/atom+xml, application/xml, text/xml",
           "User-Agent": "WorldCurlingPlatform/1.0 linked-news",
         },
-        lookup: ((_host: any, _options: any, callback: any) =>
-          callback(null, address.address, address.family)) as any,
+        lookup: ((_host: any, options: any, callback: any) =>
+          options.all
+            ? callback(null, [address])
+            : callback(null, address.address, address.family)) as any,
       },
       (response) => {
         if (response.statusCode !== 200) {
-          response.resume();
+          response.destroy();
           reject(new NewsError(`Feed returned HTTP ${response.statusCode}.`));
           return;
         }
@@ -78,5 +84,6 @@ export async function fetchFeed(value: string) {
       request.destroy(new NewsError("Feed request timed out.")),
     );
     request.on("error", reject);
+    request.on("close", () => clearTimeout(deadline));
   });
 }

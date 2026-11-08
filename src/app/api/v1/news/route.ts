@@ -44,8 +44,21 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const user = await current(request, true);
-    const text = await request.text();
-    if (text.length > 4096) throw new NewsError("Request is too large.", 413);
+    const reader = request.body?.getReader();
+    if (!reader) throw new NewsError("Request body required.");
+    const parts: Uint8Array[] = [];
+    let size = 0;
+    while (true) {
+      const part = await reader.read();
+      if (part.done) break;
+      size += part.value.length;
+      if (size > 4096) {
+        await reader.cancel();
+        throw new NewsError("Request is too large.", 413);
+      }
+      parts.push(part.value);
+    }
+    const text = Buffer.concat(parts).toString("utf8");
     let body: any;
     try {
       body = JSON.parse(text);

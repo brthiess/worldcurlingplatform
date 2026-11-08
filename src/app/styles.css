@@ -820,6 +820,11 @@ footer {
   display: block;
   width: 100%;
   margin-top: 8px;
+  min-height: 44px;
+  padding: 10px;
+  font: inherit;
+  border: 1px solid #748896;
+  border-radius: 6px;
 }
 .news-original {
   display: inline-block;
@@ -833,4 +838,15 @@ footer {
   .news-card {
     padding: 20px;
   }
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }

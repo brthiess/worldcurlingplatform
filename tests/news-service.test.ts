@@ -101,3 +101,64 @@ test("approved-only durable feeds deduplicate, hide, suspend and retain audited 
     await new Promise<void>((r) => server.close(() => r()));
   }
 });
+test("failed source audit rolls back approval and immutable audit rows cannot be rewritten", async () => {
+  const publisher = "Rollback fixture " + crypto.randomUUID(),
+    feedUrl = "https://publisher.example/rollback-" + crypto.randomUUID();
+  await pool.query(
+    `CREATE OR REPLACE FUNCTION news_test_audit_failure() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.details->>'publisher' LIKE 'Rollback fixture %' THEN RAISE EXCEPTION 'controlled audit failure'; END IF; RETURN NEW; END $$`,
+  );
+  await pool.query(
+    "CREATE TRIGGER news_test_audit_failure BEFORE INSERT ON news_audit FOR EACH ROW EXECUTE FUNCTION news_test_audit_failure()",
+  );
+  try {
+    await assert.rejects(
+      () =>
+        manageSource(pool, "demo-administrator", {
+          publisher,
+          feedUrl,
+          approved: true,
+          reason: "Audit must be atomic with approval",
+        }),
+      /controlled audit failure/,
+    );
+    assert.equal(
+      (await staffNews(pool, "demo-administrator")).sources.some(
+        (s) => s.feedUrl === feedUrl,
+      ),
+      false,
+    );
+  } finally {
+    await pool.query("DROP TRIGGER news_test_audit_failure ON news_audit");
+    await pool.query("DROP FUNCTION news_test_audit_failure()");
+  }
+  const source = await manageSource(pool, "demo-administrator", {
+    publisher,
+    feedUrl,
+    approved: true,
+    reason: "Retry after restored audit persistence",
+  });
+  await assert.rejects(
+    () =>
+      pool.query(
+        "UPDATE news_audit SET reason='tampered audit' WHERE resource_id=$1",
+        [source.id],
+      ),
+    /immutable/i,
+  );
+  const changes = await Promise.allSettled([
+    manageSource(pool, "demo-administrator", {
+      id: source.id,
+      version: 1,
+      approved: false,
+      reason: "First concurrent source change",
+    }),
+    manageSource(pool, "demo-administrator", {
+      id: source.id,
+      version: 1,
+      approved: false,
+      reason: "Second concurrent source change",
+    }),
+  ]);
+  assert.equal(changes.filter((c) => c.status === "fulfilled").length, 1);
+  assert.equal(changes.filter((c) => c.status === "rejected").length, 1);
+});
