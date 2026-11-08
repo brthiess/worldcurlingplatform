@@ -122,6 +122,7 @@ for (const [label, width, height] of [
       page.getByLabel("Representation reason", { exact: true }),
     ).toHaveValue("");
     expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+    await page.evaluate(() => window.scrollTo(0, 0));
     await page.screenshot({
       path: info.outputPath(`${label}-staff.png`),
       fullPage: false,
@@ -156,6 +157,7 @@ for (const [label, width, height] of [
     await expect(
       page.getByText(/saving does not reserve a place/),
     ).toBeVisible();
+    await page.evaluate(() => window.scrollTo(0, 0));
     await page.screenshot({
       path: info.outputPath(`${label}-representative.png`),
       fullPage: false,
@@ -184,14 +186,12 @@ for (const [label, width, height] of [
     if (label === "desktop") {
       await login(page.request, "administrator");
       await page.goto("/admin/representatives");
-      const grantCard = page
-        .locator(".workspace-list > li")
-        .filter({
-          has: page.getByRole("heading", {
-            name: `${f.name} · 2026-27`,
-            exact: true,
-          }),
-        });
+      const grantCard = page.locator(".workspace-list > li").filter({
+        has: page.getByRole("heading", {
+          name: `${f.name} · 2026-27`,
+          exact: true,
+        }),
+      });
       await grantCard
         .getByLabel("Revocation reason", { exact: true })
         .fill("Appointment ended after the event submission");

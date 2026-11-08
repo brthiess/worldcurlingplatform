@@ -224,7 +224,38 @@ export function AuthorityRecovery({
             <summary>Review retained command</summary>
             <dl style={{ overflowWrap: "anywhere" }}>
               <dt>Action</dt>
-              <dd>{body.action ?? "Assign scoring access"}</dd>
+              <dd>
+                {body.action ??
+                  (state.pending.path.includes("/entries")
+                    ? "Save entry"
+                    : "Assign scoring access")}
+              </dd>
+              {body.entry && (
+                <>
+                  <dt>Entry</dt>
+                  <dd>
+                    {body.entry.name} · {body.entry.divisionId}
+                  </dd>
+                </>
+              )}
+              {body.registrationId && (
+                <>
+                  <dt>Team-season registration</dt>
+                  <dd>{body.registrationId}</dd>
+                </>
+              )}
+              {body.season && (
+                <>
+                  <dt>Season</dt>
+                  <dd>{body.season}</dd>
+                </>
+              )}
+              {body.actions && (
+                <>
+                  <dt>Granted actions</dt>
+                  <dd>{body.actions.join(", ")}</dd>
+                </>
+              )}
               {body.authorityName && (
                 <>
                   <dt>Authority</dt>

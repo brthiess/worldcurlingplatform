@@ -890,14 +890,14 @@ export function EntriesWorkbench() {
                     disabled={busy || !dirty || stale || !canSave}
                     type="submit"
                   >
-                    {busy ? "Saving…" : "Save entry"}
+                    {busy || recovery.busy ? "Saving…" : "Save entry"}
                   </button>
                   {editing && <a href={`/entries/${id}`}>View public entry</a>}
                 </div>
               </fieldset>
             </form>
             <p role="status">
-              {busy
+              {busy || recovery.busy
                 ? "Saving entry…"
                 : saved
                   ? "Saved to the database."

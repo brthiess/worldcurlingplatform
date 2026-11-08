@@ -5,6 +5,7 @@ import { randomUUID } from "node:crypto";
 import pg from "pg";
 import { authRequest } from "./auth-request";
 import { representationFor } from "../src/modules/identity/representation";
+import { hashPassword } from "better-auth/crypto";
 const base = process.env.BETTER_AUTH_URL!;
 const sessions = new Map<string, string>();
 async function login(role: string) {
@@ -279,6 +280,60 @@ test("WC grants explicit team-season actions; representatives self-enter with im
     max: 1,
   });
   try {
+    const rollbackGrant = {
+      ...grant,
+      id: randomUUID(),
+      requestId: randomUUID(),
+      reason: "Atomic representation grant",
+    };
+    const trigger = `wcp008_${randomUUID().replaceAll("-", "")}`;
+    await db.query(
+      `CREATE FUNCTION ${trigger}() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.action='team_representation_grant' AND NEW.resource_id='${rollbackGrant.id}' THEN RAISE EXCEPTION 'Controlled representation audit failure'; END IF; RETURN NEW; END $$`,
+    );
+    await db.query(
+      `CREATE TRIGGER ${trigger} BEFORE INSERT ON audit_record FOR EACH ROW EXECUTE FUNCTION ${trigger}()`,
+    );
+    try {
+      assert.equal(
+        (await request("/api/v1/team-representation", admin, rollbackGrant))
+          .status,
+        503,
+      );
+      const afterFailure = await (
+        await request("/api/v1/team-representation", admin)
+      ).json();
+      assert.equal(
+        afterFailure.grants.some(
+          (g: { id: string }) => g.id === rollbackGrant.id,
+        ),
+        false,
+      );
+      assert.equal(
+        afterFailure.receipts.some(
+          (r: { requestId: string }) => r.requestId === rollbackGrant.requestId,
+        ),
+        false,
+      );
+    } finally {
+      await db.query(`DROP TRIGGER ${trigger} ON audit_record`);
+      await db.query(`DROP FUNCTION ${trigger}()`);
+    }
+    assert.equal(
+      (await request("/api/v1/team-representation", admin, rollbackGrant))
+        .status,
+      200,
+    );
+    assert.equal(
+      (
+        await request("/api/v1/team-representation", admin, {
+          action: "revoke",
+          id: rollbackGrant.id,
+          requestId: randomUUID(),
+          reason: "End rollback fixture grant",
+        })
+      ).status,
+      200,
+    );
     for (const action of ["submit", "amend", "withdraw", "payment"] as const)
       await assert.rejects(
         representationFor(
@@ -432,6 +487,76 @@ test("WC grants explicit team-season actions; representatives self-enter with im
         representation_grant_id: grant.id,
       },
     ]);
+    const staffId = `wcp008-staff-${randomUUID()}`,
+      staffRole = randomUUID();
+    await db.query(
+      "INSERT INTO auth_user(id,name,email,email_verified) VALUES($1,'Temporary representation staff',$2,true)",
+      [staffId, `${staffId}@demo.invalid`],
+    );
+    await db.query(
+      "INSERT INTO auth_account(id,account_id,provider_id,user_id,password,created_at,updated_at) VALUES($1,$2,'credential',$2,$3,now(),now())",
+      [randomUUID(), staffId, await hashPassword(process.env.DEMO_PASSWORD!)],
+    );
+    await db.query(
+      "INSERT INTO role_grant(id,user_id,role) VALUES($1,$2,'administrator')",
+      [staffRole, staffId],
+    );
+    const staff = await login(staffId),
+      staffGrant = {
+        ...grant,
+        id: randomUUID(),
+        requestId: randomUUID(),
+        reason: "Privileged staff receipt revocation fixture",
+      };
+    assert.equal(
+      (await request("/api/v1/team-representation", staff, staffGrant)).status,
+      200,
+    );
+    let staffView = await (
+      await request("/api/v1/team-representation", staff)
+    ).json();
+    assert.equal(
+      staffView.receipts.some(
+        (r: { requestId: string }) => r.requestId === staffGrant.requestId,
+      ),
+      true,
+    );
+    await db.query("DELETE FROM role_grant WHERE id=$1", [staffRole]);
+    staffView = await (
+      await request("/api/v1/team-representation", staff)
+    ).json();
+    assert.deepEqual(staffView.receipts, []);
+    assert.deepEqual(staffView.registrations, []);
+    assert.deepEqual(staffView.divisions, []);
+    assert.deepEqual(staffView.users, []);
+    assert.equal(
+      (await request("/api/v1/team-representation", staff, staffGrant)).status,
+      403,
+    );
+    const recipientView = await (
+      await request("/api/v1/team-representation", representative)
+    ).json();
+    assert.equal(
+      recipientView.grants.some((g: { id: string }) => g.id === staffGrant.id),
+      true,
+    );
+    assert.equal(
+      recipientView.history.some(
+        (h: { resourceId: string }) => h.resourceId === staffGrant.id,
+      ),
+      true,
+    );
+    assert.equal(
+      (
+        await request("/api/v1/team-representation", admin, {
+          action: "revoke",
+          id: staffGrant.id,
+          requestId: randomUUID(),
+          reason: "End staff receipt fixture",
+        })
+      ).status,
+      200,
+    );
   } finally {
     await db.end();
   }

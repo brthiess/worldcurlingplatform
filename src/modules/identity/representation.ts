@@ -69,8 +69,8 @@ export async function representationWorkspace(userId: string) {
   ).rows;
   const receipts = (
     await pool.query(
-      'SELECT request_id AS "requestId",command FROM team_representation_command WHERE actor_id=$1 ORDER BY created_at DESC',
-      [userId],
+      'SELECT request_id AS "requestId",command FROM team_representation_command WHERE actor_id=$1 AND $2 ORDER BY created_at DESC',
+      [userId, admin],
     )
   ).rows;
   return {
