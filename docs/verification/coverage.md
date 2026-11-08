@@ -1,6 +1,6 @@
 # Offer coverage
 
-Execution began 2026-11-08. This file describes the bounded acceptance inventory; the published graph and individual verification records carry actual completion state. No workflow below is verified yet.
+Execution began 2026-11-08. This file describes the bounded acceptance inventory; the published graph and individual verification records carry actual completion state. Verified local slices are identified below. The complete demonstration and hosted offer remain unverified.
 
 | Capability | Approved configuration / boundary | Main tickets | State |
 |---|---|---|---|
