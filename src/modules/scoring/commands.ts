@@ -36,6 +36,7 @@ export type Command = {
   winnerEntryId?: string;
   reason?: string;
   ends?: End[];
+  endHammer?: ("a" | "b" | null)[];
   side?: "a" | "b";
   members?: { playerId: string; position: string }[];
   lineups?: Partial<Record<"a" | "b", DifferenceMember[]>>;
@@ -74,6 +75,17 @@ export function parseCommand(value: unknown): Command {
         "Provide outcome, participating winner and reason; corrections require the full line score",
       );
     let lineups: Command["lineups"];
+    if (
+      c.endHammer !== undefined &&
+      (c.action !== "correct" ||
+        !Array.isArray(c.endHammer) ||
+        c.endHammer.length !== c.ends!.length ||
+        c.endHammer.some((h) => ![null, "a", "b"].includes(h)))
+    )
+      throw new ScoringError(
+        400,
+        "Provide known or unknown hammer for each corrected end",
+      );
     if (c.lineups !== undefined) {
       if (
         c.action !== "correct" ||
@@ -98,6 +110,7 @@ export function parseCommand(value: unknown): Command {
       reason: c.reason,
       ...(c.action === "correct" ? { ends: c.ends } : {}),
       ...(lineups ? { lineups } : {}),
+      ...(c.endHammer ? { endHammer: c.endHammer } : {}),
     };
   }
   if (c.action === "lineup") {
@@ -144,7 +157,10 @@ async function snapshot(client: PoolClient, id: string) {
       const a = rows.find((r) => r.end_number === i + 1 && r.side === "a"),
         b = rows.find((r) => r.end_number === i + 1 && r.side === "b");
       return {
-        state: a?.state === b?.state ? (a?.state ?? "upcoming") : "unknown",
+        state:
+          a?.state === b?.state
+            ? (a?.state ?? (g.state === "confirmed" ? "unknown" : "upcoming"))
+            : "unknown",
         a: a?.points ?? null,
         b: b?.points ?? null,
       };
@@ -359,6 +375,12 @@ export async function saveScoring(actorId: string, id: string, input: unknown) {
         [id, result.totalA, result.totalB],
       );
       await client.query("DELETE FROM game_end_score WHERE game_id=$1", [id]);
+      if (command.endHammer)
+        for (const [i, hammer] of command.endHammer.entries())
+          await client.query(
+            "INSERT INTO game_end_hammer(game_id,end_number,hammer) VALUES($1,$2,$3) ON CONFLICT(game_id,end_number) DO UPDATE SET hammer=EXCLUDED.hammer",
+            [id, i + 1, hammer],
+          );
       for (const [i, end] of result.ends.entries())
         for (const [side, points] of [
           ["a", end.a],
@@ -464,6 +486,7 @@ export async function saveScoring(actorId: string, id: string, input: unknown) {
     const frozenResult = result
       ? {
           ...result,
+          endHammer: after.endHammer,
           correction: command.action === "correct",
           entryA: before.entryA,
           entryB: before.entryB,
@@ -481,6 +504,7 @@ export async function saveScoring(actorId: string, id: string, input: unknown) {
                   totalA: before.totalA,
                   totalB: before.totalB,
                   ends: before.ends,
+                  endHammer: before.endHammer,
                   attribution: "Not recorded",
                 },
               }

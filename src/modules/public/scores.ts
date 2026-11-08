@@ -9,6 +9,7 @@ export type PublicGame = {
     confirmedBy: string;
     createdAt: string;
     result: {
+      endHammer?: (string | null)[];
       correction?: boolean;
       legacyBefore?: {
         nameA: string;
@@ -126,7 +127,7 @@ async function projectEvent(
   const endsResult = await connection.execute(
     sql`SELECT s.game_id,s.side,s.end_number,s.state,s.points FROM game_end_score s JOIN game g ON g.id=s.game_id JOIN draw_session ds ON ds.id=g.draw_id WHERE ds.division_id=${row.divisionId} ORDER BY s.end_number`,
   );
-  function ends(id: unknown, side: string): Score[] {
+  function ends(id: unknown, side: string, gameState: string): Score[] {
     const gameRows = endsResult.rows.filter((e) => e.game_id === id);
     const rows = gameRows.filter((e) => e.side === side);
     const length = Math.max(8, ...gameRows.map((e) => Number(e.end_number)));
@@ -137,7 +138,8 @@ async function projectEvent(
       const e = rows.find((e) => Number(e.end_number) === i + 1);
       return {
         state:
-          (!e || e.state === "upcoming") && i + 1 <= last
+          (!e || e.state === "upcoming") &&
+          (i + 1 <= last || gameState === "confirmed")
             ? "unknown"
             : e
               ? String(e.state)
@@ -157,8 +159,8 @@ async function projectEvent(
     attention: [],
     lineupA: null,
     lineupB: null,
-    endsA: ends(g.id, "a"),
-    endsB: ends(g.id, "b"),
+    endsA: ends(g.id, "a", String(g.state)),
+    endsB: ends(g.id, "b", String(g.state)),
   })) as unknown as PublicGame[];
   const results = await connection.execute(
     sql`SELECT r.game_id,r.version,r.confirmed_by AS "confirmedBy",r.created_at AS "createdAt",r.result FROM game_result_version r JOIN game g ON g.id=r.game_id JOIN draw_session ds ON ds.id=g.draw_id WHERE ds.division_id=${row.divisionId} ORDER BY r.version DESC`,

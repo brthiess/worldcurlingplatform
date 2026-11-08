@@ -9,12 +9,12 @@ export function LineupEvidence({
 }) {
   return (
     <section>
-      <h4>
+      <h3>
         {name} ·{" "}
         {lineup?.mode === "difference"
           ? "Declared game difference"
           : "Defaulted event lineup"}
-      </h4>
+      </h3>
       <p className="muted">
         {lineup?.eventLineupVersion
           ? `Event lineup version ${lineup.eventLineupVersion}.`
@@ -77,6 +77,9 @@ export function GameResultHistory({
             <li key={i}>
               End {i + 1}: {e.state}
               {e.state === "played" ? ` · ${e.a}–${e.b}` : ""}
+              {r.result.endHammer?.[i]
+                ? ` · Hammer: ${r.result.endHammer[i] === "a" ? r.result.nameA : r.result.nameB}`
+                : ""}
             </li>
           ))}
         </ol>

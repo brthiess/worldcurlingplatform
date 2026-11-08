@@ -16,6 +16,7 @@ type Game = {
   version: number;
   state: string;
   ends: End[];
+  endHammer: ("a" | "b" | null)[];
   scoringSource: string;
   lineupA: GameLineup | null;
   lineupB: GameLineup | null;
@@ -27,6 +28,7 @@ type Draft = {
   winnerEntryId: string;
   reason: string;
   ends: End[];
+  endHammer: ("a" | "b" | null)[];
   lineups: Partial<Record<"a" | "b", DifferenceMember[]>>;
   editing: boolean;
 };
@@ -35,6 +37,7 @@ const draftFor = (g: Game): Draft => ({
   winnerEntryId: g.results[0]?.result.winnerEntryId ?? "",
   reason: "",
   ends: g.ends,
+  endHammer: g.endHammer,
   lineups: {},
   editing: g.state !== "confirmed",
 });
@@ -63,7 +66,14 @@ export function ResultEditor({
       const raw = sessionStorage.getItem(key);
       if (raw) {
         const stored = JSON.parse(raw);
-        setDraft(stored.draft);
+        setDraft({
+          ...draftFor(game),
+          ...stored.draft,
+          endHammer: Array.from(
+            { length: stored.draft.ends.length },
+            (_, i) => stored.draft.endHammer?.[i] ?? game.endHammer[i] ?? null,
+          ),
+        });
         setVersion(stored.version);
         setPending(stored.pending);
         setStatus(stored.pending ? "uncertain" : stored.status);
@@ -115,7 +125,11 @@ export function ResultEditor({
             winnerEntryId: draft.winnerEntryId,
             reason: draft.reason,
             ...(action === "correct"
-              ? { ends: draft.ends, lineups: draft.lineups }
+              ? {
+                  ends: draft.ends,
+                  endHammer: draft.endHammer,
+                  lineups: draft.lineups,
+                }
               : {}),
           }
         : {}),
@@ -224,29 +238,30 @@ export function ResultEditor({
         </p>
         {rows.map((m, i) => (
           <div key={i} className="lineup-edit">
-            <label>
+            <label htmlFor={`game-player-${side}-${i}`}>
               Player {i + 1} · side {side.toUpperCase()}
-              <select
-                value={m.playerId}
-                onChange={(e) =>
-                  change({
-                    lineups: {
-                      ...draft.lineups,
-                      [side]: rows.map((r, j) =>
-                        j === i ? { ...r, playerId: e.target.value } : r,
-                      ),
-                    },
-                  })
-                }
-              >
-                <option value="">Choose player</option>
-                {players.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                  </option>
-                ))}
-              </select>
             </label>
+            <select
+              id={`game-player-${side}-${i}`}
+              value={m.playerId}
+              onChange={(e) =>
+                change({
+                  lineups: {
+                    ...draft.lineups,
+                    [side]: rows.map((r, j) =>
+                      j === i ? { ...r, playerId: e.target.value } : r,
+                    ),
+                  },
+                })
+              }
+            >
+              <option value="">Choose player</option>
+              {players.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
             <label>
               Position {i + 1} · side {side.toUpperCase()}
               <input
@@ -316,7 +331,9 @@ export function ResultEditor({
           ? `Corrected final · ${game.results[0].result.outcome}`
           : game.state === "confirmed"
             ? `Final · ${game.results[0]?.result.outcome ?? "legacy result"}`
-            : "Provisional · live scores"}
+            : game.state === "scheduled"
+              ? "Provisional · scheduled game"
+              : "Provisional · live scores"}
       </p>
       {game.attention.length > 0 && (
         <p role="status" className="notice">
@@ -464,6 +481,28 @@ export function ResultEditor({
                           />
                         </label>
                       ))}
+                    <label htmlFor={`corrected-hammer-${i}`}>
+                      Corrected end {i + 1} hammer
+                    </label>
+                    <select
+                      id={`corrected-hammer-${i}`}
+                      value={draft.endHammer[i] ?? "unknown"}
+                      onChange={(e) =>
+                        change({
+                          endHammer: draft.endHammer.map((h, j) =>
+                            j === i
+                              ? e.target.value === "unknown"
+                                ? null
+                                : (e.target.value as "a" | "b")
+                              : h,
+                          ),
+                        })
+                      }
+                    >
+                      <option value="unknown">Not recorded</option>
+                      <option value="a">{game.nameA}</option>
+                      <option value="b">{game.nameB}</option>
+                    </select>
                   </fieldset>
                 ))}
                 {draft.ends.length < 20 && (
@@ -476,6 +515,7 @@ export function ResultEditor({
                           ...draft.ends,
                           { state: "unplayed", a: null, b: null },
                         ],
+                        endHammer: [...draft.endHammer, null],
                       })
                     }
                   >
@@ -509,6 +549,21 @@ export function ResultEditor({
       {status === "conflict" && (
         <button type="button" onClick={() => void reload()}>
           Review accepted result version
+        </button>
+      )}
+      {(status === "unsent" || status === "conflict") && (
+        <button
+          type="button"
+          className="secondary"
+          onClick={() => {
+            setDraft(draftFor(game));
+            setVersion(game.version);
+            setPending(null);
+            setStatus("saved");
+            setError("");
+          }}
+        >
+          Discard result draft
         </button>
       )}
       <GameResultHistory results={game.results} />

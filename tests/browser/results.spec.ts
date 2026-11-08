@@ -9,17 +9,17 @@ import pg from "pg";
 import { randomUUID } from "node:crypto";
 import "dotenv/config";
 import { scoringFixtureDraw } from "../scoring-fixture";
+import { signInApiWithRateWindow } from "./auth-fixture";
 const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
 let session: BrowserContext;
 test.beforeAll(async ({ browser }) => {
+  test.setTimeout(150000);
   session = await browser.newContext();
-  const r = await session.request.post("/api/auth/sign-in/email", {
-    headers: { Origin: process.env.BETTER_AUTH_URL! },
-    data: {
-      email: "scorekeeper@demo.invalid",
-      password: process.env.DEMO_PASSWORD,
-    },
-  });
+  const r = await signInApiWithRateWindow(
+    session.request,
+    "scorekeeper@demo.invalid",
+    process.env.DEMO_PASSWORD,
+  );
   expect(r.status()).toBe(200);
 });
 test.beforeEach(async ({ context }) =>
@@ -105,12 +105,21 @@ for (const [name, width, height] of [
     await page
       .getByLabel("Result reason")
       .fill("North conceded; winner corrected");
+    await page.getByText("Correct line score", { exact: true }).click();
+    await page
+      .getByLabel("Corrected end 1 hammer", { exact: true })
+      .selectOption("a");
     await page
       .getByRole("button", { name: "Save correction", exact: true })
       .click();
     await expect(
       page.getByText("Corrected final · conceded", { exact: true }),
     ).toBeVisible();
+    const accepted = await (
+      await session.request.get(`/api/v1/games/${id}/scoring`)
+    ).json();
+    expect(accepted.results[0].result.endHammer[0]).toBe("a");
+    expect(accepted.results[1].result.endHammer[0]).toBe(null);
     expect(
       await page.evaluate(
         () => document.documentElement.scrollWidth <= innerWidth,
@@ -127,7 +136,7 @@ for (const [name, width, height] of [
       page.getByText("North conceded; winner corrected", { exact: false }),
     ).toBeVisible();
     await page.getByText("Earlier result versions").click();
-    await expect(page.getByText(/Version 3 · normal/)).toBeVisible();
+    await expect(page.getByText(/Version 10 · normal/)).toBeVisible();
     await page.screenshot({
       path: info.outputPath(`${name}-public-history.png`),
       fullPage: true,
@@ -135,7 +144,7 @@ for (const [name, width, height] of [
   });
 test("live and corrected lineup differences are persistent declared evidence without changing the event", async ({
   page,
-}) => {
+}, info) => {
   const id = await fixture(session.request),
     players = await (
       await session.request.get("/api/v1/public/players")
@@ -167,6 +176,11 @@ test("live and corrected lineup differences are persistent declared evidence wit
   await expect(
     page.getByText(`${first.name} · Skip · declared`, { exact: false }),
   ).toBeVisible();
+  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+  await page.screenshot({
+    path: info.outputPath("phone-declared-lineup.png"),
+    fullPage: true,
+  });
   await page.goto(`/admin/games/${id}`);
   await page.getByLabel("Result winner").selectOption("entry-1");
   await page

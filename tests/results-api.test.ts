@@ -60,13 +60,14 @@ test("assigned scorekeeper confirms, retries and corrects with recoverable immut
     hammer: null,
     ...extra,
   });
-  assert.equal((await post(command(0, "start"))).status, 200);
+  assert.equal((await post(command(0, "start", { hammer: "a" }))).status, 200);
   assert.equal(
     (
       await post(
         command(1, "end", {
           endNumber: 1,
           end: { state: "played", a: 2, b: 0 },
+          hammer: "b",
         }),
       )
     ).status,
@@ -95,6 +96,7 @@ test("assigned scorekeeper confirms, retries and corrects with recoverable immut
   assert.equal(first.results[0].version, 10);
   assert.equal(first.results[0].result.winnerEntryId, "entry-1");
   assert.equal(first.results[0].actorId, "demo-scorekeeper");
+  assert.equal(first.results[0].result.endHammer[0], "b");
   assert.equal(first.results[0].result.lineupA.entryId, "entry-1");
   assert.equal(first.results[0].result.lineupA.mode, "defaulted");
   assert.equal(first.results[0].result.lineupA.eventLineupVersion, null);
@@ -108,6 +110,7 @@ test("assigned scorekeeper confirms, retries and corrects with recoverable immut
     winnerEntryId: "entry-3",
     reason: "North conceded; winner initially reversed",
     ends: [{ state: "played", a: 2, b: 0 }],
+    endHammer: ["a"],
   });
   assert.equal((await post(correct)).status, 200);
   const revised = await get();
@@ -115,6 +118,8 @@ test("assigned scorekeeper confirms, retries and corrects with recoverable immut
   assert.equal(revised.results.length, 2);
   assert.equal(revised.results[0].result.winnerEntryId, "entry-3");
   assert.equal(revised.results[0].result.outcome, "conceded");
+  assert.equal(revised.endHammer[0], "a");
+  assert.equal(revised.results[0].result.endHammer[0], "a");
   assert.deepEqual(revised.results[1], first.results[0]);
   assert.equal(
     (await post({ ...correct, requestId: randomUUID() })).status,
