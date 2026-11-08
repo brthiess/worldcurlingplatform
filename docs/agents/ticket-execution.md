@@ -1,6 +1,6 @@
 # Ticket implementer contract
 
-The coordinator supplies one published ticket ID, worktree, branch, database and port. Use a fresh context and modify only that worktree. Read `AGENTS.md`, `docs/agents/execution.md`, `docs/agents/issue-tracker.md`, the assigned issue under `.scratch/world-curling-platform/issues/`, the authoritative `spec.md`, relevant ADRs/CONTEXT and frontend specification. Never use archived drafts as execution sources. Consult `docs/agents/research-index.md` when relevant.
+The coordinator supplies one published ticket ID, worktree, branch, database and port. Use a fresh context and modify only that worktree. Do not spawn further agents; the coordinator owns the concurrency bound. Read `AGENTS.md`, `docs/agents/execution.md`, `docs/agents/issue-tracker.md`, the assigned issue under `.scratch/world-curling-platform/issues/`, the authoritative `spec.md`, relevant ADRs/CONTEXT and frontend specification. Never use archived drafts as execution sources. Consult `docs/agents/research-index.md` when relevant.
 
 ## Work
 
