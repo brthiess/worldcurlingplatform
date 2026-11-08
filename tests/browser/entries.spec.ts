@@ -168,7 +168,7 @@ for (const [label, width] of [
     });
     await organizerSignIn(page);
     await page
-      .getByRole("link", { name: "Manual team entries", exact: true })
+      .getByRole("link", { name: "Team entries", exact: true })
       .click();
     await expect(
       page.getByRole("heading", { name: "Manual entries", exact: true }),

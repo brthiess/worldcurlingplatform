@@ -486,6 +486,15 @@ export function ScoresView({
             </button>
           </div>
           {!gameId && (
+            <p>
+              <a
+                href={`/divisions/${data.selectedDivisionId ?? data.divisions[0]?.id}/results`}
+              >
+                Final results and revision history →
+              </a>
+            </p>
+          )}
+          {!gameId && (
             <EventEntryLinks
               eventId={data.event.id}
               divisionId={data.selectedDivisionId ?? undefined}

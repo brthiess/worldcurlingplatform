@@ -1,6 +1,23 @@
 export function coreIdentity(discipline: string, players: string[]): string {
   return `${discipline}:${JSON.stringify([...players].sort())}`;
 }
+export function canonicalEntryCommand(v: unknown): string {
+  if (Array.isArray(v))
+    return "[" + v.map(canonicalEntryCommand).join(",") + "]";
+  if (v && typeof v === "object")
+    return (
+      "{" +
+      Object.entries(v)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(
+          ([k, value]) =>
+            JSON.stringify(k) + ":" + canonicalEntryCommand(value),
+        )
+        .join(",") +
+      "}"
+    );
+  return JSON.stringify(v) ?? "null";
+}
 export class EntryError extends Error {
   constructor(
     message: string,

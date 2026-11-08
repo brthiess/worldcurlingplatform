@@ -38,7 +38,10 @@ function valid(value: unknown): value is RetainedAuthorityCommand {
     typeof c.path !== "string" ||
     typeof c.actorId !== "string" ||
     !(
-      /^\/api\/v1\/(approval-delegations|role-grants)$/.test(c.path) ||
+      /^\/api\/v1\/(approval-delegations|role-grants|team-representation|entries|division-finalizations)$/.test(
+        c.path,
+      ) ||
+      /^\/api\/v1\/entries\/[-\w]{1,80}$/.test(c.path) ||
       /^\/api\/v1\/applications\/[-\w]{1,80}$/.test(c.path)
     ) ||
     typeof c.body !== "string" ||
@@ -57,8 +60,9 @@ function valid(value: unknown): value is RetainedAuthorityCommand {
 export function useAuthorityCommand(
   key: string | null,
   actorId: string | undefined,
-  onAccepted: () => Promise<void>,
+  onAccepted: (saved: RetainedAuthorityCommand) => Promise<void>,
   onReconcile: (pending: RetainedAuthorityCommand) => Promise<boolean>,
+  onRejected?: (status: number, message: string) => void,
 ) {
   const [pending, setPending] = useState<RetainedAuthorityCommand | null>(null),
     [busy, setBusy] = useState(false),
@@ -112,7 +116,7 @@ export function useAuthorityCommand(
         saved = { ...saved, acknowledged: true };
         retain(saved);
       }
-      await onAccepted();
+      await onAccepted(saved);
       retain(null);
       setNotice(saved.message);
     } catch (e) {
@@ -124,6 +128,7 @@ export function useAuthorityCommand(
       ) {
         retain(null);
         setError(e.message);
+        onRejected?.(e.status, e.message);
       } else
         setError(
           saved.acknowledged
@@ -189,9 +194,11 @@ export function useAuthorityCommand(
 export function AuthorityRecovery({
   state,
   label = "authority",
+  retryLabel,
 }: {
   state: ReturnType<typeof useAuthorityCommand>;
   label?: string;
+  retryLabel?: string;
 }) {
   const body = state.pending ? JSON.parse(state.pending.body) : null;
   return (
@@ -217,7 +224,40 @@ export function AuthorityRecovery({
             <summary>Review retained command</summary>
             <dl style={{ overflowWrap: "anywhere" }}>
               <dt>Action</dt>
-              <dd>{body.action ?? "Assign scoring access"}</dd>
+              <dd>
+                {body.action ??
+                  (state.pending.path.includes("/entries")
+                    ? "Save entry"
+                    : body.divisionId
+                      ? "Finalize division results"
+                      : "Assign scoring access")}
+              </dd>
+              {body.entry && (
+                <>
+                  <dt>Entry</dt>
+                  <dd>
+                    {body.entry.name} · {body.entry.divisionId}
+                  </dd>
+                </>
+              )}
+              {body.registrationId && (
+                <>
+                  <dt>Team-season registration</dt>
+                  <dd>{body.registrationId}</dd>
+                </>
+              )}
+              {body.season && (
+                <>
+                  <dt>Season</dt>
+                  <dd>{body.season}</dd>
+                </>
+              )}
+              {body.actions && (
+                <>
+                  <dt>Granted actions</dt>
+                  <dd>{body.actions.join(", ")}</dd>
+                </>
+              )}
               {body.authorityName && (
                 <>
                   <dt>Authority</dt>
@@ -274,7 +314,13 @@ export function AuthorityRecovery({
                 </>
               )}
               <dt>Reason</dt>
-              <dd>{body.reason}</dd>
+              <dd>{body.reason ?? body.note}</dd>
+              {body.divisionId && (
+                <>
+                  <dt>Division</dt>
+                  <dd>{body.divisionId}</dd>
+                </>
+              )}
               <dt>Original command identifier</dt>
               <dd style={{ overflowWrap: "anywhere" }}>
                 {body.requestId ?? body.id}
@@ -283,7 +329,7 @@ export function AuthorityRecovery({
           </details>
           <div className="application-actions">
             <button disabled={state.busy} onClick={() => void state.retry()}>
-              Retry exact {label} command
+              {retryLabel ?? `Retry exact ${label} command`}
             </button>
             <button
               className="secondary"

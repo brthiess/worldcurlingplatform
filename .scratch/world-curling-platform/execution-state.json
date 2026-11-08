@@ -18,6 +18,7 @@
     "WCP-005",
     "WCP-006",
     "WCP-008",
+    "WCP-009",
     "WCP-012",
     "WCP-013",
     "WCP-018",
@@ -34,6 +35,7 @@
     "WCP-004",
     "WCP-005",
     "WCP-006",
+    "WCP-008",
     "WCP-012",
     "WCP-013",
     "WCP-018",
@@ -49,7 +51,7 @@
   "git": {
     "remote": "https://github.com/brthiess/worldcurlingplatform.git",
     "push_as_work_progresses": true,
-    "last_verified_remote_integration_commit": "ea2bae94989259d0d141dab63c9e67b656944661",
+    "last_verified_remote_integration_commit": "01ddb5e79a2b4805c201904281ca19cdefaa8416",
     "integration_branch": "integration/world-curling-platform",
     "worktrees_created": [
       ".worktrees/WCP-001",
@@ -65,11 +67,12 @@
       ".worktrees/WCP-018",
       ".worktrees/WCP-008",
       ".worktrees/WCP-027",
-      ".worktrees/WCP-019"
+      ".worktrees/WCP-019",
+      ".worktrees/WCP-009"
     ],
     "initialized": true,
     "baseline_commit": "f6d6d8d",
-    "remote_ref_verified_at": "2026-11-08T20:46:25.973860+00:00"
+    "remote_ref_verified_at": "2026-11-08T21:45:46.752736+00:00"
   },
   "verification": {
     "policy": "Only completed tickets have reviewed required-check evidence; each record is limited to its ticket scope.",
@@ -97,6 +100,10 @@
       "WCP-006": {
         "commit": "4f50650c849021c5d764c71fe73409a56971997e",
         "evidence": "docs/verification/WCP-006.md"
+      },
+      "WCP-008": {
+        "commit": "0536bf73714490b2526888daf0569d7c35de140c",
+        "evidence": "docs/verification/WCP-008-merge.md"
       },
       "WCP-012": {
         "commit": "bae3812",
@@ -138,9 +145,9 @@
     "Close only reviewed integrated tickets with meaningful unit/PostgreSQL/API/frontend/browser evidence.",
     "Continue unblocked work and report provider/deployment limitations honestly."
   ],
-  "updated_at": "2026-11-08T20:43:27.375709+00:00",
+  "updated_at": "2026-11-08T21:45:30.160081+00:00",
   "active_tickets": [
-    "WCP-008",
+    "WCP-009",
     "WCP-019",
     "WCP-027"
   ],
@@ -358,6 +365,22 @@
       "reason": null,
       "commit": null,
       "evidence": null
+    },
+    {
+      "time": "2026-11-08T21:45:18.816120+00:00",
+      "ticket": "WCP-008",
+      "status": "completed",
+      "reason": null,
+      "commit": "0536bf73714490b2526888daf0569d7c35de140c",
+      "evidence": "docs/verification/WCP-008-merge.md"
+    },
+    {
+      "time": "2026-11-08T21:45:30.160081+00:00",
+      "ticket": "WCP-009",
+      "status": "in-progress",
+      "reason": null,
+      "commit": null,
+      "evidence": null
     }
   ],
   "research": {
@@ -429,6 +452,14 @@
       "web_port": 3119,
       "news_fixture_port": 3219,
       "reserved_migration_prefix": "0022"
+    },
+    "WCP-009": {
+      "worktree": ".worktrees/WCP-009",
+      "branch": "ticket/WCP-009",
+      "database_prefix": "wcp009",
+      "web_port": 3109,
+      "news_fixture_port": 3209,
+      "reserved_migration_prefix": "0023"
     }
   }
 }

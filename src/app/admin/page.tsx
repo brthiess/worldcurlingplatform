@@ -122,7 +122,13 @@ export default function Admin() {
             <a href="/admin/authority">Authority & event staff</a>
           </p>
           <p>
-            <a href="/admin/entries">Manual team entries</a>
+            <a href="/admin/entries">Team entries</a>
+          </p>
+          <p>
+            <a href="/admin/representatives">Team-season representatives</a>
+          </p>
+          <p>
+            <a href="/admin/finalizations">Finalize division results</a>
           </p>
           <p>
             <a href="/admin/schedule">Draw scheduling</a>
@@ -132,7 +138,9 @@ export default function Admin() {
             <a href="/admin/news">News sources and moderation</a>
           </p>
           <p>
-            <a href="/admin/ranking-inputs">Season ranking inputs and rule editions</a>
+            <a href="/admin/ranking-inputs">
+              Season ranking inputs and rule editions
+            </a>
           </p>
           <button
             className="secondary"
