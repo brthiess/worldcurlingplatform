@@ -37,7 +37,8 @@
       ".worktrees/WCP-001",
       ".worktrees/WCP-002",
       ".worktrees/WCP-004",
-      ".worktrees/WCP-012"
+      ".worktrees/WCP-012",
+      ".worktrees/WCP-013"
     ],
     "initialized": true,
     "baseline_commit": "f6d6d8d"

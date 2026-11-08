@@ -80,7 +80,7 @@ export function ScoresView({
         const response = await fetch(
           gameId
             ? `/api/v1/public/games/${encodeURIComponent(gameId)}`
-            : `/api/v1/public/events/${encodeURIComponent(eventId)}`,
+            : `/api/v1/public/events/${encodeURIComponent(eventId)}${new URLSearchParams(window.location.search).get("division") ? "?division=" + encodeURIComponent(new URLSearchParams(window.location.search).get("division")!) : ""}`,
           { cache: "no-store", signal },
         );
         if (!response.ok)
@@ -146,7 +146,11 @@ export function ScoresView({
       {gameId && (
         <a
           className="back"
-          href={`/?draw=${encodeURIComponent(data?.games[0]?.drawId ?? "draw-2")}`}
+          href={
+            data
+              ? `/events/${data.event.id}?${new URLSearchParams({ ...(data.selectedDivisionId ? { division: data.selectedDivisionId } : {}), ...(data.games[0]?.drawId ? { draw: data.games[0].drawId } : {}) })}`
+              : "/events"
+          }
         >
           ← Back to scores
         </a>
@@ -170,10 +174,16 @@ export function ScoresView({
       {data && (
         <>
           <div className="notice">
-            <strong>Fictional demonstration.</strong>{" "}
+            <strong>
+              {data.event.origin === "fictional_demo"
+                ? "Fictional demonstration."
+                : data.event.origin === "historical_import"
+                  ? "Imported historical record."
+                  : "Newly operated event."}
+            </strong>{" "}
             {data.event.origin === "fictional_demo"
               ? "Teams, results and schedules are review fixtures."
-              : "Data origin: " + data.event.origin}{" "}
+              : "Edition details are maintained by the organizing authority."}{" "}
             This is an initial offer, not an official live service.
           </div>
           <section className="event" aria-label={data.event.name}>
@@ -182,22 +192,54 @@ export function ScoresView({
                 <p className="eyebrow">{data.event.division}</p>
                 <h2>
                   <a
-                    href={`/events/${data.event.id}${selected ? "?draw=" + selected : ""}`}
+                    href={`/events/${data.event.id}?${new URLSearchParams({ ...(data.selectedDivisionId ? { division: data.selectedDivisionId } : {}), ...(selected ? { draw: selected } : {}) })}`}
                   >
                     {data.event.name}
                   </a>
                 </h2>
                 <p className="muted">
-                  {data.event.venue} · {data.event.location}
+                  {data.event.venue || "Venue not confirmed"} ·{" "}
+                  {data.event.location}
                 </p>
                 <p className="muted">
                   {data.event.startsOn} – {data.event.endsOn} ·{" "}
                   {data.event.format}
                 </p>
               </div>
-              <span className="badge">Demo scenario</span>
+              <span className="badge">
+                {data.event.origin === "fictional_demo"
+                  ? "Demo scenario"
+                  : "Admitted edition"}
+              </span>
             </div>
             {!gameId && (
+              <div className="edition-divisions">
+                <h3>Divisions</h3>
+                <p>
+                  Public admission: admitted · Registration:{" "}
+                  {data.event.registrationStatus}
+                </p>
+                <ul className="division-links">
+                  {data.divisions.map((d) => (
+                    <li key={d.id}>
+                      <a
+                        aria-current={
+                          d.id === data.selectedDivisionId ? "page" : undefined
+                        }
+                        href={`/events/${data.event.id}?division=${encodeURIComponent(d.id)}`}
+                      >
+                        {d.name} · scores
+                      </a>
+                      <span> · Ranking eligibility: {d.rankingStatus}</span>
+                    </li>
+                  ))}
+                </ul>
+                {!data.selectedDivisionId && (
+                  <p>Select a division to view its competition.</p>
+                )}
+              </div>
+            )}
+            {!gameId && data.draws.length > 0 && (
               <div className="draw-toolbar">
                 <span>
                   <strong>
@@ -267,16 +309,27 @@ export function ScoresView({
                 </article>
               ))}
             </div>
-            {!games.length && (
-              <p className="empty">No games are scheduled for this draw yet.</p>
+            {!games.length && data.selectedDivisionId && (
+              <p className="empty">
+                {data.draws.length
+                  ? "No games are scheduled for this draw yet."
+                  : "No games have been scheduled for this division yet."}
+              </p>
             )}
             {!gameId && next && (
               <div className="next-draw">
                 <strong>Next: Draw {next.number}</strong>
                 <span>{venueTime(next.startsAt, data.event.timezone)}</span>
                 <a
-                  href={`?draw=${next.id}`}
+                  href={`?${new URLSearchParams({ ...(data.selectedDivisionId ? { division: data.selectedDivisionId } : {}), draw: next.id })}`}
                   onClick={(event) => {
+                    if (
+                      event.metaKey ||
+                      event.ctrlKey ||
+                      event.shiftKey ||
+                      event.altKey
+                    )
+                      return;
                     event.preventDefault();
                     choose(next.id);
                   }}
