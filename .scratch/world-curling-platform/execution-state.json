@@ -18,6 +18,7 @@
     "WCP-006",
     "WCP-012",
     "WCP-013",
+    "WCP-044",
     "WCP-045"
   ],
   "tickets_completed": [
@@ -45,7 +46,8 @@
       ".worktrees/WCP-012",
       ".worktrees/WCP-013",
       ".worktrees/WCP-006",
-      ".worktrees/WCP-005"
+      ".worktrees/WCP-005",
+      ".worktrees/WCP-044"
     ],
     "initialized": true,
     "baseline_commit": "f6d6d8d"
@@ -93,14 +95,14 @@
     "Close only reviewed integrated tickets with meaningful unit/PostgreSQL/API/frontend/browser evidence.",
     "Continue unblocked work and report provider/deployment limitations honestly."
   ],
-  "updated_at": "2026-11-08T17:35:33.163003+00:00",
+  "updated_at": "2026-11-08T17:35:37.769241+00:00",
   "active_tickets": [
     "WCP-005",
-    "WCP-006"
+    "WCP-006",
+    "WCP-044"
   ],
   "frontier": [
-    "WCP-003",
-    "WCP-044"
+    "WCP-003"
   ],
   "events": [
     {
@@ -206,6 +208,14 @@
       "reason": null,
       "commit": "210dc44",
       "evidence": "docs/verification/WCP-013.md"
+    },
+    {
+      "time": "2026-11-08T17:35:37.769241+00:00",
+      "ticket": "WCP-044",
+      "status": "in-progress",
+      "reason": null,
+      "commit": null,
+      "evidence": null
     }
   ],
   "research": {
