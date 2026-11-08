@@ -1,4 +1,5 @@
 "use client";
+import { EventEntryLinks } from "@/components/public-rosters";
 import { useEffect, useState, useCallback, useRef } from "react";
 import type { PublicEvent, PublicGame } from "@/modules/public/scores";
 import { scoreCell } from "@/domain/scores";
@@ -361,6 +362,7 @@ export function ScoresView({
               {refreshing ? "Refreshing…" : "Refresh scores"}
             </button>
           </div>
+          {!gameId && <EventEntryLinks eventId={data.event.id} />}
         </>
       )}
     </main>

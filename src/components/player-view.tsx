@@ -4,6 +4,7 @@ type Player = {
   id: string;
   name: string;
   origin: string;
+  identityStatus: string;
   biography: string;
   handedness: string | null;
 };
@@ -58,6 +59,12 @@ export function PlayerView({ id }: { id?: string }) {
             {p.origin === "fictional_demo" && (
               <p className="notice">Fictional demonstration player.</p>
             )}
+            {p.identityStatus === "provisional" && (
+              <p className="notice">
+                Provisional player identity. Relationship to possible existing
+                records remains unresolved.
+              </p>
+            )}
             {id && (
               <>
                 <h2>Biography</h2>
@@ -73,8 +80,8 @@ export function PlayerView({ id }: { id?: string }) {
                     : "Not provided"}
                 </p>
                 <p className="muted">
-                  No team or event participation is recorded for this
-                  demonstration profile.
+                  Event roster records describe declared or defaulted lineups;
+                  they do not verify participation in a game.
                 </p>
               </>
             )}
