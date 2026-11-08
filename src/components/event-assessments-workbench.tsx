@@ -190,8 +190,13 @@ export function EventAssessmentsWorkbench() {
   const command = useAuthorityCommand(
     workspace?.actorId ? `wcp-assessment-command:${workspace.actorId}` : null,
     workspace?.actorId,
-    async () => {
-      const next = await read(`${path}?division=${division}&rules=${rules}`);
+    async (saved) => {
+      const original = JSON.parse(saved.body),
+        d = original.divisionId,
+        r = original.evidence?.rulesId ?? original.rulesId ?? rules;
+      const next = await read(`${path}?division=${d}&rules=${r}`);
+      setDivision(d);
+      setRules(r);
       setWorkspace(next);
       setError("");
       setStale(false);
@@ -199,7 +204,7 @@ export function EventAssessmentsWorkbench() {
     async (pending) => {
       const original = JSON.parse(pending.body),
         state = await read(
-          `${path}?division=${original.divisionId}&rules=${original.evidence?.rulesId ?? rules}`,
+          `${path}?division=${original.divisionId}&rules=${original.evidence?.rulesId ?? original.rulesId ?? rules}`,
         );
       const found = state.receipts?.some(
         (h) =>
@@ -217,6 +222,17 @@ export function EventAssessmentsWorkbench() {
   const locked = command.locked || loading || stale,
     review = workspace?.review,
     selected = workspace?.selected;
+  useEffect(() => {
+    if (!command.pending || division) return;
+    const original = JSON.parse(command.pending.body),
+      d = original.divisionId,
+      r = original.evidence?.rulesId ?? original.rulesId;
+    if (d && r) {
+      setDivision(d);
+      setRules(r);
+      void load(d, r, undefined, true);
+    }
+  }, [command.pending, division, load]);
   const result: AssessmentResult | null = selected?.resultContents
     ? JSON.parse(selected.resultContents).result
     : null;
@@ -472,6 +488,7 @@ export function EventAssessmentsWorkbench() {
                             {
                               action: "retry",
                               divisionId: division,
+                              rulesId: rules,
                               assessmentId: selected.id,
                               version: selected.version,
                               requestId: crypto.randomUUID(),
