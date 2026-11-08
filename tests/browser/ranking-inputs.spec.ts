@@ -58,7 +58,19 @@ test("staff inspect sources/checkpoints and five regulars versus an alternate, r
   expect(entry.status()).toBe(201);
   const created = await entry.json();
   const pageErrors: string[] = [];
+  const consoleErrors: string[] = [],
+    failedRequests: string[] = [],
+    serverErrors: string[] = [];
   page.on("pageerror", (e) => pageErrors.push(e.message));
+  page.on("console", (m) => {
+    if (m.type() === "error") consoleErrors.push(m.text());
+  });
+  page.on("requestfailed", (r) =>
+    failedRequests.push(`${r.method()} ${new URL(r.url()).pathname}`),
+  );
+  page.on("response", (r) => {
+    if (r.status() >= 500) serverErrors.push(`${r.status()} ${r.url()}`);
+  });
   await page.goto("/admin/ranking-inputs");
   await page
     .getByRole("button", { name: "Rule editions", exact: true })
@@ -401,6 +413,14 @@ test("staff inspect sources/checkpoints and five regulars versus an alternate, r
   expect(oldReview.savedReadiness.complete).toBe(true);
   expect(oldReview.data.rosterVersion).toBe(1);
   expect(pageErrors).toEqual([]);
+  expect(
+    consoleErrors.filter((t) => !/(net::ERR_FAILED|status of 422)/.test(t)),
+  ).toEqual([]);
+  expect(failedRequests).toEqual([
+    "POST /api/v1/ranking-inputs",
+    "GET /api/v1/ranking-inputs",
+  ]);
+  expect(serverErrors).toEqual([]);
 });
 
 test("staff review has honest loading and recoverable read failure; organizers see a denied state", async ({
