@@ -54,7 +54,7 @@ try {
   ];
   for (const [i, name] of names.entries())
     await client.query(
-      "INSERT INTO event_entry VALUES($1,$2,$3) ON CONFLICT DO NOTHING",
+      "INSERT INTO event_entry(id,division_id,display_name) VALUES($1,$2,$3) ON CONFLICT DO NOTHING",
       [`entry-${i + 1}`, "prairie-men", `Team ${name}`],
     );
   await client.query(
