@@ -720,3 +720,122 @@ test("accepted schedule edits and finalization serialize without a partial or mi
   assert.equal(after.source.draws.length, 2);
   assert.notEqual(after.sourceDigest, reviewed.sourceDigest);
 });
+test("a queued command cannot carry old organizer authority into a division's changed edition, even with a matching source digest", async () => {
+  const cookie = await login("organizer"),
+    f = await fixture(cookie),
+    eventId = await finalizationFixtureEvent(pool),
+    target = randomUUID();
+  const before = await (
+    await request(
+      `/api/v1/division-finalizations?division=${f.divisionId}`,
+      cookie,
+    )
+  ).json();
+  await pool.query(
+    "INSERT INTO event_edition(id,series_id,name,venue,location,timezone,starts_on,ends_on,origin,published,admission_status) VALUES($1,'finalization-test','Changed edition destination','Review ice','Fictional location','UTC','2041-01-01','2041-01-02','fictional_demo',true,'approved')",
+    [target],
+  );
+  // The caller deliberately supplies the exact post-move source fingerprint.
+  // A fingerprint is freshness evidence, never substitute authorization.
+  const canonical = (value: unknown): string =>
+    Array.isArray(value)
+      ? "[" + value.map(canonical).join(",") + "]"
+      : value && typeof value === "object"
+        ? "{" +
+          Object.keys(value)
+            .sort()
+            .map(
+              (k) =>
+                JSON.stringify(k) +
+                ":" +
+                canonical((value as Record<string, unknown>)[k]),
+            )
+            .join(",") +
+          "}"
+        : JSON.stringify(value);
+  const futureSource = {
+    ...before.source,
+    division: {
+      ...before.source.division,
+      eventId: target,
+      eventName: "Changed edition destination",
+    },
+  };
+  const digest = createHash("sha256")
+      .update(canonical(futureSource))
+      .digest("hex"),
+    blocker = await pool.connect();
+  let command!: Promise<Response>;
+  try {
+    await blocker.query("BEGIN");
+    await blocker.query("SELECT id FROM event_edition WHERE id=$1 FOR UPDATE", [
+      eventId,
+    ]);
+    const pid = (await blocker.query("SELECT pg_backend_pid() AS pid")).rows[0]
+      .pid;
+    command = request("/api/v1/division-finalizations", cookie, {
+      divisionId: f.divisionId,
+      version: 0,
+      sourceDigest: digest,
+      requestId: randomUUID(),
+      placements: f.entries.map((entryId, i) => ({ entryId, place: i + 1 })),
+      rulesReference: "Reviewed event rules",
+      note: "Old organizer cannot act in new scope",
+    });
+    let queued = false;
+    for (let i = 0; i < 100; i++) {
+      if (
+        (
+          await pool.query(
+            "SELECT pid FROM pg_stat_activity WHERE datname=current_database() AND $1=ANY(pg_blocking_pids(pid))",
+            [pid],
+          )
+        ).rowCount
+      ) {
+        queued = true;
+        break;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
+    assert.equal(
+      queued,
+      true,
+      "Finalization must actually wait at the edition barrier",
+    );
+    await blocker.query("UPDATE division SET event_id=$2 WHERE id=$1", [
+      f.divisionId,
+      target,
+    ]);
+    await blocker.query("COMMIT");
+  } finally {
+    await blocker.query("ROLLBACK");
+    blocker.release();
+  }
+  try {
+    const r = await command;
+    assert.equal(r.status, 409, await r.clone().text());
+    assert.equal(
+      (
+        await request(
+          `/api/v1/division-finalizations?division=${f.divisionId}`,
+          cookie,
+        )
+      ).status,
+      403,
+    );
+    const current = await (
+      await request(
+        `/api/v1/division-finalizations?division=${f.divisionId}`,
+        await login("administrator"),
+      )
+    ).json();
+    assert.equal(current.sourceDigest, digest);
+    assert.equal(current.version, 0);
+    assert.equal(current.selected, null);
+  } finally {
+    await pool.query(
+      "DELETE FROM role_grant WHERE id=$1 AND user_id='demo-scorekeeper'",
+      [f.gameId],
+    );
+  }
+});

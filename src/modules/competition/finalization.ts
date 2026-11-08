@@ -310,6 +310,11 @@ export async function saveFinalization(userId: string, raw: unknown) {
       [input.divisionId],
     );
     const s = await source(c, input.divisionId, true);
+    if (s.division.eventId !== event?.event_id)
+      throw new FinalizationError(
+        "The division changed editions. Reload its current scope before finalizing.",
+        409,
+      );
     const latest = (
       await c.query(historySql + " ORDER BY version DESC LIMIT 1", [
         input.divisionId,
