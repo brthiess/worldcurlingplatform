@@ -1412,7 +1412,35 @@ export function RankingInputsWorkbench() {
                           {i.severity === "blocker"
                             ? "Blocker"
                             : "Informational"}
-                          : {i.message}
+                          :{" "}
+                          {rankingCandidates.find((m) =>
+                            [
+                              "starting",
+                              "ownership",
+                              "eligibility",
+                              "prior-share",
+                            ].some(
+                              (prefix) => i.code === `${prefix}-${m.playerId}`,
+                            ),
+                          )?.name && (
+                            <>
+                              {
+                                rankingCandidates.find((m) =>
+                                  [
+                                    "starting",
+                                    "ownership",
+                                    "eligibility",
+                                    "prior-share",
+                                  ].some(
+                                    (prefix) =>
+                                      i.code === `${prefix}-${m.playerId}`,
+                                  ),
+                                )?.name
+                              }{" "}
+                              ·{" "}
+                            </>
+                          )}
+                          {i.message}
                         </strong>
                         <p>{i.action}</p>
                       </li>
