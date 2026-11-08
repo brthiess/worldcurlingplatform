@@ -1,0 +1,2087 @@
+{
+  "parent": "WCP-SPEC-001",
+  "source_spec_sha256": "045B46988225B6C8C0020B23C8C5D4EAA8E2E1916256148A0FDA26B5DA8673FD",
+  "created": "2026-11-07",
+  "status": "proposed",
+  "skill_source": "https://github.com/mattpocock/skills/blob/main/skills/engineering/to-tickets/SKILL.md",
+  "approval_required_before_publication": true,
+  "tickets": [
+    {
+      "n": 1,
+      "title": "Open a persisted event and sign in with scoped demo roles",
+      "deps": [],
+      "stories": [
+        1,
+        22,
+        23,
+        43,
+        60,
+        89,
+        90,
+        92,
+        94,
+        95
+      ],
+      "checks": [
+        1,
+        6,
+        12,
+        13,
+        14
+      ],
+      "demos": [
+        1,
+        3
+      ],
+      "product": [
+        1
+      ],
+      "deliver": "Run the application locally, read one seeded event and game from PostgreSQL, and sign in as scoped administrator, organizer, scorekeeper, or read-only reviewer.",
+      "behavior": [
+        "Bootstrap only the web/worker runtime, migrations, isolated demo seed and test harness needed by this slice; do not prebuild the entire schema.",
+        "The public scorecard and game detail show stored participants, current/latest draw, honest unknown scores, venue time and result state; reload/restart preserves data.",
+        "Seeded sessions enforce role/resource checks, and no public response exposes credentials, private person fields or internal payloads."
+      ],
+      "unit": "Test current/latest/next draw selection, score-cell states and initial role/scope decisions using explicit expected outputs.",
+      "integration": "Use real PostgreSQL for migrations, seed repeatability, session-scoped reads and denied writes; exercise the minimal worker/job runtime without mocking application persistence.",
+      "frontend": "Establish the shared scores-first visual standard at phone, tablet and desktop widths: aligned/tabular scores, readable hierarchy, keyboard focus, loading/empty/error states and no placeholder controls.",
+      "file": "01-open-a-persisted-event-and-sign-in-with-scoped-demo-roles.md"
+    },
+    {
+      "n": 2,
+      "title": "Save live end scores from a mobile scorekeeper screen",
+      "deps": [
+        1
+      ],
+      "stories": [
+        4,
+        22,
+        43,
+        44,
+        48,
+        49,
+        94,
+        95
+      ],
+      "checks": [
+        1,
+        6,
+        12,
+        14
+      ],
+      "demos": [
+        1,
+        3
+      ],
+      "product": [
+        1
+      ],
+      "deliver": "An assigned scorekeeper starts a four-player game, saves or corrects an end, and sees the accepted change on the live homepage and game view.",
+      "behavior": [
+        "Persist end scores and known hammer with actor/request attribution and an atomic audit record.",
+        "Retries are duplicate-safe; stale or out-of-scope writes cannot overwrite accepted state.",
+        "Show saved, unsent/uncertain and connection states honestly, preserving an unfinished edit through a temporary interruption without claiming full offline synchronization."
+      ],
+      "unit": "Test four-player end validation, blank/unknown/unplayed distinctions, valid totals, version/idempotency decisions and save-state transitions.",
+      "integration": "Submit valid, duplicate, conflicting and forbidden commands against real PostgreSQL; assert accepted scores and audit evidence commit together.",
+      "frontend": "Browser-check thumb-friendly entry, clear game/end identity, labelled errors and visible public refresh without losing the selected draw or expanded card.",
+      "file": "02-save-live-end-scores-from-a-mobile-scorekeeper-screen.md"
+    },
+    {
+      "n": 3,
+      "title": "Confirm results and make ordinary auditable corrections",
+      "deps": [
+        2
+      ],
+      "stories": [
+        6,
+        45,
+        46,
+        47,
+        48,
+        94,
+        95
+      ],
+      "checks": [
+        1,
+        3,
+        6,
+        9,
+        12,
+        14
+      ],
+      "demos": [
+        1,
+        3,
+        7
+      ],
+      "product": [
+        1,
+        3
+      ],
+      "deliver": "The assigned scorekeeper confirms a result, records a lineup difference or ordinary correction without admin approval, and fans see the correct final state and history.",
+      "behavior": [
+        "Support normal/conceded/forfeit outcome distinctions under the implemented four-player profile; retain result versions and participant identities.",
+        "Default game lineup from the referenced event lineup; record differences without mandatory unchanged-lineup confirmation or claims that every declared player delivered stones.",
+        "Permit post-confirmation corrections with audit history and no second approver; preserve played-game evidence and flag downstream-started effects instead of building the deferred repair policy."
+      ],
+      "unit": "Test outcome/confirmation/correction transitions, participant/winner validation and defaulted-versus-declared-difference lineup behavior.",
+      "integration": "Confirm, retry and correct through authenticated APIs; assert original result versions remain recoverable and unrelated actors cannot alter them.",
+      "frontend": "Make confirm/correct actions usable on a phone, distinguish provisional/final/corrected states by text and show useful correction feedback in scorer and public game views.",
+      "file": "03-confirm-results-and-make-ordinary-auditable-corrections.md"
+    },
+    {
+      "n": 4,
+      "title": "Submit and approve next year's event onto the calendar",
+      "deps": [
+        1
+      ],
+      "stories": [
+        5,
+        25,
+        26,
+        27,
+        28,
+        29,
+        57,
+        94,
+        95
+      ],
+      "checks": [
+        2,
+        6,
+        12,
+        14
+      ],
+      "demos": [
+        2,
+        4
+      ],
+      "product": [
+        1
+      ],
+      "deliver": "An organizer submits a dated edition with divisions; a World Curling administrator reviews it and lists the approved event publicly.",
+      "behavior": [
+        "Require organization, name, dates, city/country and proposed divisions while permitting initially incomplete venue/operational details.",
+        "Keep recurring series, dated editions, admission, registration opening and ranking eligibility distinct; creating next year does not overwrite last year.",
+        "Support ordinary organizer edits and administrator corrections with history, without a generalized amendment-reapproval engine."
+      ],
+      "unit": "Test application validation, edition separation, allowed review transitions and independent admission/open/ranking states.",
+      "integration": "Persist submit/review/edit actions and atomic audit records; denied actors and unapproved applications do not leak into admitted calendar reads.",
+      "frontend": "Deliver clear organizer draft/submission and reviewer queue/detail screens plus a usable public event/calendar view, including field errors and empty states.",
+      "file": "04-submit-and-approve-next-year-s-event-onto-the-calendar.md"
+    },
+    {
+      "n": 5,
+      "title": "Delegate event approval and assign scoped event staff",
+      "deps": [
+        4
+      ],
+      "stories": [
+        43,
+        58,
+        59,
+        60,
+        89,
+        94,
+        95
+      ],
+      "checks": [
+        2,
+        6,
+        12,
+        14
+      ],
+      "demos": [
+        2,
+        3
+      ],
+      "product": [
+        2
+      ],
+      "deliver": "World Curling grants scoped approval or event duties, and the correct reviewer or scorekeeper sees only the work assigned to them.",
+      "behavior": [
+        "Apply geography/organizer/discipline/category scopes and named exceptions with one responsible approval authority and reviewer per application.",
+        "Record reassignment and World Curling override reasons; do not create contradictory independent approvals or implicit onward delegation.",
+        "Let authorized organizers assign their event's scoring access without granting global or ranking-publication authority."
+      ],
+      "unit": "Test positive/negative scope matches, authority routing, explicit reassignment/override policy and role separation.",
+      "integration": "Exercise administrative grants and actual guarded commands in PostgreSQL-backed sessions, including cross-event denial and revocation.",
+      "frontend": "Show readable scoped grant/assignment forms and reviewer responsibility, with clear denied/empty views rather than global lists filtered only in the browser.",
+      "file": "05-delegate-event-approval-and-assign-scoped-event-staff.md"
+    },
+    {
+      "n": 6,
+      "title": "Manually enter teams and resolve core-composition identities",
+      "deps": [
+        4
+      ],
+      "stories": [
+        32,
+        33,
+        35,
+        36,
+        56,
+        62,
+        63,
+        94,
+        95
+      ],
+      "checks": [
+        2,
+        3,
+        6,
+        12,
+        14
+      ],
+      "demos": [
+        4
+      ],
+      "product": [
+        1,
+        3
+      ],
+      "deliver": "An organizer selects a team or assembles existing/new players into an entry; known core membership creates or reuses the right team and appears publicly.",
+      "behavior": [
+        "Resolve identity from discipline and unordered core players, reuse returning compositions, and separate season registration from event lineup.",
+        "Five regular rotating players are all core; a designated alternate is not. Alternate/coach/name/position changes and temporary game rotation do not create another team.",
+        "Allow incomplete/provisional entries and new sport records without player accounts; preserve declared/defaulted participation and avoid a separate team approval gate."
+      ],
+      "unit": "Cover order-independent matching, discipline differences, returning cores, five-core versus alternate classification, permanent core changes and temporary substitutes.",
+      "integration": "Exercise automatic creation/reuse and duplicate requests with relational consistency; persist entry/lineup versions without overwriting seasonal rosters.",
+      "frontend": "Provide usable team/player search and selection, add-player flow, clear core/alternate/substitute labels and a truthful public roster/entry summary.",
+      "file": "06-manually-enter-teams-and-resolve-core-composition-identities.md"
+    },
+    {
+      "n": 7,
+      "title": "Correct mistaken player selections and flag identity collisions",
+      "deps": [
+        6
+      ],
+      "stories": [
+        34,
+        64,
+        73,
+        94,
+        95
+      ],
+      "checks": [
+        3,
+        6,
+        10,
+        12,
+        14
+      ],
+      "demos": [
+        4
+      ],
+      "product": [
+        3
+      ],
+      "deliver": "World Curling staff fix an ordinary player/entry identity mistake, while collisions remain visible issues instead of partial merges.",
+      "behavior": [
+        "Suggest distinguishing existing records and permit a provisional person when uncertain; never merge by name alone.",
+        "Record factual corrections separately from genuine core transitions and retain their audit/source evidence.",
+        "Detect multi-record/team/entry/subject collisions, leave conflicting changes unapplied and retain a staff issue; defer cascading merge/consolidation tooling."
+      ],
+      "unit": "Test candidate/ambiguity classification, ordinary correction rules and collision rejection without mutating partial state.",
+      "integration": "Correct a mistaken selection through staff APIs and prove atomicity/history; attempt a collision and verify canonical and published evidence stays intact.",
+      "frontend": "Make affected identity, proposed correction and unresolved issue clear; show successful correction or actionable conflict without a pretend merge-success screen.",
+      "file": "07-correct-mistaken-player-selections-and-flag-identity-collisions.md"
+    },
+    {
+      "n": 8,
+      "title": "Grant team-season representatives self-entry authority",
+      "deps": [
+        6
+      ],
+      "stories": [
+        31,
+        36,
+        52,
+        60,
+        89,
+        94,
+        95
+      ],
+      "checks": [
+        2,
+        3,
+        6,
+        12,
+        14
+      ],
+      "demos": [
+        4
+      ],
+      "product": [
+        2,
+        3
+      ],
+      "deliver": "World Curling grants a representative team-season authority and that person can submit or amend an entry for that team while organizers retain manual entry.",
+      "behavior": [
+        "Support scoped submit/amend/withdraw/payment authority for the represented team-season.",
+        "A player-profile link grants no team powers, and authority does not transfer automatically to a different core-composition identity.",
+        "Use the existing canonical resolution and event-lineup behavior, with clear on-behalf-of actor attribution."
+      ],
+      "unit": "Test team-season/action matching, profile-versus-team authority and denial after a core identity change or grant revocation.",
+      "integration": "Exercise staff grants and permitted/forbidden self-entry commands with real sessions and database audit records.",
+      "frontend": "Expose a representative's permitted teams/entries and staff grant controls; make team/season context and lack of authority explicit.",
+      "file": "08-grant-team-season-representatives-self-entry-authority.md"
+    },
+    {
+      "n": 9,
+      "title": "Open division entries with capacity and expiring holds",
+      "deps": [
+        8
+      ],
+      "stories": [
+        27,
+        29,
+        30,
+        31,
+        83,
+        94,
+        95
+      ],
+      "checks": [
+        2,
+        6,
+        7,
+        12,
+        14
+      ],
+      "demos": [
+        4
+      ],
+      "product": [
+        1,
+        2
+      ],
+      "deliver": "An organizer opens a configured division in open, reviewed or invitation-only mode, and entrants receive the correct acceptance/reservation state.",
+      "behavior": [
+        "Require capacity, entry requirements, fee/payment terms and a documented format selection before opening; zero-fee fixtures can exercise the flow before online checkout exists.",
+        "Keep acceptance, roster readiness, payment and ranking eligibility separate; reviewed acceptance creates a defined payment window.",
+        "Expired holds release capacity, and competing accept/reserve operations cannot exceed capacity; exceptional late payment is only flagged, not automatically settled."
+      ],
+      "unit": "Test mode/state transitions, prerequisite validation, reservation deadlines and capacity counting under a controlled clock.",
+      "integration": "Use concurrent PostgreSQL transactions to prove holds/acceptance cannot overbook, plus expiry/retry and scoped action checks.",
+      "frontend": "Give organizers and entrants clear open/reviewed/invited/held/expired states, remaining-capacity feedback and validation errors without a false paid/eligible badge.",
+      "file": "09-open-division-entries-with-capacity-and-expiring-holds.md"
+    },
+    {
+      "n": 10,
+      "title": "Record entry charges, waivers and external payments",
+      "deps": [
+        9
+      ],
+      "stories": [
+        37,
+        82,
+        84,
+        87,
+        94,
+        95
+      ],
+      "checks": [
+        2,
+        7,
+        12,
+        14
+      ],
+      "demos": [
+        4
+      ],
+      "product": [
+        1
+      ],
+      "deliver": "Staff and entrants see an accurate amount due with explicit discounts, waivers or externally received payments, independent of online provider processing.",
+      "behavior": [
+        "Freeze charge currency and fee terms for an entry; later event fee edits do not rewrite prior charge history.",
+        "Apply normal fees to manual/invited entries unless an authorized reasoned adjustment exists.",
+        "Keep external receipts distinguishable from provider transactions and show payment status separately from withdrawal/readiness."
+      ],
+      "unit": "Test minor-unit currency arithmetic, allowable adjustments, balance reconciliation and immutable charge-term behavior.",
+      "integration": "Create and adjust charges through guarded commands, retaining an audit trail and rejecting unauthorized/invalid balance changes.",
+      "frontend": "Render an understandable entry charge/history view with labelled fee exceptions and external references, avoiding a misleading online-payment success state.",
+      "file": "10-record-entry-charges-waivers-and-external-payments.md"
+    },
+    {
+      "n": 11,
+      "title": "Withdraw entries and invite replacements from the waitlist",
+      "deps": [
+        10
+      ],
+      "stories": [
+        38,
+        83,
+        87,
+        94,
+        95
+      ],
+      "checks": [
+        2,
+        7,
+        12,
+        14
+      ],
+      "demos": [
+        4
+      ],
+      "product": [
+        2
+      ],
+      "deliver": "Authorized staff or representatives withdraw an entry, release its place appropriately and explicitly invite a waitlisted replacement.",
+      "behavior": [
+        "Maintain waitlist order/request state and record staff-selected invitations; do not automatically promote the next team.",
+        "Enforce representative/team-season or organizer scope and consistent reservation release.",
+        "Keep withdrawal and refund decisions distinct; preserve charge/payment history and avoid an automatic refund promise."
+      ],
+      "unit": "Test withdrawal/invitation transitions, capacity release, deadline handling and separation from payment/refund state.",
+      "integration": "Exercise repeated withdrawals/invitations and competing capacity claims against PostgreSQL without duplicate active entries or overbooking.",
+      "frontend": "Give staff a usable waitlist/invitation action and entrants an accurate withdrawn/invited/held state with explicit payment/refund context.",
+      "file": "11-withdraw-entries-and-invite-replacements-from-the-waitlist.md"
+    },
+    {
+      "n": 12,
+      "title": "Create accounts, approve player claims and edit profiles",
+      "deps": [
+        1
+      ],
+      "stories": [
+        11,
+        51,
+        52,
+        53,
+        56,
+        65,
+        89,
+        94,
+        95
+      ],
+      "checks": [
+        5,
+        6,
+        12,
+        14
+      ],
+      "demos": [
+        5
+      ],
+      "product": [
+        2
+      ],
+      "deliver": "A visitor registers, requests control of an existing player, receives World Curling approval and edits biography/handedness through the working site.",
+      "behavior": [
+        "Provide configured account verification/recovery integration and safe local email fixtures; account creation alone links no player or team authority.",
+        "Let administrators approve/reject a claim and retain the decision; sport records remain independent of login accounts.",
+        "Limit player-controlled text fields to short biography and handedness and preserve other role boundaries."
+      ],
+      "unit": "Test claim/link transitions, permitted field changes, validated profile input and denial before approval or for another player.",
+      "integration": "Use real application sessions and PostgreSQL to prove ownership/link uniqueness and public projection boundaries; verify email/recovery adapters without exposing tokens.",
+      "frontend": "Deliver complete register/sign-in/claim/status/profile forms and public profile reads with concise errors, keyboard access and no invented biography.",
+      "file": "12-create-accounts-approve-player-claims-and-edit-profiles.md"
+    },
+    {
+      "n": 13,
+      "title": "Review private photo submissions and publish approved images",
+      "deps": [
+        12
+      ],
+      "stories": [
+        11,
+        54,
+        55,
+        66,
+        94,
+        95
+      ],
+      "checks": [
+        5,
+        6,
+        12,
+        14
+      ],
+      "demos": [
+        5
+      ],
+      "product": [],
+      "deliver": "A linked player uploads a replacement, sees review status, and an administrator publishes only the exact reviewed image.",
+      "behavior": [
+        "Keep pending/rejected media private and leave the previous approved image visible until approval.",
+        "Validate and process uploads into durable storage; bind approval to immutable reviewed content rather than a replaceable upload key.",
+        "Retain approval/rejection actor, time and reason; do not expose upload credentials or private originals through public APIs."
+      ],
+      "unit": "Test media type/size/input validation, request transitions, asset binding and public/private projection policy.",
+      "integration": "Exercise upload, rejection and approval with controlled storage adapters and real PostgreSQL; prove a pending asset is inaccessible through public paths and cannot be swapped after review.",
+      "frontend": "Provide usable upload/progress/preview/status controls and reviewer comparison, with clear rejection feedback and correct public image replacement at mobile and desktop sizes.",
+      "file": "13-review-private-photo-submissions-and-publish-approved-images.md"
+    },
+    {
+      "n": 14,
+      "title": "Stage a representative read-only Curling Crawler import",
+      "deps": [
+        3,
+        7
+      ],
+      "stories": [
+        71,
+        73,
+        74,
+        76,
+        92,
+        94,
+        95
+      ],
+      "checks": [
+        3,
+        10,
+        12,
+        14
+      ],
+      "demos": [
+        6
+      ],
+      "product": [
+        1,
+        3
+      ],
+      "deliver": "An administrator runs and inspects a staged import from a consistent export of the confirmed Curling Crawler project without changing its archive.",
+      "behavior": [
+        "Translate source claims/records with fully parent-scoped keys, parser/export version and retained provenance; stream rather than inventing a live crawler dependency.",
+        "Preview final-score-only and complete-line-score games, incomplete rosters, known/unknown hammer and uncertain player/core identities.",
+        "Persist a frozen reviewable batch/digest and quality issues; staging alone does not publish or fabricate human certification."
+      ],
+      "unit": "Use representative source fixtures to test scoped key normalization, translation, completeness/missingness and rejected malformed inputs.",
+      "integration": "Read a representative real source export, persist/retry a staging job and query its preview/issues through admin APIs; verify source data is unchanged.",
+      "frontend": "Show useful import progress/failure state, exact batch identity, previewed records and issue counts without presenting observation counts as unique games.",
+      "file": "14-stage-a-representative-read-only-curling-crawler-import.md"
+    },
+    {
+      "n": 15,
+      "title": "Approve historical batches and rerun imports safely",
+      "deps": [
+        14
+      ],
+      "stories": [
+        5,
+        71,
+        72,
+        73,
+        74,
+        94,
+        95
+      ],
+      "checks": [
+        3,
+        6,
+        10,
+        12,
+        14
+      ],
+      "demos": [
+        6
+      ],
+      "product": [
+        1,
+        3
+      ],
+      "deliver": "An administrator approves a reviewed batch and its historical events/results become publicly browseable with truthful origin and completeness.",
+      "behavior": [
+        "Tie approval to the exact staged batch contents and map source identifiers to canonical events, entries, people/teams and games only where justified.",
+        "Rerunning an unchanged approved batch adds no duplicates; unknown core membership stays unresolved rather than creating invented team identities.",
+        "A reimport conflict with curated staff data retains evidence/issues and cannot overwrite the correction; defer complex field-level reconciliation."
+      ],
+      "unit": "Test mapping/idempotency decisions, reviewed-digest checks and curated-conflict classification.",
+      "integration": "Approve/retry/rerun against PostgreSQL and compare canonical identities/counts/history; verify unchanged import effects and no partial curated overwrite.",
+      "frontend": "Show an explicit batch approve action and its result, public imported-source/completeness labels and inspectable unresolved issues with working event/game links.",
+      "file": "15-approve-historical-batches-and-rerun-imports-safely.md"
+    },
+    {
+      "n": 16,
+      "title": "Browse historical imported ranking editions",
+      "deps": [
+        15
+      ],
+      "stories": [
+        15,
+        17,
+        20,
+        69,
+        75,
+        94,
+        95
+      ],
+      "checks": [
+        9,
+        10,
+        11,
+        12,
+        14
+      ],
+      "demos": [
+        6
+      ],
+      "product": [
+        1,
+        4
+      ],
+      "deliver": "Readers and administrators select dated historical ranking observations without pretending they were recalculated by this platform.",
+      "behavior": [
+        "Retain original labels/ranks/points, source/publication dates and optional subject mappings; unresolved historical rows remain viewable with honest status.",
+        "Keep imported observations distinct from calculated WCTRS run/approval records and preserve published-as-seen values.",
+        "Provide season/list/date selection and inspectable provenance, preserving meaningful point precision."
+      ],
+      "unit": "Test edition selection, nullable subject mapping, origin/date presentation and meaningful decimal formatting.",
+      "integration": "Load representative imported editions via approved batches, select them through public/admin reads and prove later mapping changes do not rewrite frozen observed values.",
+      "frontend": "Build a readable dated ranking table/history selector with working resolved subject links and honest unresolved rows, plus accessible phone layouts.",
+      "file": "16-browse-historical-imported-ranking-editions.md"
+    },
+    {
+      "n": 17,
+      "title": "Connect event, game, team and player discovery with favorites",
+      "deps": [
+        3,
+        6,
+        12
+      ],
+      "stories": [
+        3,
+        4,
+        5,
+        6,
+        7,
+        10,
+        11,
+        12,
+        13,
+        22,
+        23,
+        24,
+        94,
+        95
+      ],
+      "checks": [
+        1,
+        3,
+        5,
+        11,
+        12,
+        14
+      ],
+      "demos": [
+        1,
+        4,
+        5
+      ],
+      "product": [
+        1,
+        3
+      ],
+      "deliver": "Fans search the event archive and move between actual event/game/team/player pages while preserving useful context and browser favorites.",
+      "behavior": [
+        "Complete the public pages around existing persisted data, with calendar/status/discipline filters and stable identity-based links.",
+        "Expose current results, next known game, core/alternate season context and known player information without lineage or fabricated participation.",
+        "Save favorites locally without account synchronization; preserve filters/draw selection/back navigation during refresh."
+      ],
+      "unit": "Test search/filter/read-projection rules, stable context links, favorites serialization and current-versus-archived identity presentation.",
+      "integration": "Query representative seeded and available imported records through public APIs, verifying privacy and correct identity/date/division scopes.",
+      "frontend": "Browser-check homepage -> event -> game -> team/player navigation, search, empty/error states and favorites at phone/tablet/desktop widths with no dead controls or filler sections.",
+      "file": "17-connect-event-game-team-and-player-discovery-with-favorites.md"
+    },
+    {
+      "n": 18,
+      "title": "Schedule draw sessions and show known conflicts",
+      "deps": [
+        3,
+        6
+      ],
+      "stories": [
+        3,
+        23,
+        40,
+        43,
+        94,
+        95
+      ],
+      "checks": [
+        1,
+        2,
+        4,
+        6,
+        12,
+        14
+      ],
+      "demos": [
+        1,
+        3,
+        4
+      ],
+      "product": [
+        1
+      ],
+      "deliver": "An organizer assigns existing games to draw sessions/sheets, sees known clashes, and fans can browse the resulting schedule and draws.",
+      "behavior": [
+        "Persist session/sheet/time revisions using explicit venue time zones and show current/latest/next draw consistently.",
+        "Detect overlapping sheets, entries and known player assignments across divisions; do not introduce a schedule optimizer.",
+        "Keep playing/status evidence distinct from a scheduled start having passed."
+      ],
+      "unit": "Test overlap/availability decisions, session ordering, current/latest/next selection and timezone-aware schedule boundaries.",
+      "integration": "Save/revise schedules through scoped commands; verify PostgreSQL relationships/history and public schedule projections agree.",
+      "frontend": "Provide a usable organizer scheduling form/grid and public previous/next draw controls with explicit time labels, unclipped phone actions and clear conflict feedback.",
+      "file": "18-schedule-draw-sessions-and-show-known-conflicts.md"
+    },
+    {
+      "n": 19,
+      "title": "Preview and run a single-knockout draw through public views",
+      "deps": [
+        18
+      ],
+      "stories": [
+        7,
+        8,
+        9,
+        10,
+        39,
+        40,
+        41,
+        46,
+        94,
+        95
+      ],
+      "checks": [
+        1,
+        4,
+        6,
+        12,
+        14
+      ],
+      "demos": [
+        1,
+        3
+      ],
+      "product": [
+        1
+      ],
+      "deliver": "An organizer configures one documented single-knockout template, previews/publishes its persisted draw and sees confirmed results resolve future slots.",
+      "behavior": [
+        "Introduce the shared relational graph/template-version contract with stable games, participants, explicit advancement and published revision history.",
+        "Use one bounded documented configuration, seeded entries and supported bye behavior; no unrestricted graph designer.",
+        "Expose usable bracket and game-list views; actual result/participant history cannot be rewritten by a later slot revision."
+      ],
+      "unit": "Compare generated fixtures and advancement to an independently specified expected graph; check bye, slot/participant and progression invariants.",
+      "integration": "Publish and advance via real score confirmation APIs, verifying stored graph/slot state and auditable revision behavior in PostgreSQL.",
+      "frontend": "Deliver responsive preview/publish, linked bracket/list navigation and selected-team highlighting with unresolved-slot labels and keyboard-accessible game links.",
+      "file": "19-preview-and-run-a-single-knockout-draw-through-public-views.md"
+    },
+    {
+      "n": 20,
+      "title": "Run the main 16-team triple-knockout demonstration",
+      "deps": [
+        19
+      ],
+      "stories": [
+        1,
+        2,
+        7,
+        8,
+        9,
+        10,
+        39,
+        41,
+        46,
+        91,
+        93,
+        94,
+        95
+      ],
+      "checks": [
+        1,
+        4,
+        12,
+        13,
+        14
+      ],
+      "demos": [
+        1,
+        3
+      ],
+      "product": [
+        1
+      ],
+      "deliver": "The main four-player demo operates a real 16-team triple-knockout draw with visible A/B/C routes, explicit qualifiers and next-game assignments.",
+      "behavior": [
+        "Document one exact 16-team template, including its qualifier count/destinations, byes if any, and full A/B/C winner/loser routing before implementing it.",
+        "Use the stored graph, not loss count alone, and demonstrate representative A, B and C paths plus qualification/elimination.",
+        "Keep the current/next homepage draw, game links and bracket/list views consistent with confirmed results; defer played-downstream conflict repair."
+      ],
+      "unit": "Use an independently reviewed expected routing fixture; cover each routing/qualification branch and whole-graph completeness without mirroring generator code.",
+      "integration": "Drive representative and full bounded completion sequences through scoring APIs and assert final placements/qualifiers and next slots match the expected graph.",
+      "frontend": "Verify a fan can follow one selected team on a phone and desktop through A/B/C and its next known game, with legible connectors and a readable list alternative.",
+      "file": "20-run-the-main-16-team-triple-knockout-demonstration.md"
+    },
+    {
+      "n": 21,
+      "title": "Run one documented double-knockout configuration",
+      "deps": [
+        19
+      ],
+      "stories": [
+        8,
+        9,
+        39,
+        41,
+        46,
+        93,
+        94,
+        95
+      ],
+      "checks": [
+        1,
+        4,
+        12,
+        14
+      ],
+      "demos": [
+        1
+      ],
+      "product": [
+        1
+      ],
+      "deliver": "An organizer selects and publishes one bounded double-knockout profile and fans follow its stored advancement paths.",
+      "behavior": [
+        "Document the selected field size, routes, byes and qualification/final behavior; do not claim all variants are supported.",
+        "Reuse common scoring, schedule and published-graph interfaces without changing the main triple-knockout configuration.",
+        "Show honest planned/implemented/verified coverage for this named profile."
+      ],
+      "unit": "Verify graph and winner/loser outcomes against independent fixtures, including elimination and any documented bye/final branch.",
+      "integration": "Complete a representative profile using real persistence and score-confirmation APIs and assert resolved slots/history.",
+      "frontend": "Make profile selection/preview and public bracket/list navigation as usable as the first template, with no generic template placeholder pages.",
+      "file": "21-run-one-documented-double-knockout-configuration.md"
+    },
+    {
+      "n": 22,
+      "title": "Run pooled round robin with basic public standings",
+      "deps": [
+        19
+      ],
+      "stories": [
+        5,
+        10,
+        39,
+        41,
+        46,
+        93,
+        94,
+        95
+      ],
+      "checks": [
+        1,
+        4,
+        12,
+        14
+      ],
+      "demos": [
+        1,
+        4
+      ],
+      "product": [
+        1
+      ],
+      "deliver": "An organizer publishes one documented round-robin/pool configuration and fans see its games and basic standings.",
+      "behavior": [
+        "Generate a bounded documented pool configuration and persist its games/groups; expose wins/losses/ties as supported by results.",
+        "Keep unresolved standings ties explicit and leave playoff qualifier/seed selection manual.",
+        "Document the single-group/pool behavior exercised and avoid claiming every group/stage combination."
+      ],
+      "unit": "Check fixture uniqueness/completeness and standings from independently listed game outcomes, including unknown/unfinished and tied cases.",
+      "integration": "Confirm games and read updated pool/standings APIs with correct division/group boundaries and no duplicate game counting.",
+      "frontend": "Provide readable pool tabs/standings/schedule links on phones, clear tie/pending labels and live refresh that preserves selected group.",
+      "file": "22-run-pooled-round-robin-with-basic-public-standings.md"
+    },
+    {
+      "n": 23,
+      "title": "Run a documented Page-playoff draw",
+      "deps": [
+        19
+      ],
+      "stories": [
+        8,
+        9,
+        10,
+        39,
+        41,
+        46,
+        93,
+        94,
+        95
+      ],
+      "checks": [
+        1,
+        4,
+        12,
+        14
+      ],
+      "demos": [
+        1,
+        4
+      ],
+      "product": [
+        1
+      ],
+      "deliver": "An organizer supplies the manual seeds for one documented Page-playoff profile and its stored routes produce the expected final.",
+      "behavior": [
+        "Persist explicit seeded games and advancement for the selected Page profile, with the same confirmation/history contract as other formats.",
+        "Keep source qualification a manual input instead of adding the excluded tiebreak engine.",
+        "Display named stages and unresolved opponents accurately."
+      ],
+      "unit": "Compare all seed/winner/loser branches and final placement implications to a hand-specified expected fixture.",
+      "integration": "Publish, score and complete the profile via the application and verify graph/slot/result consistency.",
+      "frontend": "Make seed selection and public bracket/list views understandable and keyboard/touch accessible with correct event/game links.",
+      "file": "23-run-a-documented-page-playoff-draw.md"
+    },
+    {
+      "n": 24,
+      "title": "Generate and score bounded Swiss/Schenkel pairings",
+      "deps": [
+        19
+      ],
+      "stories": [
+        3,
+        10,
+        39,
+        40,
+        41,
+        46,
+        93,
+        94,
+        95
+      ],
+      "checks": [
+        1,
+        4,
+        12,
+        14
+      ],
+      "demos": [
+        1,
+        4
+      ],
+      "product": [
+        1
+      ],
+      "deliver": "An organizer runs one documented Swiss/Schenkel configuration, reviews each pairing round and scores the published games.",
+      "behavior": [
+        "Specify field size, rounds and deterministic pairing/ordering rules for the supported profile; record seeds/tie inputs explicitly.",
+        "Persist pairings and inputs before publishing the next round; preserve organizer changes and prior rounds.",
+        "Do not add automated playoff-qualification tiebreaks or claim every Swiss/Schenkel variation."
+      ],
+      "unit": "Verify initial/next-round pairings, deterministic equal-record ordering and documented rematch/bye constraints against independent fixtures.",
+      "integration": "Generate successive rounds from confirmed results using real PostgreSQL and assert no duplicate/incorrect assignments or hidden overwrite of prior games.",
+      "frontend": "Provide a usable review/publish-next-round flow and public round/standing navigation, with pending-result and validation states.",
+      "file": "24-generate-and-score-bounded-swiss-schenkel-pairings.md"
+    },
+    {
+      "n": 25,
+      "title": "Select qualifiers and run a pooled-to-Page stage combination",
+      "deps": [
+        22,
+        23
+      ],
+      "stories": [
+        8,
+        9,
+        10,
+        39,
+        41,
+        42,
+        94,
+        95
+      ],
+      "checks": [
+        1,
+        4,
+        6,
+        9,
+        12,
+        14
+      ],
+      "demos": [
+        1,
+        4,
+        7
+      ],
+      "product": [
+        1
+      ],
+      "deliver": "An organizer manually resolves qualifiers/seeds from the supported pools into Page playoffs and makes ordinary auditable bracket edits.",
+      "behavior": [
+        "Document one supported stage combination and explicitly record qualifier/seed decisions; tied qualification does not require automated policy.",
+        "Allow authorized organizer slot/path corrections without an administrator dispute case; retain draw and participant/result history.",
+        "If a correction affects already-started downstream games, preserve played records and flag the assignments for attention; defer comprehensive continuation/repair automation."
+      ],
+      "unit": "Test compatible stage/qualifier mapping, allowed ordinary edits, invalid slot/entry rejection and started-game safeguard classification.",
+      "integration": "Run pool results -> manual qualification -> playoffs and an ordinary correction through guarded commands, verifying preserved evidence and current public graph.",
+      "frontend": "Make qualifier/seed selection and organizer edits clear, show updated fan brackets consistently, and expose affected-assignment warnings without a false automatic-repair claim.",
+      "file": "25-select-qualifiers-and-run-a-pooled-to-page-stage-combination.md"
+    },
+    {
+      "n": 26,
+      "title": "Score mixed doubles and record required measurements",
+      "deps": [
+        3,
+        6
+      ],
+      "stories": [
+        22,
+        39,
+        44,
+        45,
+        46,
+        47,
+        61,
+        93,
+        94,
+        95
+      ],
+      "checks": [
+        1,
+        3,
+        4,
+        6,
+        12,
+        14
+      ],
+      "demos": [
+        3,
+        4
+      ],
+      "product": [
+        1,
+        3
+      ],
+      "deliver": "A mixed-doubles division can be entered and scored through the same working UI with its applicable scoring, participation and measurement profile.",
+      "behavior": [
+        "Implement the documented men's/women's four-player and mixed-doubles profiles; do not add wheelchair/age-specific variants deferred by P-01.",
+        "Preserve discipline-appropriate hammer/end/outcome and LSD/DSC measurements where required, with unknown versus measured distinctions.",
+        "Keep core identity, registered roster and actual game participation separate, including temporary substitutions/recorded differences."
+      ],
+      "unit": "Use sourced profile fixtures to test valid/invalid discipline-specific scores, outcomes, measurement units and lineup restrictions without imposing one universal four-player rule.",
+      "integration": "Enter, score, confirm and ordinarily correct representative mixed-doubles games and required measurements against real PostgreSQL.",
+      "frontend": "Verify a clear mixed-doubles entry/scoring screen and public line score, with applicable labels/measurement fields and no irrelevant four-player-only controls.",
+      "file": "26-score-mixed-doubles-and-record-required-measurements.md"
+    },
+    {
+      "n": 27,
+      "title": "Finalize division results and preserve revised snapshots",
+      "deps": [
+        3,
+        6
+      ],
+      "stories": [
+        27,
+        41,
+        42,
+        47,
+        67,
+        70,
+        94,
+        95
+      ],
+      "checks": [
+        1,
+        3,
+        6,
+        9,
+        12,
+        14
+      ],
+      "demos": [
+        7
+      ],
+      "product": [
+        4
+      ],
+      "deliver": "An organizer finalizes a completed division, later accepts an ordinary correction and finalizes its revision without losing the original snapshot.",
+      "behavior": [
+        "Record required outcomes, final placements, referenced entries/lineups/rules and exact frozen contents for each division independently.",
+        "Do not treat sporting finalization as ranking approval or an eligibility waiver; expose ranking-specific issues separately.",
+        "Allow the scorekeeper's correction without an admin gate, flag changed results and create a replacement finalization; defer transitive historical reassessment."
+      ],
+      "unit": "Test finalization prerequisites, placement validation, revision/dirty-state transitions and snapshot-content stability.",
+      "integration": "Finalize two divisions independently, correct and refinalize one, and prove old contents/digests remain unchanged with atomic audit evidence.",
+      "frontend": "Deliver an understandable final-results review/finalize screen and changed-since-finalization notice with working revision/history access.",
+      "file": "27-finalize-division-results-and-preserve-revised-snapshots.md"
+    },
+    {
+      "n": 28,
+      "title": "Collect an entry fee with sandbox Checkout and verified events",
+      "deps": [
+        10
+      ],
+      "stories": [
+        30,
+        37,
+        82,
+        83,
+        84,
+        86,
+        87,
+        94,
+        95
+      ],
+      "checks": [
+        2,
+        6,
+        7,
+        12,
+        14
+      ],
+      "demos": [
+        4
+      ],
+      "product": [
+        2
+      ],
+      "deliver": "An authorized entrant pays a held entry through central sandbox Checkout and the application confirms the correct charge/place from verified provider state.",
+      "behavior": [
+        "Use the existing charge/reservation model and scoped representative/organizer actions; a success redirect alone does not mark an entry paid.",
+        "Verify provider events, deduplicate deliveries and outbound requests, and retain request/provider/payment status and audit attribution.",
+        "Never overbook after released capacity; retain a late/exceptional outcome as a visible staff issue without implementing automated settlement policy."
+      ],
+      "unit": "Test checkout/payment state classification, reservation/balance decisions, invalid/duplicate event handling and minor-unit amounts.",
+      "integration": "Exercise signed provider fixtures, reordered/duplicate delivery and PostgreSQL capacity races, plus a real sandbox checkout when credentials are configured.",
+      "frontend": "Show clear pay/return/pending/paid/failed/expired states and charge context on phone and desktop; uncertain outcomes never display a fabricated successful payment.",
+      "file": "28-collect-an-entry-fee-with-sandbox-checkout-and-verified-events.md"
+    },
+    {
+      "n": 29,
+      "title": "Issue and track full or partial sandbox refunds",
+      "deps": [
+        28
+      ],
+      "stories": [
+        37,
+        38,
+        84,
+        85,
+        86,
+        87,
+        94,
+        95
+      ],
+      "checks": [
+        6,
+        7,
+        12,
+        14
+      ],
+      "demos": [
+        4
+      ],
+      "product": [],
+      "deliver": "Authorized staff request a full or partial sandbox refund and entrants/staff see its truthful transaction status and remaining balance.",
+      "behavior": [
+        "Record refund actor/reason, idempotent provider request, pending/succeeded/failed status and amount/currency separately from withdrawal.",
+        "Reserve the refundable balance including pending requests so retries or overlapping requests cannot over-refund.",
+        "Demonstrate ordinary sequential refunds and flag uncertain outcomes; defer elaborate concurrent-operator reconciliation UI and automatic refund policy."
+      ],
+      "unit": "Test refundable/pending balance arithmetic, valid partial amounts, repeated request handling and refund/withdrawal independence.",
+      "integration": "Use PostgreSQL transactions and controlled provider responses to prove duplicate/overlapping requests cannot exceed the balance; perform normal full/partial sandbox checks.",
+      "frontend": "Provide a clear staff amount/reason/confirmation form and readable refund history/status without promising success before provider confirmation.",
+      "file": "29-issue-and-track-full-or-partial-sandbox-refunds.md"
+    },
+    {
+      "n": 30,
+      "title": "Provision a scoped scoring feed and switch active sources",
+      "deps": [
+        3
+      ],
+      "stories": [
+        48,
+        50,
+        60,
+        77,
+        79,
+        81,
+        94,
+        95
+      ],
+      "checks": [
+        1,
+        6,
+        9,
+        12,
+        14
+      ],
+      "demos": [
+        3
+      ],
+      "product": [],
+      "deliver": "World Curling provisions a feed that scores/confirms/corrects its designated game, and authorized staff switch between that feed and manual scoring.",
+      "behavior": [
+        "Issue/rotate/revoke event/action-scoped credentials with nonrecoverable secret verification and recorded client/request attribution.",
+        "Use the same score validation/version/idempotency rules as humans; only one active source controls a game.",
+        "Check current authority/source at the application point; reject stale-source work after a switch/revocation. Demonstrate sequential switching, not queue-draining/recovery automation."
+      ],
+      "unit": "Test scope/action matching, credential/source decisions, duplicate/stale update classification and revoked-source rejection.",
+      "integration": "Drive permitted/forbidden feed commands and human takeover against real PostgreSQL, including current authority checks and retained audit history.",
+      "frontend": "Deliver usable client/scope/source administration and visible game source/takeover feedback; secrets appear only at issuance and never in public views.",
+      "file": "30-provision-a-scoped-scoring-feed-and-switch-active-sources.md"
+    },
+    {
+      "n": 31,
+      "title": "Submit event, entry and finalization commands through partner APIs",
+      "deps": [
+        27,
+        30
+      ],
+      "stories": [
+        27,
+        31,
+        32,
+        42,
+        77,
+        78,
+        79,
+        80,
+        81,
+        92,
+        95
+      ],
+      "checks": [
+        2,
+        6,
+        9,
+        12,
+        14
+      ],
+      "demos": [
+        2,
+        3,
+        4,
+        7
+      ],
+      "product": [
+        2,
+        4
+      ],
+      "deliver": "An explicitly authorized partner can submit permitted event/entry data and finalize assigned divisions through the same domain behavior used by the UI.",
+      "behavior": [
+        "Expose bounded command contracts and action/scope grants for event information, entries and organizer-level finalization.",
+        "Scoring access alone grants neither finalization nor event approval/ranking publication; preserve on-behalf-of client attribution and safe retries.",
+        "Return clear accepted/current/conflict/denied outcomes and documented API usage; do not invent another data-authority model."
+      ],
+      "unit": "Test command/scope policy and input/response validation for allowed and denied partner actions.",
+      "integration": "Compare equivalent human and partner command outcomes, audit attribution and duplicate behavior in PostgreSQL; deny unrelated scopes and publication attempts.",
+      "frontend": "The existing admin/public views reflect partner changes accurately and expose client provenance where appropriate; no separate unimplemented integration dashboard is required.",
+      "file": "31-submit-event-entry-and-finalization-commands-through-partner-apis.md"
+    },
+    {
+      "n": 32,
+      "title": "Review official rosters, WCTRS sources and starting entitlements",
+      "deps": [
+        6
+      ],
+      "stories": [
+        61,
+        62,
+        63,
+        64,
+        67,
+        69,
+        76,
+        93,
+        94,
+        95
+      ],
+      "checks": [
+        3,
+        6,
+        8,
+        9,
+        12,
+        14
+      ],
+      "demos": [
+        6,
+        7
+      ],
+      "product": [
+        1,
+        3,
+        4
+      ],
+      "deliver": "World Curling staff inspect and maintain versioned seasonal registration, allocation and sourced starting-input records with visible ranking-readiness issues.",
+      "behavior": [
+        "Separate platform core identity, registered ranking roster and point ownership, including five regular core members versus a designated alternate.",
+        "Record official rule/source editions, effective checkpoints and reviewed starting entitlements; missing required evidence remains unresolved instead of normalized away.",
+        "Document supported interpretations and independently worked input fixtures for the known counting-event/rounding ambiguities before verified calculations; an aggregate old total alone does not establish all future ownership inputs."
+      ],
+      "unit": "Test roster/allocation membership and exact-share validation, effective interval/source requirements and blocker-versus-informational issue classification.",
+      "integration": "Save/revise sourced records with staff authorization and PostgreSQL history, and prove unreviewed/incomplete inputs cannot be represented as complete approved evidence.",
+      "frontend": "Provide a focused team-season/rules/input review with inspectable sources, version/effective dates and actionable issues, without a manual editable ranking-total shortcut.",
+      "file": "32-review-official-rosters-wctrs-sources-and-starting-entitlements.md"
+    },
+    {
+      "n": 33,
+      "title": "Calculate four-player event assessments and point awards",
+      "deps": [
+        27,
+        32
+      ],
+      "stories": [
+        16,
+        61,
+        67,
+        69,
+        70,
+        76,
+        93,
+        94,
+        95
+      ],
+      "checks": [
+        8,
+        9,
+        12,
+        14
+      ],
+      "demos": [
+        6,
+        7
+      ],
+      "product": [
+        1,
+        4
+      ],
+      "deliver": "An administrator calculates and reviews a four-player event's field strength and awards from a frozen result snapshot and sourced historical inputs.",
+      "behavior": [
+        "Use the applicable 2026-27 rules, exact cutoff/pre-event ranking and event-edition inputs with eligible/excluded entries and explained factors.",
+        "Persist a replayable assessment/award revision and durable calculation job state; incomplete required inputs block a verified result instead of producing invented points.",
+        "Preserve source/rule/engine/input references and explicit adjustments; do not publish a world ranking list in this slice."
+      ],
+      "unit": "Use independent sourced fixtures for field-strength/factors, award placement, eligibility/exclusion and stage-specific rounding, including missing/invalid inputs.",
+      "integration": "Queue/retry calculations using real PostgreSQL, inspect completed/failed/blocked jobs and prove immutable input/result associations and duplicate safety.",
+      "frontend": "Show an administrator useful assessment/award breakdown, inputs, exclusions and job/issues state rather than a bare unexplained points number.",
+      "file": "33-calculate-four-player-event-assessments-and-point-awards.md"
+    },
+    {
+      "n": 34,
+      "title": "Calculate four-player overall WCTRS draft lists",
+      "deps": [
+        33
+      ],
+      "stories": [
+        15,
+        16,
+        17,
+        61,
+        62,
+        63,
+        67,
+        69,
+        70,
+        76,
+        93,
+        94,
+        95
+      ],
+      "checks": [
+        3,
+        8,
+        9,
+        11,
+        12,
+        14
+      ],
+      "demos": [
+        6,
+        7
+      ],
+      "product": [
+        1,
+        3,
+        4
+      ],
+      "deliver": "World Curling reviews complete men's/women's overall draft rankings with counted/excluded awards, ownership and dated carryover explanations.",
+      "behavior": [
+        "Apply supported 2026-27 effective checkpoints, counting limits, weights, tie ordering, entitlements and ordinary adjustments without relying on lineage.",
+        "Keep core-identity reuse separate from restored point rights and retain frozen run manifests/contribution values.",
+        "Show unresolved required inputs/eligibility as calculation blockers; keep nonmaterial biography/unneeded-end-score warnings distinguishable."
+      ],
+      "unit": "Work independent expected totals/orderings for normal and meaningful boundary cases, roster/ownership changes, carryover dates, caps/exclusions, exact arithmetic and required ranking ties.",
+      "integration": "Calculate/retry/replay complete fixtures and reject incomplete ones through admin APIs using persisted awards/inputs; prove no duplicate or mutable contribution shortcuts.",
+      "frontend": "Deliver a readable draft table and subject contribution drill-down with dates, meaningful precision, explanations and clear blocked/ready states.",
+      "file": "34-calculate-four-player-overall-wctrs-draft-lists.md"
+    },
+    {
+      "n": 35,
+      "title": "Calculate Champion, Elite and Challenger series drafts",
+      "deps": [
+        34
+      ],
+      "stories": [
+        15,
+        16,
+        17,
+        20,
+        67,
+        69,
+        76,
+        93,
+        94,
+        95
+      ],
+      "checks": [
+        8,
+        9,
+        11,
+        12,
+        14
+      ],
+      "demos": [
+        6
+      ],
+      "product": [
+        1,
+        4
+      ],
+      "deliver": "Administrators select and inspect the applicable men's/women's 2026-27 series drafts separately from overall rankings.",
+      "behavior": [
+        "Implement the supported series-specific event classifications, schedules and counting/weight rules from sourced versions.",
+        "Reuse the recorded run/contribution/readiness contract while keeping different lists distinct and versioned.",
+        "Expose list/series selection and correct exclusions; do not invent series outside the accepted WCTRS scope."
+      ],
+      "unit": "Use independently worked fixtures for each series' distinct checkpoints, classification, counted awards and ordering, not a copy of overall expected values.",
+      "integration": "Persist/replay the different series lists and verify their inputs/contributions remain separate and compatible with generic publication readiness.",
+      "frontend": "Provide useful series selectors, dates and breakdowns with no misleading overall/series mixing or placeholder list rows.",
+      "file": "35-calculate-champion-elite-and-challenger-series-drafts.md"
+    },
+    {
+      "n": 36,
+      "title": "Calculate mixed-doubles field strength and event awards",
+      "deps": [
+        26,
+        34
+      ],
+      "stories": [
+        16,
+        44,
+        61,
+        67,
+        69,
+        76,
+        93,
+        94,
+        95
+      ],
+      "checks": [
+        3,
+        8,
+        9,
+        12,
+        14
+      ],
+      "demos": [
+        6,
+        7
+      ],
+      "product": [
+        1,
+        3,
+        4
+      ],
+      "deliver": "Administrators assess a mixed-doubles event using its pair/player and required four-player ranking inputs and inspect its award breakdown.",
+      "behavior": [
+        "Use sourced 2026-27 mixed-doubles formulas and the exact required historical inputs; pair-only history cannot silently substitute for missing individual/team inputs.",
+        "Retain eligibility, effective roster/participation evidence, cutoff and factor explanations with frozen result snapshots.",
+        "Blocked required inputs remain visible; document the known counting-rule interpretation instead of treating inconsistent prose as resolved fact."
+      ],
+      "unit": "Verify independently worked strength/award examples, individual/team contribution branches, cutoffs, exclusions and rounding with valid and incomplete input sets.",
+      "integration": "Calculate/retry from persisted mixed-doubles results and four-player inputs, retaining all source/subject relationships and issue states.",
+      "frontend": "Show the mixed-doubles assessment as an understandable breakdown with player/pair links, source dates and specific readiness issues.",
+      "file": "36-calculate-mixed-doubles-field-strength-and-event-awards.md"
+    },
+    {
+      "n": 37,
+      "title": "Calculate mixed-doubles pair and individual draft lists",
+      "deps": [
+        36
+      ],
+      "stories": [
+        15,
+        16,
+        17,
+        20,
+        61,
+        63,
+        67,
+        69,
+        76,
+        93,
+        94,
+        95
+      ],
+      "checks": [
+        3,
+        8,
+        9,
+        11,
+        12,
+        14
+      ],
+      "demos": [
+        6,
+        7
+      ],
+      "product": [
+        1,
+        3,
+        4
+      ],
+      "deliver": "World Curling reviews the supported mixed-doubles pair, female-player and male-player draft rankings with independent contributions and history.",
+      "behavior": [
+        "Apply each supported subject/list's 2026-27 counting, ownership, weighting and tie-ordering rules to sufficient sourced inputs.",
+        "Keep person subjects separate from pair identities and preserve counts/exclusions/effective dates in replayable runs.",
+        "Do not auto-publish, fabricate inputs or add Member Association/other discipline lists."
+      ],
+      "unit": "Use independently worked pair and individual expected totals/orderings across relevant dated checkpoints, partner changes, excluded events and rounding branches.",
+      "integration": "Persist and replay all three subject/list types and verify correct subject mappings, contributions and incomplete-input blocking.",
+      "frontend": "Make pair/individual selection and contributor drill-down readable at mobile and desktop widths, with clear list names and no mislabeled team-only views.",
+      "file": "37-calculate-mixed-doubles-pair-and-individual-draft-lists.md"
+    },
+    {
+      "n": 38,
+      "title": "Approve and publish complete dated WCTRS lists",
+      "deps": [
+        34
+      ],
+      "stories": [
+        15,
+        16,
+        17,
+        20,
+        24,
+        67,
+        68,
+        69,
+        70,
+        89,
+        93,
+        94,
+        95
+      ],
+      "checks": [
+        6,
+        8,
+        9,
+        11,
+        12,
+        14
+      ],
+      "demos": [
+        6,
+        7
+      ],
+      "product": [
+        1,
+        4
+      ],
+      "deliver": "A World Curling administrator compares and approves a complete dated list, and public rankings expose that exact approved publication.",
+      "behavior": [
+        "Use a list/subject-type-independent review/publication contract compatible with overall, series and mixed-doubles draft producers.",
+        "Block publication on required calculation/eligibility issues; allow only informational acknowledgements unrelated to the calculation, without an exception/waiver engine.",
+        "Freeze inputs, contributions, outputs and decision evidence; expose effective and publication dates separately and exclude drafts/live projections from public defaults."
+      ],
+      "unit": "Test readiness gating, informational-versus-blocking issues, authorized publication transitions, comparison rules and meaningful precision.",
+      "integration": "Attempt incomplete/forbidden approval and publish/replay a complete list in PostgreSQL; prove outputs cannot be silently overwritten and published reads are exact.",
+      "frontend": "Deliver a focused comparison/approve flow and polished public list/filter/contribution views with actual data and honest blocked/imported/draft/published labels.",
+      "file": "38-approve-and-publish-complete-dated-wctrs-lists.md"
+    },
+    {
+      "n": 39,
+      "title": "Audit ranking history and approve a direct replacement",
+      "deps": [
+        38
+      ],
+      "stories": [
+        17,
+        20,
+        42,
+        47,
+        67,
+        68,
+        69,
+        70,
+        91,
+        94,
+        95
+      ],
+      "checks": [
+        1,
+        6,
+        8,
+        9,
+        11,
+        12,
+        14
+      ],
+      "demos": [
+        6,
+        7
+      ],
+      "product": [
+        4
+      ],
+      "deliver": "An ordinary result correction leads to revised finalization, a directly affected draft and an approved replacement, while administrators can audit both publications.",
+      "behavior": [
+        "Preserve the original finalized snapshot/publication and show what changed, who acted and the exact calculation inputs/engine revision.",
+        "Support replay and published-as-seen versus corrected-effective-date views with a direct replacement chain.",
+        "Do not build transitive later-event field-strength reassessment; retain original later assessment inputs and flag broader impacts as unresolved instead of claiming full cascade completion."
+      ],
+      "unit": "Test immutable-content/digest comparison, direct supersession/date selection and changed-input classification with independent expected results.",
+      "integration": "Complete correction -> revised finalization -> recalculation -> approval through real commands and assert original snapshots/runs remain unchanged and auditable.",
+      "frontend": "Provide useful history/version comparison, actor/reason and contribution navigation, with a clear limitation for wider unprocessed impacts and no fake recalculated status.",
+      "file": "39-audit-ranking-history-and-approve-a-direct-replacement.md"
+    },
+    {
+      "n": 40,
+      "title": "Show team win-loss records and title counts",
+      "deps": [
+        17,
+        27
+      ],
+      "stories": [
+        7,
+        11,
+        18,
+        22,
+        24,
+        73,
+        93,
+        94,
+        95
+      ],
+      "checks": [
+        3,
+        9,
+        11,
+        12,
+        14
+      ],
+      "demos": [
+        1,
+        6
+      ],
+      "product": [
+        1,
+        5
+      ],
+      "deliver": "Fans inspect the first minimum analytics view: supported team win/loss records and titles with explicit sample and result coverage.",
+      "behavior": [
+        "Document counting rules for confirmed/unknown/tied/forfeit/void results and titles from finalized placements; count a logical game/division once across revisions.",
+        "Filter by the supported discipline/date/event context and retain source/completeness information.",
+        "Do not infer that every listed/defaulted player played or expand into deferred streak/rivalry statistics; any player-level attribution must state its evidence."
+      ],
+      "unit": "Use small hand-counted fixtures for records, title counts, revisions, missing outcomes and scope filters with independently expected denominators.",
+      "integration": "Query persisted results/finalizations and ordinary corrections through analytics APIs, proving no double counting or private-data leakage.",
+      "frontend": "Render purposeful records/title tables or charts with filters, units/sample labels, working team/event links and honest no-data states at all target widths.",
+      "file": "40-show-team-win-loss-records-and-title-counts.md"
+    },
+    {
+      "n": 41,
+      "title": "Chart approved rank and points history with contributions",
+      "deps": [
+        16,
+        17,
+        38
+      ],
+      "stories": [
+        15,
+        16,
+        17,
+        20,
+        24,
+        69,
+        75,
+        93,
+        94,
+        95
+      ],
+      "checks": [
+        8,
+        9,
+        10,
+        11,
+        12,
+        14
+      ],
+      "demos": [
+        1,
+        6
+      ],
+      "product": [
+        1,
+        4,
+        5
+      ],
+      "deliver": "Fans compare approved ranking/points history and inspect contributing events across calculated publications and honestly labelled imported history.",
+      "behavior": [
+        "Use dated approved/observed values, preserving effective-versus-publication-time and imported-versus-calculated origin.",
+        "Expose contribution detail where it exists and explicitly mark unavailable historical explanation rather than reconstructing it silently.",
+        "Keep core-composition subjects distinct and person histories stable without deferred team lineage."
+      ],
+      "unit": "Test history/date selection, series alignment, contribution reconciliation, sparse-history handling and meaningful decimal values against explicit fixtures.",
+      "integration": "Read representative calculated and imported publications through public APIs and verify graph/table values agree with frozen rows and selected context.",
+      "frontend": "Provide readable chart plus table access, date/list filters, comparison/point drill-down and keyboard/mobile usability without decorative or invented trend lines.",
+      "file": "41-chart-approved-rank-and-points-history-with-contributions.md"
+    },
+    {
+      "n": 42,
+      "title": "Show blank and steal rates from known end data",
+      "deps": [
+        17
+      ],
+      "stories": [
+        19,
+        22,
+        24,
+        73,
+        93,
+        94,
+        95
+      ],
+      "checks": [
+        1,
+        10,
+        11,
+        12,
+        14
+      ],
+      "demos": [
+        1,
+        6
+      ],
+      "product": [
+        1,
+        5
+      ],
+      "deliver": "Fans use the minimum scoring-pattern view to inspect blank and steal rates computed from suitable observed ends.",
+      "behavior": [
+        "Define/document numerators, denominators and team/population scope before implementation, using actual completed ends and known hammer where required.",
+        "Exclude unknown-required fields and unplayed/post-concession ends; distinguish zero sample from a true zero rate and avoid revision double counting.",
+        "Limit the offered measures to P-05 blank/steal rates and supported disciplines with clear filters and coverage."
+      ],
+      "unit": "Verify hand-counted numerator/denominator examples, hammer perspectives, missing/unplayed data, corrections and zero-sample behavior.",
+      "integration": "Calculate rates from stored games/ends and confirm filtered API values, sample counts and displayed corrections agree.",
+      "frontend": "Show the two useful rates with sample/coverage, clear definitions and filter state, readable on a phone without unexplained percentages.",
+      "file": "42-show-blank-and-steal-rates-from-known-end-data.md"
+    },
+    {
+      "n": 43,
+      "title": "Show observed win rates by end, margin and hammer",
+      "deps": [
+        17
+      ],
+      "stories": [
+        21,
+        22,
+        24,
+        73,
+        93,
+        94,
+        95
+      ],
+      "checks": [
+        1,
+        10,
+        11,
+        12,
+        14
+      ],
+      "demos": [
+        1,
+        6
+      ],
+      "product": [
+        1,
+        5
+      ],
+      "deliver": "Fans inspect the minimum situational analytics view using actual comparable game states and known final outcomes.",
+      "behavior": [
+        "Document the state timing, win/sample definition and population filters, separating supported disciplines and relevant regulation/rule contexts.",
+        "Use only observed situations with the required margin/hammer/outcome evidence; exclude hypothetical ends after concession and unknown required data.",
+        "Show sample sizes and unknown/zero-sample states; do not present calibrated live prediction or expand the metric inventory."
+      ],
+      "unit": "Compare matrix cells/filters to independent hand-worked game-state fixtures, including both hammer perspectives, missing outcomes and conceded games.",
+      "integration": "Read persisted score/outcome history and verify API cells, population filters and sample counts against the same immutable fixture evidence.",
+      "frontend": "Provide an understandable filtered table/heatmap with accessible cell details and mobile table access, showing exact context and samples rather than unsupported certainty.",
+      "file": "43-show-observed-win-rates-by-end-margin-and-hammer.md"
+    },
+    {
+      "n": 44,
+      "title": "Aggregate approved curling news into working source links",
+      "deps": [
+        1
+      ],
+      "stories": [
+        14,
+        24,
+        60,
+        92,
+        94,
+        95
+      ],
+      "checks": [
+        6,
+        11,
+        12,
+        14
+      ],
+      "demos": [
+        1
+      ],
+      "product": [],
+      "deliver": "Staff configure approved external feeds and fans browse concise news cards that open the original publisher.",
+      "behavior": [
+        "Fetch only approved source feeds, record publisher/date/supplied excerpt/original URL and deduplicate items.",
+        "Allow staff to manage sources and hide unsuitable/duplicate items; record failures and stale fetch state without inventing news.",
+        "Keep untrusted text/URLs safely rendered and exclude editorial authoring/full-article republication."
+      ],
+      "unit": "Test feed normalization, identity/deduplication, date/URL validation, safe text projection and hide/source-status filtering.",
+      "integration": "Run retryable fetch jobs with controlled feed fixtures and PostgreSQL, proving duplicate-safe persistence and public/staff permission boundaries.",
+      "frontend": "Create useful news cards and source-management controls with honest empty/failure states and working external links, without generated filler or inactive buttons.",
+      "file": "44-aggregate-approved-curling-news-into-working-source-links.md"
+    },
+    {
+      "n": 45,
+      "title": "Host the working review environment on the supplied domain",
+      "deps": [
+        1
+      ],
+      "stories": [
+        51,
+        77,
+        82,
+        88,
+        89,
+        90,
+        92,
+        93,
+        94,
+        95
+      ],
+      "checks": [
+        5,
+        6,
+        7,
+        12,
+        13,
+        14
+      ],
+      "demos": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "product": [
+        1
+      ],
+      "deliver": "The implemented application runs as web/worker/PostgreSQL services with a reviewer-accessible HTTPS domain and configured provider adapters.",
+      "behavior": [
+        "Use actual repository/provider/domain inputs when supplied; this ticket may deploy an early completed slice and accept later feature migrations without waiting for all product branches.",
+        "Keep resettable synthetic scenarios separate from imported history; configure scoped review accounts, environment secrets, email, media and sandbox payment services as they become available.",
+        "Document setup, health/jobs, migration/release and operator/API use; do not activate live payments or add the excluded independent backup/recovery project."
+      ],
+      "unit": "Run applicable deployment/configuration validation and existing domain suites; add focused tests only for new substantive configuration/adapter logic, not duplicate library behavior.",
+      "integration": "Perform hosted web/worker/database persistence, authentication, configured provider and restart/job smoke checks, with real credentials kept out of logs/recordings.",
+      "frontend": "Verify the live HTTPS page/sign-in and currently delivered flows on phone/desktop; clearly label demo data and report any unresolved deployment inputs instead of claiming a successful host.",
+      "external_inputs": [
+        "User-supplied domain and DNS access",
+        "Source repository and hosting access with a reviewed service quote",
+        "Configured email/media/payment sandbox credentials when those integrations are exercised"
+      ],
+      "file": "45-host-the-working-review-environment-on-the-supplied-domain.md"
+    },
+    {
+      "n": 46,
+      "title": "Verify and record the fan, approval, scoring and entry demos",
+      "deps": [
+        5,
+        11,
+        17,
+        20,
+        25,
+        29,
+        45
+      ],
+      "stories": [
+        1,
+        2,
+        4,
+        7,
+        8,
+        9,
+        10,
+        25,
+        27,
+        31,
+        33,
+        37,
+        38,
+        43,
+        46,
+        47,
+        82,
+        85,
+        88,
+        89,
+        90,
+        91,
+        93,
+        94,
+        95
+      ],
+      "checks": [
+        1,
+        2,
+        3,
+        4,
+        6,
+        7,
+        12,
+        13,
+        14
+      ],
+      "demos": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "product": [
+        1,
+        2,
+        3
+      ],
+      "kind": "verification",
+      "deliver": "Record reproducible hosted D-01 through D-04 using the 16-team main event, real persisted interactions and scoped personas.",
+      "behavior": [
+        "Reset only the synthetic scenario and exercise current/next homepage draws, A/B/C path, event approval, mobile scoring/correction and organizer/manual/self-entry/payment flows.",
+        "Demonstrate the ordinary correction/refund/withdrawal examples, not full resolution of the six deferred exceptional scenarios.",
+        "Fix scoped observed regressions before claiming the flow complete; retain truthful implemented/verified coverage and record reproducible steps."
+      ],
+      "unit": "Run the inherited identity/scoring/draw/registration/payment/permission suites, inspect uncovered core branches and add focused regression cases for substantive defects discovered.",
+      "integration": "Run the PostgreSQL/API acceptance paths and hosted sandbox checks for D-01 through D-04; retain actual commands/results without credentials.",
+      "frontend": "Inspect and capture phone/tablet/desktop views, keyboard flow, loading/error/stale states and all visible navigation; recordings must show actual operations with clear scores, not static mockups.",
+      "file": "46-verify-and-record-the-fan-approval-scoring-and-entry-demos.md"
+    },
+    {
+      "n": 47,
+      "title": "Verify remaining demos and assemble the reviewed offer",
+      "deps": [
+        13,
+        21,
+        24,
+        31,
+        35,
+        37,
+        39,
+        40,
+        41,
+        42,
+        43,
+        44,
+        46
+      ],
+      "stories": [
+        11,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        24,
+        42,
+        51,
+        52,
+        53,
+        54,
+        55,
+        61,
+        65,
+        66,
+        67,
+        68,
+        69,
+        70,
+        71,
+        72,
+        73,
+        74,
+        75,
+        76,
+        77,
+        78,
+        79,
+        80,
+        81,
+        88,
+        89,
+        90,
+        91,
+        92,
+        93,
+        94,
+        95
+      ],
+      "checks": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14
+      ],
+      "demos": [
+        5,
+        6,
+        7
+      ],
+      "product": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "kind": "verification",
+      "deliver": "Record D-05 through D-07 and the partner companion, rerun the agreed supporting capability checks and deliver a coherent hosted offer package.",
+      "behavior": [
+        "Exercise claim/photo review, historical and calculated ranking audit, direct corrected-finalization/replacement approval, and sequential scoped partner scoring/source switching.",
+        "Verify one documented configuration for each accepted format, supported four-player/mixed-doubles coverage and the four P-05 analytics views; publish only actual verification status.",
+        "Assemble seven recordings plus partner example, setup/API/operator notes, source/provenance and known limitations; preserve all explicit deferrals and unresolved official-rule claims honestly."
+      ],
+      "unit": "Run all domain suites and review coverage gaps against supported rule branches and P-01 through P-05; no arbitrary percentage or trivial tests substitutes for meaningful evidence.",
+      "integration": "Run T-01 through T-14 within the bounded acceptance map, including real PostgreSQL, repeat imports, publication gates/replay and configured sandbox checks; do not require deferred recovery engines.",
+      "frontend": "Perform cross-page mobile/tablet/desktop and accessibility review, correct material visible/console/network defects, and confirm every displayed control uses implemented behavior and purposeful content.",
+      "file": "47-verify-remaining-demos-and-assemble-the-reviewed-offer.md"
+    }
+  ]
+}
