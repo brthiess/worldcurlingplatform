@@ -130,6 +130,9 @@ export default function Admin() {
           <p>
             <a href="/admin/news">News sources and moderation</a>
           </p>
+          <p>
+            <a href="/admin/ranking-inputs">Season ranking inputs and rule editions</a>
+          </p>
           <button
             className="secondary"
             disabled={busy}
