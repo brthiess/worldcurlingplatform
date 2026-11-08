@@ -7,20 +7,21 @@ import {
 import AxeBuilder from "@axe-core/playwright";
 import { randomUUID } from "node:crypto";
 import pg from "pg";
+import { scoringFixtureDraw } from "../scoring-fixture";
+import { signInApiWithRateWindow } from "./auth-fixture";
 import "dotenv/config";
 // Each browser suite owns its fixture connection lifecycle. Other files may
 // close the application module's pool in the same Playwright worker.
 const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
 let session: BrowserContext;
 test.beforeAll(async ({ browser }) => {
+  test.setTimeout(150000);
   session = await browser.newContext();
-  const r = await session.request.post("/api/auth/sign-in/email", {
-    headers: { Origin: process.env.BETTER_AUTH_URL! },
-    data: {
-      email: "scorekeeper@demo.invalid",
-      password: process.env.DEMO_PASSWORD,
-    },
-  });
+  const r = await signInApiWithRateWindow(
+    session.request,
+    "scorekeeper@demo.invalid",
+    process.env.DEMO_PASSWORD,
+  );
   expect(r.status()).toBe(200);
   await restore(session.request);
 });
@@ -95,13 +96,15 @@ for (const [name, width, height] of [
         (await page.getByLabel(label).boundingBox())!.height,
       ).toBeGreaterThanOrEqual(44);
     expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
-    const earlier = page.locator("summary");
+    const earlier = page.getByText(/Earlier \d+ accepted changes/, {
+      exact: true,
+    });
     if (await earlier.count()) {
       await earlier.focus();
       await page.keyboard.press("Enter");
-      await expect(page.locator("details")).toHaveAttribute("open", "");
+      await expect(earlier.locator("..")).toHaveAttribute("open", "");
       await page.keyboard.press("Enter");
-      await expect(page.locator("details")).not.toHaveAttribute("open", "");
+      await expect(earlier.locator("..")).not.toHaveAttribute("open", "");
     }
     expect(errors).toEqual([]);
     await page.screenshot({
@@ -266,8 +269,9 @@ test("assigned scorekeeper starts an actual scheduled fixture with end-one hamme
   page,
 }) => {
   const id = `wcp002-browser-${randomUUID()}`;
+  await scoringFixtureDraw(pool);
   await pool.query(
-    "INSERT INTO game(id,draw_id,sheet,phase,state,entry_a,entry_b,slot_a,slot_b) VALUES($1,'draw-3','T','Browser start','scheduled','entry-1','entry-3','Team North','Team Prairie')",
+    "INSERT INTO game(id,draw_id,sheet,phase,state,entry_a,entry_b,slot_a,slot_b) VALUES($1,'scoring-test-draw','T','Browser start','scheduled','entry-1','entry-3','Team North','Team Prairie')",
     [id],
   );
   await pool.query(
@@ -279,7 +283,7 @@ test("assigned scorekeeper starts an actual scheduled fixture with end-one hamme
     await page.getByLabel("Known hammer (selected end)").selectOption("a");
     await page.getByRole("button", { name: "Start game", exact: true }).click();
     await expect(page.getByText(/Saved · version 1/)).toBeVisible();
-    await expect(page.getByText(/Draw 3 · Sheet T · live/)).toBeVisible();
+    await expect(page.getByText(/Draw 999 · Sheet T · live/)).toBeVisible();
     await expect(page.getByLabel("Known hammer (selected end)")).toHaveValue(
       "a",
     );
@@ -289,10 +293,8 @@ test("assigned scorekeeper starts an actual scheduled fixture with end-one hamme
     expect(published.games[0].hammer).toBe("a");
     expect(published.games[0].hammerEnd).toBe(1);
   } finally {
-    await pool.query("DELETE FROM scoring_command WHERE game_id=$1", [id]);
-    await pool.query("DELETE FROM audit_record WHERE resource_id=$1", [id]);
     await pool.query("DELETE FROM role_grant WHERE game_id=$1", [id]);
-    await pool.query("DELETE FROM game WHERE id=$1", [id]);
+    // Immutable evidence and its audit stay in this noncurrent fixture draw.
   }
 });
 test("normal mobile fixture can record end nine and its hammer without pre-existing extra-end rows", async ({
