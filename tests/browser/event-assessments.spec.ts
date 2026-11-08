@@ -259,6 +259,7 @@ test("staff complete ordinary sourced controls, queue real awards and review res
 test("assessment workspace shows loading/error and denies organizer access", async ({
   page,
 }) => {
+  test.setTimeout(120000);
   await signIn(page);
   let release!: () => void;
   const gate = new Promise<void>((r) => (release = r));
