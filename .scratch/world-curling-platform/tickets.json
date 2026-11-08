@@ -472,13 +472,17 @@
       "file": "09-open-division-entries-with-capacity-and-expiring-holds.md",
       "id": "WCP-009",
       "path": "issues/09-open-division-entries-with-capacity-and-expiring-holds.md",
-      "status": "in-progress",
+      "status": "completed",
       "labels": [
         "ready-for-agent"
       ],
       "blocked_by": [
         "WCP-008"
-      ]
+      ],
+      "completion": {
+        "commit": "62c63082c99125fafb0ccc37f1bc268a1217c313",
+        "evidence": "docs/verification/WCP-009-merge.md"
+      }
     },
     {
       "n": 10,

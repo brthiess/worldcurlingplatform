@@ -17,6 +17,8 @@ The coordinator supplies one published ticket ID, worktree, branch, database and
 
 The integration branch can contain a provisional merger checkpoint or an explicitly rejected ticket while independent checks/corrections continue. A merge title or branch tip is not ticket acceptance. The coordinator's acceptance notification and published tracker state identify completed boundaries; preserve known open findings. Keep source frozen during a running suite. Merge only between runs, retain any interrupted/invalidated report, and never claim a passing subset covers a known missing regression.
 
+Browser selectors should target the application region and the intended current-state element. Next also renders an empty route-announcer alert, and immutable history can repeat revision text. Global alert or unqualified revision-text locators have caused retained fixture failures; scope them without suppressing errors or weakening the expected state. Wait for held route handlers to finish before removing them.
+
 ## Environment
 
 Git/npm/Node entry scripts can fail in the Windows sandbox while resolving `C:/Users/brthi`. Reviewed `exec_command` calls with `sandbox_permissions: require_escalated` have worked. Git is 2.20 in that environment (`symbolic-ref --short HEAD`, not `branch --show-current`). Avoid destructive cross-shell operations. Use native PowerShell literal paths and verify workspace containment before recursive deletion/moving.
