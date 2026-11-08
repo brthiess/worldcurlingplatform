@@ -16,7 +16,7 @@ Execution began 2026-11-08. This file describes the bounded acceptance inventory
 | Other accepted formats | One documented configuration each: single/double knockout, pooled round robin, Page, Swiss/Schenkel, pooled-to-Page | 019,021–025,047 | Planned |
 | Discipline/list coverage | Men's/women's four-player overall and Champion/Elite/Challenger lists; mixed-doubles pair/individual lists | 026,032–039 | Planned |
 | Analytics | Records/titles; approved rank/points/contributions; blank/steal rates; observed end/margin/hammer win rates | 040–043 | Planned |
-| Public supporting features | Connected discovery, local favorites, approved-source linked news, honest coverage | 017,044 | Planned |
+| Public supporting features | Connected discovery, local favorites, approved-source linked news, honest coverage | 017,044 | Approved-source linked news locally verified (044); discovery/favorites pending |
 | Hosted review package | User domain, HTTPS, configured providers, setup/operator/API notes, seven recordings plus partner example | 045–047 | Planned; external inputs not supplied |
 
 All ticket slices require their published unit, real PostgreSQL/API and frontend/browser acceptance. Testing one slice never verifies the entire inventory. Preserve the six exceptional-scenario deferrals and minimum safeguards in the canonical specification. Historical input observations do not establish complete ranking reconstruction, verified participation or known hammer.

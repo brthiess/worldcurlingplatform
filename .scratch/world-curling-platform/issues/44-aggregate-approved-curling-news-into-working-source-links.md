@@ -4,7 +4,7 @@ number: 44
 title: "Aggregate approved curling news into working source links"
 parent: WCP-SPEC-001
 type: implementation
-status: in-progress
+status: completed
 labels: [ready-for-agent]
 blocked_by: [WCP-001]
 source_spec_sha256: 045B46988225B6C8C0020B23C8C5D4EAA8E2E1916256148A0FDA26B5DA8673FD
@@ -18,7 +18,7 @@ published: 2026-11-07
 
 **Blocked by:** [01: Open a persisted event and sign in with scoped demo roles](01-open-a-persisted-event-and-sign-in-with-scoped-demo-roles.md).
 
-**Status:** in-progress
+**Status:** completed
 
 ## Parent and scope
 
@@ -30,13 +30,13 @@ published: 2026-11-07
 
 ## Acceptance criteria
 
-- [ ] Fetch only approved source feeds, record publisher/date/supplied excerpt/original URL and deduplicate items.
-- [ ] Allow staff to manage sources and hide unsuitable/duplicate items; record failures and stale fetch state without inventing news.
-- [ ] Keep untrusted text/URLs safely rendered and exclude editorial authoring/full-article republication.
-- [ ] **Unit testing:** Test feed normalization, identity/deduplication, date/URL validation, safe text projection and hide/source-status filtering.
-- [ ] **Database/API verification:** Run retryable fetch jobs with controlled feed fixtures and PostgreSQL, proving duplicate-safe persistence and public/staff permission boundaries.
-- [ ] **Frontend quality:** Create useful news cards and source-management controls with honest empty/failure states and working external links, without generated filler or inactive buttons.
-- [ ] Record actual verification commands/results and relevant browser/screenshots or API evidence. Report meaningful uncovered branches or limitations; do not claim checks that were not run.
+- [x] Fetch only approved source feeds, record publisher/date/supplied excerpt/original URL and deduplicate items.
+- [x] Allow staff to manage sources and hide unsuitable/duplicate items; record failures and stale fetch state without inventing news.
+- [x] Keep untrusted text/URLs safely rendered and exclude editorial authoring/full-article republication.
+- [x] **Unit testing:** Test feed normalization, identity/deduplication, date/URL validation, safe text projection and hide/source-status filtering.
+- [x] **Database/API verification:** Run retryable fetch jobs with controlled feed fixtures and PostgreSQL, proving duplicate-safe persistence and public/staff permission boundaries.
+- [x] **Frontend quality:** Create useful news cards and source-management controls with honest empty/failure states and working external links, without generated filler or inactive buttons.
+- [x] Record actual verification commands/results and relevant browser/screenshots or API evidence. Report meaningful uncovered branches or limitations; do not claim checks that were not run.
 
 ## Slice boundary
 
