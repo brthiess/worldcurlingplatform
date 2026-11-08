@@ -17,6 +17,7 @@
     "WCP-004",
     "WCP-005",
     "WCP-006",
+    "WCP-008",
     "WCP-012",
     "WCP-013",
     "WCP-018",
@@ -44,7 +45,7 @@
   "git": {
     "remote": "https://github.com/brthiess/worldcurlingplatform.git",
     "push_as_work_progresses": true,
-    "last_verified_remote_integration_commit": "928ad8b6eb4d3eef29b31d3ca3a8ed12280858c9",
+    "last_verified_remote_integration_commit": "6f690cda3c9dd8d2d62e9f51e08edb2391ceddfc",
     "integration_branch": "integration/world-curling-platform",
     "worktrees_created": [
       ".worktrees/WCP-001",
@@ -57,11 +58,12 @@
       ".worktrees/WCP-044",
       ".worktrees/WCP-003",
       ".worktrees/WCP-032",
-      ".worktrees/WCP-018"
+      ".worktrees/WCP-018",
+      ".worktrees/WCP-008"
     ],
     "initialized": true,
     "baseline_commit": "f6d6d8d",
-    "remote_ref_verified_at": "2026-11-08T19:21:11.669599+00:00"
+    "remote_ref_verified_at": "2026-11-08T19:49:11.696787+00:00"
   },
   "verification": {
     "policy": "Only completed tickets have reviewed required-check evidence; each record is limited to its ticket scope.",
@@ -122,14 +124,14 @@
     "Close only reviewed integrated tickets with meaningful unit/PostgreSQL/API/frontend/browser evidence.",
     "Continue unblocked work and report provider/deployment limitations honestly."
   ],
-  "updated_at": "2026-11-08T19:48:50.982447+00:00",
+  "updated_at": "2026-11-08T19:48:56.637560+00:00",
   "active_tickets": [
+    "WCP-008",
     "WCP-018",
     "WCP-032"
   ],
   "frontier": [
     "WCP-007",
-    "WCP-008",
     "WCP-017",
     "WCP-026",
     "WCP-027",
@@ -303,6 +305,14 @@
       "reason": null,
       "commit": "5a0fcd9a7ac7d698ae04beeeba6120771f76baf0",
       "evidence": "docs/verification/WCP-005.md"
+    },
+    {
+      "time": "2026-11-08T19:48:56.637560+00:00",
+      "ticket": "WCP-008",
+      "status": "in-progress",
+      "reason": null,
+      "commit": null,
+      "evidence": null
     }
   ],
   "research": {
@@ -350,6 +360,14 @@
       "web_port": 3118,
       "news_fixture_port": 3218,
       "reserved_migration_prefix": "0019"
+    },
+    "WCP-008": {
+      "worktree": ".worktrees/WCP-008",
+      "branch": "ticket/WCP-008",
+      "database_prefix": "wcp008",
+      "web_port": 3108,
+      "news_fixture_port": 3208,
+      "reserved_migration_prefix": "0020"
     }
   }
 }
