@@ -1,5 +1,6 @@
 "use client";
 import { EventEntryLinks } from "@/components/public-rosters";
+import { GameResultHistory } from "./game-result-history";
 import { useEffect, useState, useCallback, useRef } from "react";
 import type { PublicEvent, PublicGame } from "@/modules/public/scores";
 import { scoreCell } from "@/domain/scores";
@@ -313,10 +314,24 @@ export function ScoresView({
                   </div>
                   {gameId && (
                     <p className="legend">
-                      Result state: {game.state}. Last score record:{" "}
+                      Result state:{" "}
+                      {game.results.length > 1
+                        ? "Corrected final"
+                        : game.state === "confirmed"
+                          ? "Final"
+                          : "Provisional"}{" "}
+                      · {game.results[0]?.result.outcome ?? game.state}. Last
+                      score record:{" "}
                       {venueTime(game.updatedAt, data.event.timezone)}.
                     </p>
                   )}
+                  {game.attention.length > 0 && (
+                    <p className="notice">
+                      Organizer attention required for affected assignments.
+                      Recorded participants and results are preserved.
+                    </p>
+                  )}
+                  {gameId && <GameResultHistory results={game.results} />}
                   {gameId && (
                     <p className="legend">
                       Recorded hammer:{" "}

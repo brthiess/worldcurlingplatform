@@ -3,8 +3,17 @@ import { useEffect, useState, useRef } from "react";
 import { saveTransition, type SaveState } from "@/domain/save-state";
 import { validateEnd, type End } from "@/domain/scoring";
 import type { Command } from "@/modules/scoring/commands";
+import { ResultEditor } from "./result-editor";
+import type { GameLineup } from "@/modules/scoring/lineups";
+import type { PublicGame } from "@/modules/public/scores";
 type Game = {
   id: string;
+  entryA: string;
+  entryB: string;
+  lineupA: GameLineup | null;
+  lineupB: GameLineup | null;
+  results: PublicGame["results"];
+  attention: { downstreamGameId: string }[];
   actorId: string;
   nameA: string;
   nameB: string;
@@ -50,6 +59,7 @@ export function ScoringEditor({ gameId }: { gameId: string }) {
     [ready, setReady] = useState(false);
   const key = useRef(""),
     sending = useRef(false);
+  const [resultBusy, setResultBusy] = useState(false);
   const url = `/api/v1/games/${encodeURIComponent(gameId)}/scoring`;
   async function read() {
     const r = await fetch(url, { cache: "no-store" });
@@ -136,7 +146,7 @@ export function ScoringEditor({ gameId }: { gameId: string }) {
       hammer: game!.endHammer[n - 1] ?? null,
     });
   }
-  async function send(action: "start" | "end") {
+  async function send(action: Command["action"]) {
     if (sending.current) return;
     let command = pending;
     if (!command) {
@@ -227,7 +237,10 @@ export function ScoringEditor({ gameId }: { gameId: string }) {
     }
   }
   const locked =
-    save === "saving" || save === "uncertain" || save === "conflict";
+    save === "saving" ||
+    save === "uncertain" ||
+    save === "conflict" ||
+    resultBusy;
   return (
     <main id="main" className="workspace">
       <a href="/admin">← Your workspace</a>
@@ -409,6 +422,16 @@ export function ScoringEditor({ gameId }: { gameId: string }) {
           <p>
             <a href={`/games/${gameId}`}>Open public game →</a>
           </p>
+          <ResultEditor
+            game={game}
+            disabled={save !== "saved"}
+            onBusy={setResultBusy}
+            onApplied={async () => {
+              const g = await read();
+              setGame(g);
+              setBaseVersion(g.version);
+            }}
+          />
           <h2>Accepted history</h2>
           <ul className="workspace-list">
             {game.history.slice(0, 3).map((h) => (

@@ -2,6 +2,26 @@ import { sql } from "drizzle-orm";
 import { db } from "@/db";
 import { selectDraws, type Score } from "@/domain/scores";
 export type PublicGame = {
+  results: {
+    version: number;
+    confirmedBy: string;
+    createdAt: string;
+    result: {
+      outcome: string;
+      winnerEntryId: string;
+      entryA: string;
+      entryB: string;
+      nameA: string;
+      nameB: string;
+      reason: string;
+      totalA: number | null;
+      totalB: number | null;
+      lineupA: import("@/modules/scoring/lineups").GameLineup;
+      lineupB: import("@/modules/scoring/lineups").GameLineup;
+      ends: import("@/domain/scoring").End[];
+    };
+  }[];
+  attention: { downstreamGameId: string; resultVersion: number }[];
   id: string;
   drawId: string;
   sheet: string;
@@ -122,9 +142,33 @@ async function projectEvent(
     ...g,
     updatedAt: new Date(g.updatedAt as string).toISOString(),
     endHammer: [] as (string | null)[],
+    results: [],
+    attention: [],
     endsA: ends(g.id, "a"),
     endsB: ends(g.id, "b"),
-  })) as PublicGame[];
+  })) as unknown as PublicGame[];
+  const results = await connection.execute(
+    sql`SELECT r.game_id,r.version,r.confirmed_by AS "confirmedBy",r.created_at AS "createdAt",r.result FROM game_result_version r JOIN game g ON g.id=r.game_id JOIN draw_session ds ON ds.id=g.draw_id WHERE ds.division_id=${row.divisionId} ORDER BY r.version DESC`,
+  );
+  const attention = await connection.execute(
+    sql`SELECT a.upstream_game_id,a.downstream_game_id AS "downstreamGameId",a.result_version AS "resultVersion" FROM game_assignment_attention a JOIN game g ON g.id=a.upstream_game_id JOIN draw_session ds ON ds.id=g.draw_id WHERE ds.division_id=${row.divisionId}`,
+  );
+  for (const game of games) {
+    game.results = results.rows
+      .filter((r) => r.game_id === game.id)
+      .map(({ game_id: _, ...r }) => ({
+        ...r,
+        createdAt: new Date(r.createdAt as string).toISOString(),
+      })) as PublicGame["results"];
+    game.attention = attention.rows
+      .filter(
+        (a) => a.upstream_game_id === game.id || a.downstreamGameId === game.id,
+      )
+      .map((a) => ({
+        downstreamGameId: String(a.downstreamGameId),
+        resultVersion: Number(a.resultVersion),
+      }));
+  }
   for (const game of games)
     if (
       game.state === "live" &&
