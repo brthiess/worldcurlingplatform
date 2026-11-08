@@ -663,3 +663,75 @@ test("published immutable single-knockout profile overrides a misleading legacy 
     "81/4",
   );
 });
+test("an identity change committing during source review invalidates the queued assessment instead of freezing an earlier identified projection", async () => {
+  const cookie = await login(),
+    send = (path: string, body?: unknown) => request(cookie, path, body),
+    f = await assessmentFixture(db, send),
+    view = await (
+      await send(
+        `/api/v1/event-assessments?division=${f.divisionId}&rules=${f.rulesId}`,
+      )
+    ).json(),
+    playerId = f.playerLists[0][0],
+    blocker = await db.connect();
+  let active = false;
+  try {
+    await blocker.query("BEGIN");
+    active = true;
+    const pid = Number(
+      (await blocker.query("SELECT pg_backend_pid() AS pid")).rows[0].pid,
+    );
+    await blocker.query(
+      "UPDATE player SET identity_status='provisional' WHERE id=$1",
+      [playerId],
+    );
+    const pending = send("/api/v1/event-assessments", {
+      action: "calculate",
+      divisionId: f.divisionId,
+      version: 0,
+      requestId: randomUUID(),
+      sourceDigest: view.review.sourceDigest,
+      evidence: f.evidence,
+    });
+    let reached = false;
+    const end = Date.now() + 10000;
+    while (Date.now() < end) {
+      if (
+        (
+          await db.query(
+            "SELECT pid FROM pg_stat_activity WHERE datname=current_database() AND $1=ANY(pg_blocking_pids(pid))",
+            [pid],
+          )
+        ).rowCount
+      ) {
+        reached = true;
+        break;
+      }
+      await new Promise((r) => setTimeout(r, 25));
+    }
+    assert.ok(
+      reached,
+      "The real source review must reach the identity writer's lock barrier",
+    );
+    await blocker.query("COMMIT");
+    active = false;
+    const response = await pending;
+    assert.equal(response.status, 409);
+    assert.equal(
+      (
+        await db.query(
+          "SELECT count(*) FROM event_assessment WHERE division_id=$1",
+          [f.divisionId],
+        )
+      ).rows[0].count,
+      "0",
+    );
+  } finally {
+    if (active) await blocker.query("ROLLBACK");
+    blocker.release();
+    await db.query(
+      "UPDATE player SET identity_status='identified' WHERE id=$1",
+      [playerId],
+    );
+  }
+});

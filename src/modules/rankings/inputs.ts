@@ -161,12 +161,20 @@ export async function calculationRosterEvidence(
       [registrationId],
     )
   ).rows[0];
+  // detail() can have read presentation rows before waiting in context().
+  // Re-read the event-relevant facts after those locks; never project an earlier identity snapshot.
+  const rankingPlayers = (
+    await c.query(
+      "SELECT id AS \"playerId\",name,identity_status AS \"identityStatus\",'ranking' AS role,'' AS position FROM player WHERE id=ANY($1::text[]) ORDER BY name,id FOR SHARE",
+      [[...data.rankingPlayerIds, ...data.rankingAlternateIds]],
+    )
+  ).rows;
   return {
     id: row.id,
     version: row.version,
     startingState: row.state,
     currentRosterVersion: current.version,
-    rankingPlayers: row.rankingPlayers,
+    rankingPlayers,
     data: {
       registrationId: data.registrationId,
       rosterVersion: data.rosterVersion,
