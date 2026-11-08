@@ -132,20 +132,41 @@ export function normalizeFeed(
       const url = articleUrl(link),
         title = safeText(item.title?.["#text"] ?? item.title, 180),
         date = String(item.pubDate ?? item.published ?? item.updated ?? "");
+      const iso = date.match(/^(\d{4})-(\d\d)-(\d\d)/);
+      const rfc = date.match(/\b(\d{1,2})\s+([A-Za-z]{3})\s+(\d{4})\b/);
+      const calendar = iso
+        ? [Number(iso[1]), Number(iso[2]), Number(iso[3])]
+        : rfc
+          ? [
+              Number(rfc[3]),
+              [
+                "jan",
+                "feb",
+                "mar",
+                "apr",
+                "may",
+                "jun",
+                "jul",
+                "aug",
+                "sep",
+                "oct",
+                "nov",
+                "dec",
+              ].indexOf(rfc[2].toLowerCase()) + 1,
+              Number(rfc[1]),
+            ]
+          : null;
+      if (!title || !calendar) continue;
+      const [year, month, day] = calendar;
+      const suppliedDay = new Date(Date.UTC(year, month - 1, day));
+      // Validate the publisher's calendar date before its offset can cross a UTC day.
       if (
-        !title ||
-        !/(?:\d{4}-\d\d-\d\d|\d{1,2}\s+[A-Za-z]{3}\s+\d{4})/.test(date)
+        suppliedDay.getUTCFullYear() !== year ||
+        suppliedDay.getUTCMonth() + 1 !== month ||
+        suppliedDay.getUTCDate() !== day
       )
         continue;
       const publishedAt = new Date(date);
-      const iso = date.match(/^(\d{4})-(\d\d)-(\d\d)/);
-      if (
-        iso &&
-        new Date(Date.UTC(Number(iso[1]), Number(iso[2]) - 1, Number(iso[3])))
-          .toISOString()
-          .slice(0, 10) !== iso[0]
-      )
-        continue;
       if (
         !Number.isFinite(+publishedAt) ||
         +publishedAt > +now + 86400000 ||

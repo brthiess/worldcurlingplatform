@@ -162,3 +162,57 @@ test("failed source audit rolls back approval and immutable audit rows cannot be
   assert.equal(changes.filter((c) => c.status === "fulfilled").length, 1);
   assert.equal(changes.filter((c) => c.status === "rejected").length, 1);
 });
+
+test("fetched RSS drops impossible RFC calendar dates and persists valid offset leap-day instants", async () => {
+  const key = crypto.randomUUID();
+  const server = createServer((_request, response) => {
+    const dates = [
+      "Tue, 31 Feb 2026 10:00:00 GMT",
+      "31 Apr 2026 10:00:00 +0200",
+      "Thu, 29 Feb 2025 23:00:00 -0500",
+      "Thu, 29 Feb 2024 23:30:00 -0500",
+      "Fri, 01 Mar 2024 00:30:00 +1400",
+    ];
+    response.end(
+      `<rss><channel>${dates.map((date, index) => `<item><title>Controlled calendar fixture ${index}</title><link>https://publisher.example/calendar-${key}-${index}</link><pubDate>${date}</pubDate><description>Supplied calendar fixture excerpt.</description></item>`).join("")}</channel></rss>`,
+    );
+  });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  process.env.NEWS_FIXTURE_ORIGIN = `http://127.0.0.1:${(server.address() as any).port}`;
+  const source = await manageSource(pool, "demo-administrator", {
+    publisher: "Controlled calendar fixture",
+    feedUrl: process.env.NEWS_FIXTURE_ORIGIN + "/" + key,
+    approved: true,
+    reason: "Verify supplied RFC calendar dates through real persistence",
+  });
+  try {
+    await fetchSource(pool, source.id, "calendar-" + key);
+    const items = (await publicNews(pool)).items.filter(
+      (item) => item.sourceId === source.id,
+    );
+    assert.deepEqual(
+      items.map((item) => ({
+        title: item.title,
+        publishedAt: new Date(item.publishedAt).toISOString(),
+      })),
+      [
+        {
+          title: "Controlled calendar fixture 3",
+          publishedAt: "2024-03-01T04:30:00.000Z",
+        },
+        {
+          title: "Controlled calendar fixture 4",
+          publishedAt: "2024-02-29T10:30:00.000Z",
+        },
+      ],
+    );
+  } finally {
+    await manageSource(pool, "demo-administrator", {
+      id: source.id,
+      version: 1,
+      approved: false,
+      reason: "Controlled calendar acceptance finished",
+    });
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  }
+});

@@ -96,3 +96,29 @@ test("reserved fetch addresses and impossible calendar dates are rejected", () =
     );
   }
 });
+
+test("valid supplied leap days and timezone offsets preserve the actual UTC instant", () => {
+  for (const [date, expected] of [
+    ["Thu, 29 Feb 2024 23:30:00 -0500", "2024-03-01T04:30:00.000Z"],
+    ["Fri, 01 Mar 2024 00:30:00 +1400", "2024-02-29T10:30:00.000Z"],
+    ["29 Feb 2024 10:00:00 GMT", "2024-02-29T10:00:00.000Z"],
+    ["2024-02-29T23:30:00-05:00", "2024-03-01T04:30:00.000Z"],
+    ["2024-03-01T00:30:00+14:00", "2024-02-29T10:30:00.000Z"],
+    ["Tue, 29 Feb 2000 12:00:00 GMT", "2000-02-29T12:00:00.000Z"],
+  ]) {
+    const xml = `<rss><channel><item><title>Valid calendar fixture</title><link>https://publisher.example/calendar</link><pubDate>${date}</pubDate></item></channel></rss>`;
+    assert.deepEqual(
+      normalizeFeed(xml, "P", new Date("2026-11-08")),
+      [
+        {
+          title: "Valid calendar fixture",
+          publisher: "P",
+          url: "https://publisher.example/calendar",
+          publishedAt: expected,
+          excerpt: "",
+        },
+      ],
+      date,
+    );
+  }
+});
