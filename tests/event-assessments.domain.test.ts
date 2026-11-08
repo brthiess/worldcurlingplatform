@@ -26,14 +26,12 @@ const f1 = (): CalculationField => ({
 });
 test("F2 eight-team small field and single knockout; F3 prior-edition floor", () => {
   const f = f1();
-  f.entries = f.entries
-    .slice(0, 8)
-    .map((e, i) => ({
-      ...e,
-      rank: 31 + i,
-      qualified: i < 4,
-      place: i < 2 ? i + 1 : i < 4 ? 3 : 5,
-    }));
+  f.entries = f.entries.slice(0, 8).map((e, i) => ({
+    ...e,
+    rank: 31 + i,
+    qualified: i < 4,
+    place: i < 2 ? i + 1 : i < 4 ? 3 : 5,
+  }));
   assert.deepEqual(
     assessFourPlayer(f).awards.map((a) => a.points),
     ["27", "99/5", "261/20", "261/20", "27/10", "27/10", "27/10", "27/10"],
@@ -111,6 +109,60 @@ test("losing qualifier requires a known first playoff result; fixed Worlds stren
   assert.equal(r.state, "completed");
   assert.equal(r.sfm, "11");
   assert.equal(r.awards[0].points, "165/2");
+});
+test("special importance, category caps, exact award precision and explicit midpoint policy", () => {
+  const small = f1();
+  small.entries = small.entries.slice(0, 8).map((e, i) => ({
+    ...e,
+    rank: 31 + i,
+    qualified: i < 4,
+    place: i < 2 ? i + 1 : i < 4 ? 3 : 5,
+  }));
+  for (const [kind, sfm, winner] of [
+    ["nationals", "63/10", "189/4"],
+    ["world_qualifier", "63/10", "189/4"],
+    ["slam", "9/2", "135/4"],
+    ["europeans", "9/2", "135/4"],
+    ["trials", "34/5", "51"],
+    ["olympics", "9", "135/2"],
+    ["worlds", "11", "165/2"],
+  ] as const) {
+    const r = assessFourPlayer({ ...small, kind });
+    assert.equal(r.sfm, sfm);
+    assert.equal(r.awards[0].points, winner);
+    assert.equal(r.series, "Champion");
+  }
+  assert.equal(assessFourPlayer({ ...f1(), kind: "nationals" }).sfm, "10");
+  const floor = f1();
+  floor.entries = floor.entries.map((e) => ({ ...e, rank: 51 }));
+  floor.newEvent = false;
+  floor.previousSfm = "4.9";
+  assert.equal(assessFourPlayer(floor).sfm, "43/10"); // (3.6+4.9)/2 = 4.25; APPLICATION midpoint policy.
+  assert.equal(assessFourPlayer({ ...floor, previousSfm: "20" }).sfm, "8"); // APPLICATION floor/cap order.
+  assert.equal(
+    assessFourPlayer({
+      ...small,
+      entries: small.entries.slice(0, 4),
+      kind: "nationals",
+    }).state,
+    "blocked",
+  );
+});
+test("all sourced contribution bands including zero/nonzero beyond200 and invalid public inputs", () => {
+  for (const [rank, points, sfm] of [
+    [21, "1", "6"],
+    [76, "1", "12/5"],
+    [101, "1", "6/5"],
+    [201, "0", "1/5"],
+    [201, "1", "1/2"],
+  ] as const) {
+    const f = f1();
+    f.entries = f.entries.map((e) => ({ ...e, rank, points }));
+    assert.equal(assessFourPlayer(f).sfm, sfm);
+  }
+  const f = f1();
+  f.entries[0].place = 0;
+  assert.equal(assessFourPlayer(f).state, "blocked");
 });
 test("F1 sourced synthetic 16-team tour: full strength, placement and non-playoff wins", () => {
   const r = assessFourPlayer(f1());

@@ -108,9 +108,16 @@ export function assessmentEvidence(raw: unknown): AssessmentEvidence {
     );
   const kind = e.kind as EventKind;
   if (
-    !["tour", "nationals", "slam", "trials", "olympics", "worlds"].includes(
-      kind,
-    ) ||
+    ![
+      "tour",
+      "nationals",
+      "world_qualifier",
+      "slam",
+      "europeans",
+      "trials",
+      "olympics",
+      "worlds",
+    ].includes(kind) ||
     typeof e.singleKnockout !== "boolean" ||
     ![true, false, null].includes(e.newEvent as null)
   )
@@ -134,7 +141,12 @@ export function assessmentEvidence(raw: unknown): AssessmentEvidence {
     );
   let resultsUrl = text(e.resultsUrl, 500);
   if (resultsUrl) {
-    const u = new URL(resultsUrl);
+    let u: URL;
+    try {
+      u = new URL(resultsUrl);
+    } catch {
+      throw new EntryError("Use an HTTPS results evidence URL.");
+    }
     if (u.protocol !== "https:" || u.username || u.password || u.hash)
       throw new EntryError("Use an HTTPS results evidence URL.");
     resultsUrl = u.href;

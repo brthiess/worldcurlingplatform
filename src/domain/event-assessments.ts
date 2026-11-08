@@ -3,7 +3,9 @@ export const assessmentEngine = "wcp.four-event.2026-27.v1";
 export type EventKind =
   | "tour"
   | "nationals"
+  | "world_qualifier"
   | "slam"
+  | "europeans"
   | "trials"
   | "olympics"
   | "worlds";
@@ -74,6 +76,22 @@ export function assessFourPlayer(f: CalculationField): AssessmentResult {
     contributions: [],
   };
   let sum = "0";
+  if (new Set(f.entries.map((e) => e.entryId)).size !== f.entries.length)
+    r.issues.push("Competing entry identities must be unique.");
+  if (
+    f.entries.some(
+      (e) =>
+        !Number.isSafeInteger(e.place) ||
+        e.place < 1 ||
+        e.place > f.entries.length ||
+        [e.wins, e.qualificationWins, e.qualificationLosses].some(
+          (n) => !Number.isSafeInteger(n) || n < 0,
+        ),
+    )
+  )
+    r.issues.push(
+      "Frozen placements and win/loss counts must be valid nonnegative sporting facts.",
+    );
   for (const e of f.entries) {
     let value = "0",
       reason = "Excluded from field strength and awards";
@@ -160,7 +178,9 @@ export function assessFourPlayer(f: CalculationField): AssessmentResult {
   } else {
     const importance = {
       nationals: "7/4",
+      world_qualifier: "7/4",
       slam: "5/4",
+      europeans: "5/4",
       trials: "19/10",
       olympics: "5/2",
     }[f.kind];

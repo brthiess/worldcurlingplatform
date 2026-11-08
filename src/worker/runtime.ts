@@ -21,7 +21,7 @@ export async function startWorker(database?: Pool) {
         !/^[a-zA-Z0-9-]{1,80}$/.test(job.data.assessmentId)
       )
         throw new Error("Invalid event assessment identifier");
-      await processEventAssessment(pool, job.data.assessmentId);
+      await processEventAssessment(pool, job.data.assessmentId, job.id);
     },
   );
   await boss.work<{ probeId: string }>(

@@ -3,15 +3,31 @@ import { useCallback, useEffect, useState } from "react";
 import { AuthorityRecovery, useAuthorityCommand } from "./authority-command";
 import {
   assessmentPolicy,
+  assessmentEvidence,
   type AssessmentEvidence,
 } from "@/domain/event-assessment-input";
+import { AssessmentEvidenceEditor } from "./assessment-evidence-editor";
 import type { AssessmentResult } from "@/domain/event-assessments";
-type Review = {
+export type Review = {
+  priorEditions?: { id: string; name: string; starts_on: string }[];
   sourceDigest: string;
   current: {
-    division: { name: string; eventName: string };
+    division: { name: string; eventName: string; discipline: string };
     entries: { id: string; name: string }[];
-    games: { id: string; phase: string }[];
+    games: {
+      id: string;
+      phase: string;
+      entryA: string;
+      entryB: string;
+      result: {
+        lineupA?: {
+          members: { playerId: string; name: string; identityStatus: string }[];
+        };
+        lineupB?: {
+          members: { playerId: string; name: string; identityStatus: string }[];
+        };
+      } | null;
+    }[];
   };
   finalization: { version: number; digest: string } | null;
   rules: { id: string; version: number };
@@ -22,7 +38,23 @@ type Review = {
       version: number;
       currentRosterVersion: number;
       startingState: string;
-      data: { rankingPlayerIds: string[] };
+      rankingPlayers: {
+        playerId: string;
+        name: string;
+        identityStatus: string;
+      }[];
+      data: {
+        rankingPlayerIds: string[];
+        rosterVersion: number;
+        rosterSourceId: string;
+        sources: {
+          id: string;
+          title: string;
+          url: string;
+          edition: string;
+          sha256: string;
+        }[];
+      };
     } | null;
   }[];
 };
@@ -52,6 +84,7 @@ type Workspace = {
     actorId: string;
     requestId: string;
   }[];
+  receipts?: { actorId: string; requestId: string; assessmentId: string }[];
   selected?: Saved | null;
 };
 const path = "/api/v1/event-assessments";
@@ -73,7 +106,7 @@ function fresh(r: Review): AssessmentEvidence {
       effectiveDate: "",
       cutoffInstant: "",
       sourceId: "",
-      family: "men_four",
+      family: r.current.division.discipline,
       rows: r.current.entries.map((e) => ({
         entryId: e.id,
         rank: null,
@@ -158,14 +191,17 @@ export function EventAssessmentsWorkbench() {
     workspace?.actorId ? `wcp-assessment-command:${workspace.actorId}` : null,
     workspace?.actorId,
     async () => {
-      await load();
+      const next = await read(`${path}?division=${division}&rules=${rules}`);
+      setWorkspace(next);
+      setError("");
+      setStale(false);
     },
     async (pending) => {
       const original = JSON.parse(pending.body),
         state = await read(
           `${path}?division=${original.divisionId}&rules=${original.evidence?.rulesId ?? rules}`,
         );
-      const found = state.history?.some(
+      const found = state.receipts?.some(
         (h) =>
           h.actorId === pending.actorId && h.requestId === original.requestId,
       );
@@ -184,6 +220,9 @@ export function EventAssessmentsWorkbench() {
   const result: AssessmentResult | null = selected?.resultContents
     ? JSON.parse(selected.resultContents).result
     : null;
+  const frozenEntries: { id: string; name: string }[] = selected
+    ? JSON.parse(selected.contents).source.current.entries
+    : (review?.current.entries ?? []);
   function patch(p: Partial<AssessmentEvidence>) {
     if (evidence) setEvidence({ ...evidence, ...p });
   }
@@ -210,6 +249,11 @@ export function EventAssessmentsWorkbench() {
       )}
       <AuthorityRecovery state={command} label="assessment" />
       {loading && <p role="status">Loading assessment review…</p>}
+      {!workspace && !loading && (
+        <button type="button" onClick={() => void load()}>
+          Retry assessment workspace
+        </button>
+      )}
       {workspace && (
         <>
           <div className="form-card">
@@ -302,155 +346,11 @@ export function EventAssessmentsWorkbench() {
             </details>
             <fieldset disabled={locked}>
               <legend>Event assessment evidence</legend>
-              <label htmlFor="assessment-kind">Event category</label>
-              <select
-                id="assessment-kind"
-                value={evidence.event.kind}
-                onChange={(e) =>
-                  patch({
-                    event: {
-                      ...evidence.event,
-                      kind: e.target
-                        .value as AssessmentEvidence["event"]["kind"],
-                    },
-                  })
-                }
-              >
-                {[
-                  "tour",
-                  "nationals",
-                  "slam",
-                  "trials",
-                  "olympics",
-                  "worlds",
-                ].map((x) => (
-                  <option key={x} value={x}>
-                    {x}
-                  </option>
-                ))}
-              </select>
-              <label htmlFor="assessment-date">
-                Pre-event ranking effective date
-              </label>
-              <input
-                id="assessment-date"
-                type="date"
-                value={evidence.preEvent.effectiveDate}
-                onChange={(e) =>
-                  patch({
-                    preEvent: {
-                      ...evidence.preEvent,
-                      effectiveDate: e.target.value,
-                    },
-                  })
-                }
+              <AssessmentEvidenceEditor
+                evidence={evidence}
+                review={review}
+                onChange={setEvidence}
               />
-              <label htmlFor="assessment-cutoff">
-                Exact cutoff instant with offset
-              </label>
-              <input
-                id="assessment-cutoff"
-                placeholder="2026-11-17T12:00:00Z"
-                value={evidence.preEvent.cutoffInstant}
-                onChange={(e) =>
-                  patch({
-                    preEvent: {
-                      ...evidence.preEvent,
-                      cutoffInstant: e.target.value,
-                    },
-                  })
-                }
-              />
-              <label htmlFor="assessment-note">
-                Assessment review rationale
-              </label>
-              <textarea
-                id="assessment-note"
-                rows={3}
-                value={evidence.reviewNote}
-                onChange={(e) => patch({ reviewNote: e.target.value })}
-              />
-              <h3>Field and eligibility</h3>
-              <ul className="workspace-list">
-                {evidence.entries.map((entry, i) => {
-                  const row = evidence.preEvent.rows.find(
-                      (r) => r.entryId === entry.entryId,
-                    ),
-                    roster = review.starting.find(
-                      (r) => r.entryId === entry.entryId,
-                    )?.evidence;
-                  return (
-                    <li key={entry.entryId}>
-                      <h4>
-                        {review.current.entries.find(
-                          (e) => e.id === entry.entryId,
-                        )?.name ?? entry.entryId}
-                      </h4>
-                      <p>
-                        Official roster evidence{" "}
-                        {roster
-                          ? `revision ${roster.version}; current platform roster ${roster.currentRosterVersion}`
-                          : "missing"}
-                        . Event-specific roster review{" "}
-                        {entry.rosterReview ? "recorded" : "required"}.
-                      </p>
-                      <label htmlFor={`eligibility-${i}`}>
-                        Ranking eligibility
-                      </label>
-                      <select
-                        id={`eligibility-${i}`}
-                        value={entry.eligibility}
-                        onChange={(e) =>
-                          patch({
-                            entries: evidence.entries.map((x, j) =>
-                              j === i
-                                ? {
-                                    ...x,
-                                    eligibility: e.target
-                                      .value as typeof x.eligibility,
-                                  }
-                                : x,
-                            ),
-                          })
-                        }
-                      >
-                        <option value="unknown">Unresolved</option>
-                        <option value="eligible">Eligible with evidence</option>
-                        <option value="excluded">Excluded with reason</option>
-                      </select>
-                      <label htmlFor={`rank-${i}`}>Exact pre-event rank</label>
-                      <input
-                        id={`rank-${i}`}
-                        type="number"
-                        min={1}
-                        value={row?.rank ?? ""}
-                        onChange={(e) =>
-                          patch({
-                            preEvent: {
-                              ...evidence.preEvent,
-                              rows: evidence.preEvent.rows.map((x) =>
-                                x.entryId === entry.entryId
-                                  ? {
-                                      ...x,
-                                      rank: e.target.value
-                                        ? Number(e.target.value)
-                                        : null,
-                                    }
-                                  : x,
-                              ),
-                            },
-                          })
-                        }
-                      />
-                      <p className="muted">
-                        Source: {entry.sourceId || "required"} ·{" "}
-                        {entry.note || "Eligibility rationale required"}.
-                        Throughout-play game records: {entry.games.length}.
-                      </p>
-                    </li>
-                  );
-                })}
-              </ul>
               <details>
                 <summary>Import or inspect sourced event evidence</summary>
                 <p>
@@ -473,16 +373,7 @@ export function EventAssessmentsWorkbench() {
                   type="button"
                   onClick={() => {
                     try {
-                      const value = JSON.parse(importText);
-                      if (
-                        !value.entries ||
-                        !value.event ||
-                        !value.preEvent ||
-                        !value.sources
-                      )
-                        throw new Error(
-                          "Use a complete event evidence record.",
-                        );
+                      const value = assessmentEvidence(JSON.parse(importText));
                       setEvidence(value);
                       setImportError("");
                     } catch (e) {
@@ -625,7 +516,7 @@ export function EventAssessmentsWorkbench() {
                                   <li key={a.entryId}>
                                     <strong>
                                       Place {a.place} ·{" "}
-                                      {review.current.entries.find(
+                                      {frozenEntries.find(
                                         (e) => e.id === a.entryId,
                                       )?.name ?? a.entryId}
                                     </strong>
@@ -646,7 +537,7 @@ export function EventAssessmentsWorkbench() {
                               <ul>
                                 {result.contributions.map((c) => (
                                   <li key={c.entryId}>
-                                    {review.current.entries.find(
+                                    {frozenEntries.find(
                                       (e) => e.id === c.entryId,
                                     )?.name ?? c.entryId}
                                     : {amount(c.value)} · {c.reason}

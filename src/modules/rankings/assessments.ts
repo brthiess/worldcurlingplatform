@@ -84,7 +84,7 @@ async function review(c: PoolClient, id: string, rulesId: string) {
     throw new EntryError("Choose an existing rule-source edition.", 404);
   const eligibility = (
     await c.query(
-      "SELECT d.ranking_status,e.timezone FROM division d JOIN event_edition e ON e.id=d.event_id WHERE d.id=$1",
+      "SELECT d.ranking_status,e.timezone,e.admission_status FROM division d JOIN event_edition e ON e.id=d.event_id WHERE d.id=$1",
       [id],
     )
   ).rows[0];
@@ -95,12 +95,19 @@ async function review(c: PoolClient, id: string, rulesId: string) {
       : null;
     starting.push({ entryId: entry.id, evidence });
   }
+  const priorEditions = (
+    await c.query(
+      "SELECT p.id,p.name,p.starts_on::text AS starts_on,p.ends_on::text AS ends_on FROM event_edition p JOIN event_edition e ON e.series_id=p.series_id WHERE e.id=$1 AND p.starts_on>='2025-08-01' AND p.starts_on<'2026-08-01' ORDER BY p.starts_on,p.id",
+      [current.division.eventId],
+    )
+  ).rows;
   const state = {
     current,
     finalization: latest,
     rules: rule,
     starting,
     eligibility,
+    priorEditions,
   };
   return { ...state, sourceDigest: freezeContents(state).digest };
 }
@@ -112,6 +119,12 @@ async function detail(c: PoolClient, id: string) {
     )
   ).rows[0];
   if (!row) throw new EntryError("Assessment not found.", 404);
+  row.deliveries = (
+    await c.query(
+      'SELECT queue_id AS "queueId",outcome,error,created_at AS "createdAt" FROM event_calculation_delivery WHERE assessment_id=$1 ORDER BY created_at,id',
+      [id],
+    )
+  ).rows;
   return row;
 }
 export async function assessmentWorkspace(
@@ -163,6 +176,12 @@ export async function assessmentWorkspace(
       policy: assessmentPolicy,
       review: state,
       history,
+      receipts: (
+        await c.query(
+          'SELECT r.actor_id AS "actorId",r.request_id AS "requestId",r.assessment_id AS "assessmentId" FROM event_calculation_receipt r JOIN event_assessment a ON a.id=r.assessment_id WHERE a.division_id=$1',
+          [divisionId],
+        )
+      ).rows,
       selected: selected ? await detail(c, selected) : null,
     };
     await c.query("COMMIT");
@@ -185,6 +204,22 @@ function fieldFor(
     issues.push(
       "Current division ranking eligibility is unresolved or ineligible.",
     );
+  if (r.eligibility.admission_status !== "approved")
+    issues.push("Event edition admission is not approved.");
+  if (e.event.kind === "tour") {
+    if (e.event.newEvent === true && r.priorEditions.length)
+      issues.push(
+        "This event series has a prior-season edition; it cannot be treated as new.",
+      );
+    if (
+      e.event.newEvent === false &&
+      (!e.event.previous ||
+        !r.priorEditions.some((p) => p.id === e.event.previous!.editionId))
+    )
+      issues.push(
+        "Previous SFM must reference an actual prior-season edition of this event series.",
+      );
+  }
   if (
     r.finalization &&
     r.finalization.source_digest !== freezeContents(r.current).digest
@@ -372,13 +407,17 @@ export async function queueEventAssessment(userId: string, raw: unknown) {
   }
 }
 /** Real queue delivery; input/result association is frozen and duplicate delivery is harmless. */
-export async function processEventAssessment(database: Pool, id: string) {
+export async function processEventAssessment(
+  database: Pool,
+  id: string,
+  deliveryQueueId?: string,
+) {
   const c = await database.connect();
   try {
     await c.query("BEGIN");
     const row = (
       await c.query(
-        "SELECT a.*,j.state FROM event_assessment a JOIN event_calculation_job j ON j.assessment_id=a.id WHERE a.id=$1 FOR UPDATE OF j",
+        "SELECT a.*,j.state,j.queue_id FROM event_assessment a JOIN event_calculation_job j ON j.assessment_id=a.id WHERE a.id=$1 FOR UPDATE OF j",
         [identifier(id)],
       )
     ).rows[0];
@@ -430,13 +469,53 @@ export async function processEventAssessment(database: Pool, id: string) {
       "UPDATE event_calculation_job SET state=$2,updated_at=now() WHERE assessment_id=$1",
       [id, result.state],
     );
+    await c.query(
+      "INSERT INTO event_calculation_delivery(id,assessment_id,queue_id,outcome,audit_id) VALUES($1,$2,$3,$4,$5)",
+      [
+        randomUUID(),
+        id,
+        deliveryQueueId ?? row.queue_id,
+        result.state,
+        auditId,
+      ],
+    );
     await c.query("COMMIT");
   } catch (e) {
     await c.query("ROLLBACK");
+    await c.query("BEGIN");
+    const failed = (
+      await c.query(
+        "SELECT a.actor_id,j.queue_id,j.state FROM event_assessment a JOIN event_calculation_job j ON j.assessment_id=a.id WHERE a.id=$1 FOR UPDATE OF j",
+        [id],
+      )
+    ).rows[0];
+    const error =
+      e instanceof Error ? e.message.slice(0, 500) : "Delivery failed";
+    if (failed && !["completed", "blocked"].includes(failed.state)) {
+      const auditId = randomUUID();
+      await c.query(
+        "INSERT INTO audit_record(id,actor_id,action,resource_id,after_state) VALUES($1,$2,'event_assessment_delivery_failed',$3,$4)",
+        [
+          auditId,
+          failed.actor_id,
+          id,
+          {
+            executor: "ranking-four-event-worker",
+            queueId: deliveryQueueId ?? failed.queue_id,
+            error,
+          },
+        ],
+      );
+      await c.query(
+        "INSERT INTO event_calculation_delivery(id,assessment_id,queue_id,outcome,error,audit_id) VALUES($1,$2,$3,'failed',$4,$5)",
+        [randomUUID(), id, deliveryQueueId ?? failed.queue_id, error, auditId],
+      );
+    }
     await c.query(
       "UPDATE event_calculation_job SET state='failed',attempts=attempts+1,error=$2,updated_at=now() WHERE assessment_id=$1 AND state NOT IN ('completed','blocked')",
-      [id, e instanceof Error ? e.message.slice(0, 500) : "Delivery failed"],
+      [id, error],
     );
+    await c.query("COMMIT");
     throw e;
   } finally {
     c.release();
