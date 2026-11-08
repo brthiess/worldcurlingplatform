@@ -143,6 +143,44 @@ async function detail(c: Reader, id: string, version?: number) {
         : null,
   };
 }
+/** Scoped event-roster projection. It grants no starting-entitlement approval. */
+export async function calculationRosterEvidence(
+  c: Reader,
+  registrationId: string,
+) {
+  const record = await c.query(
+    "SELECT id FROM ranking_record WHERE registration_id=$1 FOR SHARE",
+    [registrationId],
+  );
+  if (!record.rowCount) return null;
+  const row = await detail(c, record.rows[0].id),
+    data = seasonInput(row.data);
+  const current = (
+    await c.query(
+      "SELECT version FROM season_registration WHERE id=$1 FOR SHARE",
+      [registrationId],
+    )
+  ).rows[0];
+  return {
+    id: row.id,
+    version: row.version,
+    startingState: row.state,
+    currentRosterVersion: current.version,
+    rankingPlayers: row.rankingPlayers,
+    data: {
+      registrationId: data.registrationId,
+      rosterVersion: data.rosterVersion,
+      rulesId: data.rulesId,
+      rulesVersion: data.rulesVersion,
+      effectiveFrom: data.effectiveFrom,
+      effectiveTo: data.effectiveTo,
+      rankingPlayerIds: data.rankingPlayerIds,
+      rankingAlternateIds: data.rankingAlternateIds,
+      rosterSourceId: data.rosterSourceId,
+      sources: data.sources,
+    },
+  };
+}
 export async function rankingWorkspace(
   userId: string,
   id?: string,

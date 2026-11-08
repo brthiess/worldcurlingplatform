@@ -2,6 +2,8 @@ import PgBoss from "pg-boss";
 import type { Pool } from "pg";
 import { fetchSource } from "../modules/news/service";
 import { newsQueue } from "../modules/news/queue";
+import { assessmentQueue } from "../modules/rankings/assessment-queue";
+import { processEventAssessment } from "../modules/rankings/assessments";
 export const probeQueue = "runtime-probe";
 export async function startWorker(database?: Pool) {
   const pool = database ?? (await import("../db")).pool;
@@ -9,6 +11,19 @@ export async function startWorker(database?: Pool) {
   boss.on("error", (error) => console.error("Worker error:", error.message));
   await boss.start();
   await boss.createQueue(probeQueue);
+  await boss.createQueue(assessmentQueue);
+  await boss.work<{ assessmentId: string }>(
+    assessmentQueue,
+    { pollingIntervalSeconds: 1 },
+    async ([job]) => {
+      if (
+        typeof job.data.assessmentId !== "string" ||
+        !/^[a-zA-Z0-9-]{1,80}$/.test(job.data.assessmentId)
+      )
+        throw new Error("Invalid event assessment identifier");
+      await processEventAssessment(pool, job.data.assessmentId);
+    },
+  );
   await boss.work<{ probeId: string }>(
     probeQueue,
     { pollingIntervalSeconds: 1 },

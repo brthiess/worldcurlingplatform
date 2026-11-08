@@ -1241,3 +1241,9 @@ footer {
     flex: 1 1 120px;
   }
 }
+/* Staff assessment evidence remains readable on narrow task screens. */
+.assessment-workbench code {overflow-wrap:anywhere;}
+.assessment-workbench pre {white-space:pre-wrap;overflow-wrap:anywhere;max-height:30rem;overflow:auto;font-size:.8rem;}
+.assessment-workbench fieldset {min-width:0;border:1px solid var(--line,#c5cdd4);padding:1rem;}
+.assessment-workbench select,.assessment-workbench input,.assessment-workbench textarea {max-width:100%;}
+.assessment-workbench dd {overflow-wrap:anywhere;}

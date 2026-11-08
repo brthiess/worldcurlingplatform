@@ -141,6 +141,9 @@ export default function Admin() {
               Season ranking inputs and rule editions
             </a>
           </p>
+          <p>
+            <a href="/admin/event-assessments">Four-player event assessments</a>
+          </p>
           <button
             className="secondary"
             disabled={busy}
