@@ -644,13 +644,17 @@
       "file": "13-review-private-photo-submissions-and-publish-approved-images.md",
       "id": "WCP-013",
       "path": "issues/13-review-private-photo-submissions-and-publish-approved-images.md",
-      "status": "in-progress",
+      "status": "completed",
       "labels": [
         "ready-for-agent"
       ],
       "blocked_by": [
         "WCP-012"
-      ]
+      ],
+      "completion": {
+        "commit": "210dc44",
+        "evidence": "docs/verification/WCP-013.md"
+      }
     },
     {
       "n": 14,

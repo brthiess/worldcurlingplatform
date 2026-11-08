@@ -24,7 +24,8 @@
     "WCP-001",
     "WCP-002",
     "WCP-004",
-    "WCP-012"
+    "WCP-012",
+    "WCP-013"
   ],
   "workflow": {
     "fresh_agent_per_ticket": true,
@@ -67,6 +68,10 @@
       "WCP-012": {
         "commit": "bae3812",
         "evidence": "docs/verification/WCP-012.md"
+      },
+      "WCP-013": {
+        "commit": "210dc44",
+        "evidence": "docs/verification/WCP-013.md"
       }
     }
   },
@@ -88,11 +93,10 @@
     "Close only reviewed integrated tickets with meaningful unit/PostgreSQL/API/frontend/browser evidence.",
     "Continue unblocked work and report provider/deployment limitations honestly."
   ],
-  "updated_at": "2026-11-08T17:17:00.478111+00:00",
+  "updated_at": "2026-11-08T17:35:33.163003+00:00",
   "active_tickets": [
     "WCP-005",
-    "WCP-006",
-    "WCP-013"
+    "WCP-006"
   ],
   "frontier": [
     "WCP-003",
@@ -194,6 +198,14 @@
       "reason": null,
       "commit": null,
       "evidence": null
+    },
+    {
+      "time": "2026-11-08T17:35:33.163003+00:00",
+      "ticket": "WCP-013",
+      "status": "completed",
+      "reason": null,
+      "commit": "210dc44",
+      "evidence": "docs/verification/WCP-013.md"
     }
   ],
   "research": {
