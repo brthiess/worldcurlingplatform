@@ -15,6 +15,7 @@
     "WCP-002",
     "WCP-004",
     "WCP-012",
+    "WCP-013",
     "WCP-045"
   ],
   "tickets_completed": [
@@ -72,13 +73,13 @@
     "Close only reviewed integrated tickets with meaningful unit/PostgreSQL/API/frontend/browser evidence.",
     "Continue unblocked work and report provider/deployment limitations honestly."
   ],
-  "updated_at": "2026-11-08T16:42:32.760728+00:00",
+  "updated_at": "2026-11-08T16:42:36.966886+00:00",
   "active_tickets": [
     "WCP-002",
-    "WCP-004"
+    "WCP-004",
+    "WCP-013"
   ],
   "frontier": [
-    "WCP-013",
     "WCP-044"
   ],
   "events": [
@@ -137,6 +138,14 @@
       "reason": null,
       "commit": "bae3812",
       "evidence": "docs/verification/WCP-012.md"
+    },
+    {
+      "time": "2026-11-08T16:42:36.966886+00:00",
+      "ticket": "WCP-013",
+      "status": "in-progress",
+      "reason": null,
+      "commit": null,
+      "evidence": null
     }
   ],
   "research": {
