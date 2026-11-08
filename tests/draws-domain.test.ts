@@ -4,7 +4,27 @@ import {
   singleKnockout,
   assignmentDecision,
   selectedDrawPath,
+  validateDrawFieldIdentity,
 } from "../src/domain/draws";
+
+test("a known core team occupies one seed while distinct unresolved entries remain independent", () => {
+  assert.throws(
+    () =>
+      validateDrawFieldIdentity([
+        { id: "entry-A", teamId: "known-core" },
+        { id: "entry-B", teamId: "known-core" },
+      ]),
+    /same known team/,
+  );
+  assert.doesNotThrow(() =>
+    validateDrawFieldIdentity([
+      { id: "entry-A", teamId: "core-A" },
+      { id: "entry-B", teamId: "core-B" },
+      { id: "entry-C", teamId: null },
+      { id: "entry-D", teamId: null },
+    ]),
+  );
+});
 
 test("eight seeded entries follow the independently specified quarterfinal and winner routes", () => {
   const graph = singleKnockout([

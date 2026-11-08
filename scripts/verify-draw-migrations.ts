@@ -46,6 +46,21 @@ try {
     ).rows[0].n,
     0,
   );
+  const fingerprint = createHash("sha256");
+  const tables = (
+    await pool.query(
+      "SELECT tablename FROM pg_tables WHERE schemaname='public' ORDER BY tablename",
+    )
+  ).rows;
+  for (const { tablename } of tables) {
+    const quoted = '"' + tablename.replaceAll('"', '""') + '"';
+    const rows = (
+      await pool.query(
+        `SELECT row_to_json(t)::text AS value FROM ${quoted} t ORDER BY row_to_json(t)::text`,
+      )
+    ).rows;
+    fingerprint.update(JSON.stringify([tablename, rows.map((r) => r.value)]));
+  }
   console.log(
     JSON.stringify({
       migrationCount: names.length,
@@ -53,6 +68,7 @@ try {
       profileVersion: 1,
       seedEntries: 6,
       seedGames: 0,
+      seedFingerprintSha256: fingerprint.digest("hex"),
       profileMigrationSha256: applied.find((r) => r.name.startsWith("0022_"))
         .sha256,
     }),

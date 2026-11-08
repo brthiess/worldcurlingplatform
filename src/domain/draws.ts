@@ -6,6 +6,19 @@ export type DrawFixture = {
   a: DrawSource;
   b: DrawSource;
 };
+export function validateDrawFieldIdentity(
+  entries: readonly { id: string; teamId: string | null }[],
+) {
+  const known = new Set<string>();
+  for (const entry of entries) {
+    if (entry.teamId === null) continue;
+    if (known.has(entry.teamId))
+      throw new Error(
+        "The same known team cannot occupy two seeds. Resolve the duplicate entry records before drawing.",
+      );
+    known.add(entry.teamId);
+  }
+}
 export function assignmentDecision(
   state: string,
   actual: string | null,

@@ -896,3 +896,111 @@ test("queued graph writer rechecks the division association after acquiring edit
     );
   }
 });
+
+async function identityField() {
+  const id = "identity-" + randomUUID(),
+    seeds: string[] = [];
+  await pool.query(
+    "INSERT INTO division(id,event_id,name,discipline,format) VALUES($1,$2,'Known identity field','men_four','single knockout')",
+    [id, event.id],
+  );
+  for (let n = 1; n <= 6; n++) {
+    const entry = id + "-" + n;
+    seeds.push(entry);
+    await pool.query(
+      "INSERT INTO event_entry(id,division_id,display_name) VALUES($1,$2,'Same display name')",
+      [entry, id],
+    );
+  }
+  const known = (
+    await pool.query(
+      "SELECT t.id FROM team t WHERE t.discipline='men_four' AND EXISTS(SELECT 1 FROM team_core_member m WHERE m.team_id=t.id) ORDER BY t.id LIMIT 1",
+    )
+  ).rows[0]?.id;
+  assert.equal(
+    typeof known,
+    "string",
+    "Fixture needs a seeded known core identity",
+  );
+  const cookie = await login();
+  const post = (body: object) =>
+    fetch(base + "/api/v1/divisions/" + id + "/draw", {
+      method: "POST",
+      headers: { cookie, Origin: base, "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  const preview = () => ({
+    requestId: randomUUID(),
+    expectedVersion: 0,
+    action: "preview",
+    seedEntryIds: seeds,
+    reason: "Review distinct actual entrants",
+  });
+  return { id, seeds, known, post, preview };
+}
+test("preview rejects two distinct entry records for the same known team without inferring identity from names", async () => {
+  const f = await identityField();
+  await pool.query(
+    "UPDATE event_entry SET team_id=$2 WHERE id=ANY($1::text[])",
+    [f.seeds.slice(0, 2), f.known],
+  );
+  const rejected = await f.post(f.preview());
+  assert.equal(rejected.status, 422, await rejected.clone().text());
+  assert.equal(
+    (
+      await pool.query(
+        "SELECT count(*)::integer AS n FROM draw_revision WHERE division_id=$1",
+        [f.id],
+      )
+    ).rows[0].n,
+    0,
+  );
+  await pool.query("UPDATE event_entry SET team_id=NULL WHERE id=$1", [
+    f.seeds[1],
+  ]);
+  const distinct = await f.post(f.preview());
+  assert.equal(distinct.status, 200, await distinct.clone().text());
+});
+test("publication rechecks known team identity and permits unresolved same-name entries when the collision is removed", async () => {
+  const f = await identityField();
+  await pool.query("UPDATE event_entry SET team_id=$2 WHERE id=$1", [
+    f.seeds[0],
+    f.known,
+  ]);
+  assert.equal((await f.post(f.preview())).status, 200);
+  await pool.query("UPDATE event_entry SET team_id=$2 WHERE id=$1", [
+    f.seeds[1],
+    f.known,
+  ]);
+  const publish = () => ({
+    requestId: randomUUID(),
+    expectedVersion: 1,
+    action: "publish",
+    reason: "Publish reviewed distinct entrants",
+  });
+  const rejected = await f.post(publish());
+  assert.equal(rejected.status, 409, await rejected.clone().text());
+  assert.equal(
+    (
+      await pool.query(
+        "SELECT count(*)::integer AS n FROM game WHERE division_id=$1",
+        [f.id],
+      )
+    ).rows[0].n,
+    0,
+  );
+  await pool.query("UPDATE event_entry SET team_id=NULL WHERE id=$1", [
+    f.seeds[1],
+  ]);
+  const accepted = await f.post(publish());
+  assert.equal(accepted.status, 200, await accepted.clone().text());
+  assert.equal(
+    (
+      await pool.query(
+        "SELECT count(*)::integer AS n FROM game WHERE division_id=$1",
+        [f.id],
+      )
+    ).rows[0].n,
+    5,
+  );
+});

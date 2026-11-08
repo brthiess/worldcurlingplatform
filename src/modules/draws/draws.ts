@@ -5,6 +5,7 @@ import { readDrawFieldEntries } from "@/modules/entries/draw-field";
 import {
   singleKnockout,
   SINGLE_TEMPLATE,
+  validateDrawFieldIdentity,
   type DrawSource,
 } from "@/domain/draws";
 export class DrawError extends Error {
@@ -207,6 +208,11 @@ export async function saveDraw(userId: string, id: string, input: unknown) {
           "Only entries admitted to this field can be seeded. Pending submissions are not field places.",
           422,
         );
+      try {
+        validateDrawFieldIdentity(rows);
+      } catch (e) {
+        throw new DrawError((e as Error).message, 422);
+      }
       seeds = x.seedEntryIds!.map((entryId, i) => {
         const row = rows.find((r) => r.id === entryId)!;
         return { seed: i + 1, entryId, version: row.version, name: row.name };
@@ -243,6 +249,11 @@ export async function saveDraw(userId: string, id: string, input: unknown) {
           409,
         );
       // An existing operated/legacy competition is never silently replaced.
+      try {
+        validateDrawFieldIdentity(current);
+      } catch (e) {
+        throw new DrawError((e as Error).message, 409);
+      }
       if (
         (
           await c.query("SELECT id FROM game WHERE division_id=$1 LIMIT 1", [
