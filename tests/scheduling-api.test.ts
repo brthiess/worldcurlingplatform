@@ -294,7 +294,7 @@ test("declared rotating-five and referenced game lineups detect cross-division c
           newPlayers: newIds.map((id) => ({
             id,
             name: id === coach ? "Shared coach" : "Schedule player",
-            provisional: false,
+            provisional: id === coach,
           })),
         },
       }),
@@ -363,6 +363,11 @@ test("declared rotating-five and referenced game lineups detect cross-division c
     games[0],
     opponent.entryId,
   ]);
+  const knownPlayingCoverage = await (await request(f.eventId, cookie)).json();
+  assert.equal(
+    knownPlayingCoverage.games.find((g: any) => g.id === games[0]).coverage,
+    "Declared/defaulted players; participation unverified",
+  );
   assert.equal(
     (await score({ expectedVersion: 0, action: "start" })).status,
     200,

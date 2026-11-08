@@ -345,7 +345,7 @@ export function ScheduleWorkbench() {
                     id="session-offset"
                     name="offset"
                     placeholder="-06:00"
-                    pattern="[+-][0-9]{2}:[0-9]{2}"
+                    pattern={"[+\\-][0-9]{2}:[0-9]{2}"}
                     required
                     defaultValue={fields.offset}
                     aria-describedby="offset-help"
@@ -429,7 +429,7 @@ export function ScheduleWorkbench() {
                         id="assignment-sheet"
                         name="sheet"
                         maxLength={16}
-                        pattern="[A-Za-z0-9 -]+"
+                        pattern={"[A-Za-z0-9 \\-]+"}
                         defaultValue={game?.sheet}
                         required
                       />

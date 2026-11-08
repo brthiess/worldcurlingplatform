@@ -154,7 +154,9 @@ async function snapshot(c: PoolClient, eventId: string) {
           "mixed_doubles"
             ? 2
             : 4) ||
-        l.members.some((m) => m.identityStatus === "provisional"),
+        l.members.some(
+          (m) => m.role !== "coach" && m.identityStatus === "provisional",
+        ),
     );
     games.push({
       ...row,
