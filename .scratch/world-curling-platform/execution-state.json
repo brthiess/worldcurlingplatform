@@ -21,7 +21,9 @@
     "skill": "C:/Users/brthi/.codex/skills/implement-spec/SKILL.md"
   },
   "git": {
-    "remote": null,
+    "remote": "https://github.com/brthiess/worldcurlingplatform.git",
+    "push_as_work_progresses": true,
+    "last_verified_remote_integration_commit": "72e4144ca18a0c657acd80096d67a5e9b3002620",
     "integration_branch": "integration/world-curling-platform",
     "worktrees_created": [
       ".worktrees/WCP-001"
@@ -45,7 +47,7 @@
     {
       "ticket": "WCP-045",
       "status": "not_supplied",
-      "required": "Domain/DNS, source remote, hosting access and reviewed quote; provider credentials when exercised"
+      "required": "Domain/DNS, hosting access and reviewed quote; provider credentials when exercised"
     }
   ],
   "resume": [
