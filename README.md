@@ -5,7 +5,9 @@ Standalone curling platform and its authoritative planning package. The initial 
 ## Start here
 
 - [Canonical parent specification: WCP-SPEC-001](.scratch/world-curling-platform/spec.md)
-- [47 published implementation tickets — ready-for-agent](.scratch/world-curling-platform/tickets.md)
+- [47 published implementation tickets](.scratch/world-curling-platform/tickets.md)
+- [Verified offer inventory and ticket evidence](docs/verification/coverage.md)
+- [Current execution workflow and resume guidance](docs/agents/execution.md)
 - [Ticket traceability and verification](.scratch/world-curling-platform/ticket-traceability.md)
 - [Seven-workflow acceptance, deferrals, and accepted core decisions](.scratch/world-curling-platform/spec.md#initial-offer-acceptance-seven-demonstration-workflows)
 - [Specification entry point](SPEC.md)
@@ -26,4 +28,4 @@ Standalone curling platform and its authoritative planning package. The initial 
 
 Local application setup and migrations are available. A hosted service and validated ranking implementation are not yet delivered. Accepted interview decisions are the user's direction for an offer, not World Curling endorsement.
 - [Run the application, seed demo personas, and verify it](docs/setup.md)
-- [WCP-001 verification evidence](docs/verification/WCP-001.md)
+- [Individual verification and independent review records](docs/verification/)
