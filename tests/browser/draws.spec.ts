@@ -30,6 +30,10 @@ async function fixture() {
       [entry, id, "Browser team " + n],
     );
   }
+  await pool.query(
+    "INSERT INTO event_entry(id,division_id,display_name,entry_admission) VALUES($1,$2,'Pending browser submission','submitted_pending')",
+    [id + "-pending", id],
+  );
   return { id, entries };
 }
 for (const [device, width, height] of [
@@ -65,6 +69,14 @@ for (const [device, width, height] of [
     ).toBe(200);
     await page.goto("/admin/draws?division=" + id);
     await expect(page.getByLabel("Seed 1", { exact: true })).toBeVisible();
+    await expect(
+      page
+        .getByLabel("Seed 1", { exact: true })
+        .getByRole("option", {
+          name: "Pending browser submission",
+          exact: true,
+        }),
+    ).toHaveCount(0);
     for (let n = 1; n <= 6; n++)
       await page
         .getByLabel("Seed " + n, { exact: true })

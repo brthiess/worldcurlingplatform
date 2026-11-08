@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { PoolClient } from "pg";
 import { pool } from "@/db";
+import { readDrawFieldEntries } from "@/modules/entries/draw-field";
 import {
   singleKnockout,
   SINGLE_TEMPLATE,
@@ -96,12 +97,10 @@ export async function drawWorkspace(userId: string, id: string) {
     await c.query("BEGIN ISOLATION LEVEL REPEATABLE READ");
     const division = await scope(c, userId, id);
     const data = await state(c, id);
-    const entries = (
-      await c.query(
-        "SELECT id,display_name AS name,version FROM event_entry WHERE division_id=$1 ORDER BY display_name,id",
-        [id],
-      )
-    ).rows;
+    const entries = (await readDrawFieldEntries(c, id))
+      .filter((e) => e.admitted)
+      .map(({ id, name, version }) => ({ id, name, version }))
+      .sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id));
     const history = (
       await c.query(
         'SELECT version,state,reason,created_at AS "createdAt" FROM draw_revision WHERE division_id=$1 ORDER BY version DESC',
@@ -197,16 +196,16 @@ export async function saveDraw(userId: string, id: string, input: unknown) {
       } catch (e) {
         throw new DrawError((e as Error).message);
       }
-      const rows = (
-        await c.query(
-          "SELECT id,display_name AS name,version FROM event_entry WHERE division_id=$1 AND id=ANY($2::text[]) ORDER BY id FOR SHARE",
-          [id, x.seedEntryIds],
-        )
-      ).rows;
+      const rows = await readDrawFieldEntries(c, id, x.seedEntryIds, true);
       if (rows.length !== x.seedEntryIds!.length)
         throw new DrawError(
           "Every selected entry must belong to this division.",
           403,
+        );
+      if (rows.some((e) => !e.admitted))
+        throw new DrawError(
+          "Only entries admitted to this field can be seeded. Pending submissions are not field places.",
+          422,
         );
       seeds = x.seedEntryIds!.map((entryId, i) => {
         const row = rows.find((r) => r.id === entryId)!;
@@ -224,20 +223,23 @@ export async function saveDraw(userId: string, id: string, input: unknown) {
         );
       graph = before.graph;
       seeds = before.seeds;
-      const current = (
-        await c.query(
-          "SELECT id,version FROM event_entry WHERE division_id=$1 AND id=ANY($2::text[]) ORDER BY id FOR SHARE",
-          [id, seeds.map((s) => s.entryId)],
-        )
-      ).rows;
+      const current = await readDrawFieldEntries(
+        c,
+        id,
+        seeds.map((s) => s.entryId),
+        true,
+      );
       if (
         seeds.some(
           (s) =>
-            !current.some((e) => e.id === s.entryId && e.version === s.version),
+            !current.some(
+              (e) =>
+                e.id === s.entryId && e.version === s.version && e.admitted,
+            ),
         )
       )
         throw new DrawError(
-          "An entry changed after preview. Save and review a new preview before publishing.",
+          "An entry or field admission changed after preview. Save and review a new preview before publishing.",
           409,
         );
       // An existing operated/legacy competition is never silently replaced.

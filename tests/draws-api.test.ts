@@ -281,6 +281,44 @@ test("organizer persists a private seeded preview, publishes the reviewed versio
     seeds[3],
   );
   const firstResponse = await finished.json();
+  const finalizationUrl = base + "/api/v1/division-finalizations";
+  const reviewResponse = await fetch(finalizationUrl + "?division=" + id, {
+    headers: { cookie },
+  });
+  assert.equal(reviewResponse.status, 200, await reviewResponse.clone().text());
+  const incomplete = await reviewResponse.json();
+  const premature = await fetch(finalizationUrl, {
+    method: "POST",
+    headers: { cookie, Origin: base, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      divisionId: id,
+      version: incomplete.version,
+      sourceDigest: incomplete.sourceDigest,
+      requestId: randomUUID(),
+      placements: incomplete.source.entries.map((e: any, n: number) => ({
+        entryId: e.id,
+        place: n + 1,
+      })),
+      rulesReference: "Application single8 seeded profile version1",
+      note: "Attempt while required unscheduled games remain",
+    }),
+  });
+  assert.equal(premature.status, 422, await premature.clone().text());
+  assert.equal(incomplete.source.games.length, 5);
+  assert.equal(
+    incomplete.source.games.filter((g: any) => g.drawId === null).length,
+    4,
+  );
+  assert.ok(incomplete.prerequisites.includes("Every game must be confirmed."));
+  assert.equal(
+    (
+      await pool.query(
+        "SELECT count(*)::integer AS n FROM division_finalization WHERE division_id=$1",
+        [id],
+      )
+    ).rows[0].n,
+    0,
+  );
   assert.deepEqual(await (await score(q2.id, confirm)).json(), firstResponse);
   assert.equal(
     (await score(q2.id, { ...confirm, requestId: randomUUID() })).status,
@@ -348,6 +386,47 @@ test("organizer persists a private seeded preview, publishes the reviewed versio
     [seeds[0]],
   );
   assert.equal(record.rows[0].wins, 2);
+  const finishedReview = await (
+    await fetch(finalizationUrl + "?division=" + id, { headers: { cookie } })
+  ).json();
+  assert.deepEqual(finishedReview.prerequisites, []);
+  const finalizedResponse = await fetch(finalizationUrl, {
+    method: "POST",
+    headers: { cookie, Origin: base, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      divisionId: id,
+      version: finishedReview.version,
+      sourceDigest: finishedReview.sourceDigest,
+      requestId: randomUUID(),
+      placements: [
+        { entryId: seeds[0], place: 1 },
+        { entryId: seeds[1], place: 2 },
+        { entryId: seeds[2], place: 3 },
+        { entryId: seeds[3], place: 3 },
+        { entryId: seeds[4], place: 5 },
+        { entryId: seeds[5], place: 5 },
+      ],
+      rulesReference: "Application single8 seeded profile version1",
+      note: "Semifinal losers share third; quarterfinal losers share fifth. Structural byes are not played wins.",
+    }),
+  });
+  assert.equal(
+    finalizedResponse.status,
+    200,
+    await finalizedResponse.clone().text(),
+  );
+  const frozenFinalization = (
+    await pool.query(
+      "SELECT digest,contents FROM division_finalization WHERE division_id=$1 AND version=1",
+      [id],
+    )
+  ).rows[0];
+  const frozenSport = JSON.parse(frozenFinalization.contents);
+  assert.equal(frozenSport.source.games.length, 5);
+  assert.equal(
+    frozenSport.source.games.filter((g: any) => g.drawId === null).length,
+    4,
+  );
   const s1 = complete.games.find((g: any) => g.key === "S1");
   const s1history = (
     await pool.query(
@@ -417,6 +496,19 @@ test("organizer persists a private seeded preview, publishes the reviewed versio
     ).rows[0].digest,
     frozen,
   );
+  assert.deepEqual(
+    (
+      await pool.query(
+        "SELECT digest,contents FROM division_finalization WHERE division_id=$1 AND version=1",
+        [id],
+      )
+    ).rows[0],
+    frozenFinalization,
+  );
+  const dirtyFinalization = await (
+    await fetch(finalizationUrl + "?division=" + id, { headers: { cookie } })
+  ).json();
+  assert.equal(dirtyFinalization.dirty, true);
   await assert.rejects(
     pool.query(
       "UPDATE draw_slot SET side='b' WHERE division_id=$1 AND revision=2 AND node_key='F' AND side='a'",
@@ -441,6 +533,74 @@ test("organizer persists a private seeded preview, publishes the reviewed versio
     (await schedule.json()).games.some(
       (g: any) => g.id === s1.id && g.drawId === null,
     ),
+  );
+});
+
+test("pending submissions are excluded from field candidates and cannot be previewed or published as an admitted seed", async () => {
+  const cookie = await login(),
+    id = "admission-" + randomUUID(),
+    seeds: string[] = [];
+  await pool.query(
+    "INSERT INTO division(id,event_id,name,discipline,format) VALUES($1,$2,'Admission boundary fixture','men_four','single knockout')",
+    [id, event.id],
+  );
+  for (let n = 1; n <= 6; n++) {
+    const en = id + "-" + n;
+    seeds.push(en);
+    await pool.query(
+      "INSERT INTO event_entry(id,division_id,display_name) VALUES($1,$2,$3)",
+      [en, id, "Admission team " + n],
+    );
+  }
+  const pending = id + "-pending";
+  await pool.query(
+    "INSERT INTO event_entry(id,division_id,display_name,entry_admission) VALUES($1,$2,'Pending submission','submitted_pending')",
+    [pending, id],
+  );
+  const url = base + "/api/v1/divisions/" + id + "/draw",
+    headers = { cookie, Origin: base, "Content-Type": "application/json" };
+  const workspace = await (await fetch(url, { headers })).json();
+  assert.equal(
+    workspace.entries.some((e: any) => e.id === pending),
+    false,
+    "Pending submission must not be offered as a draw seed",
+  );
+  const post = (body: object) =>
+    fetch(url, { method: "POST", headers, body: JSON.stringify(body) });
+  const preview = {
+    requestId: randomUUID(),
+    expectedVersion: 0,
+    action: "preview",
+    reason: "Explicit admitted seeds",
+    seedEntryIds: [pending, ...seeds.slice(1)],
+  };
+  assert.equal((await post(preview)).status, 422);
+  assert.equal(
+    (await post({ ...preview, requestId: randomUUID(), seedEntryIds: seeds }))
+      .status,
+    200,
+  );
+  // Force an authoritative eligibility-projection change without a lineup edit:
+  // publication must re-read current field eligibility, not just the seed version.
+  await pool.query(
+    "UPDATE event_entry SET entry_admission='submitted_pending' WHERE id=$1",
+    [seeds[0]],
+  );
+  const publish = await post({
+    requestId: randomUUID(),
+    expectedVersion: 1,
+    action: "publish",
+    reason: "Attempt changed field admission",
+  });
+  assert.equal(publish.status, 409, await publish.clone().text());
+  assert.equal(
+    (
+      await pool.query(
+        "SELECT count(*)::integer AS n FROM game WHERE division_id=$1",
+        [id],
+      )
+    ).rows[0].n,
+    0,
   );
 });
 

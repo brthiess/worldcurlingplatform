@@ -74,12 +74,15 @@ export function DrawWorkbench() {
         const w = await r.json();
         if (!r.ok) throw new Error(w.error);
         if (!active) return;
-        setDivisions(w.divisions);
+        const editable = w.divisions.filter(
+          (d: Choice & { manual: boolean }) => d.manual,
+        );
+        setDivisions(editable);
         const requested = new URLSearchParams(window.location.search).get(
           "division",
         );
-        const id = requested ?? w.divisions[0]?.id ?? "";
-        if (w.divisions.some((d: Choice) => d.id === id)) {
+        const id = requested ?? editable[0]?.id ?? "";
+        if (editable.some((d: Choice) => d.id === id)) {
           setDivisionId(id);
           await load(id);
         } else {
