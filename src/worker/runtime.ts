@@ -1,7 +1,10 @@
 import PgBoss from "pg-boss";
-import { pool } from "../db";
+import type { Pool } from "pg";
+import { fetchSource } from "../modules/news/service";
+import { newsQueue } from "../modules/news/queue";
 export const probeQueue = "runtime-probe";
-export async function startWorker() {
+export async function startWorker(database?: Pool) {
+  const pool = database ?? (await import("../db")).pool;
   const boss = new PgBoss(process.env.DATABASE_URL!);
   boss.on("error", (error) => console.error("Worker error:", error.message));
   await boss.start();
@@ -19,5 +22,42 @@ export async function startWorker() {
       return { status: "ready", probeId: job.data.probeId };
     },
   );
+  await boss.createQueue(newsQueue);
+  await boss.work<{ sourceId: string }>(
+    newsQueue,
+    { pollingIntervalSeconds: 1 },
+    async ([job]) => {
+      if (
+        typeof job.data.sourceId !== "string" ||
+        job.data.sourceId.length > 80
+      )
+        throw new Error("Invalid source identifier");
+      await fetchSource(pool, job.data.sourceId, job.id);
+    },
+  );
+  await boss.createQueue("news-refresh-approved");
+  await boss.work(
+    "news-refresh-approved",
+    { pollingIntervalSeconds: 5 },
+    async () => {
+      const sources = await pool.query(
+        "SELECT id FROM news_source WHERE approved",
+      );
+      for (const source of sources.rows)
+        await boss.send(
+          newsQueue,
+          { sourceId: source.id },
+          {
+            retryLimit: 3,
+            retryDelay: 5,
+            retryBackoff: true,
+            expireInSeconds: 60,
+            singletonKey: source.id,
+            singletonSeconds: 30,
+          },
+        );
+    },
+  );
+  await boss.schedule("news-refresh-approved", "0 * * * *", {}, { tz: "UTC" });
   return boss;
 }

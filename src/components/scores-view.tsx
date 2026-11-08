@@ -288,7 +288,7 @@ export function ScoresView({
                     <span
                       className={`badge ${game.state === "live" ? "live" : ""}`}
                     >
-                      {game.results.length > 1
+                      {(game.results.length > 1 || game.results[0]?.result.correction)
                         ? "Corrected final result"
                         : game.state === "live"
                           ? "Live · provisional"
@@ -317,7 +317,7 @@ export function ScoresView({
                   {gameId && (
                     <p className="legend">
                       Result state:{" "}
-                      {game.results.length > 1
+                      {(game.results.length > 1 || game.results[0]?.result.correction)
                         ? "Corrected final"
                         : game.state === "confirmed"
                           ? "Final"

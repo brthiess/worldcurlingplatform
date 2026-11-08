@@ -121,6 +121,9 @@ export default function Admin() {
           <p>
             <a href="/admin/entries">Manual team entries</a>
           </p>
+          <p>
+            <a href="/admin/news">News sources and moderation</a>
+          </p>
           <button
             className="secondary"
             disabled={busy}
