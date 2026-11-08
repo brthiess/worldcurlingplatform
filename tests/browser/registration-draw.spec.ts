@@ -159,6 +159,12 @@ for (const [device, width, height, count] of [
         exact: true,
       }),
     ).toBeVisible();
+    if (device === "phone") {
+      await page
+        .getByRole("button", { name: "Game list", exact: true })
+        .click();
+      await expect(page.getByRole("article")).toHaveCount(5);
+    }
     await page.screenshot({
       path: `docs/verification/assets/WCP-009/${device}-configured-draw.png`,
       fullPage: true,
@@ -216,7 +222,9 @@ test("publication rechecks admission-only changes and a newly accepted peer with
   await expect(page.getByRole("main").getByRole("alert")).toContainText(
     "field admission changed",
   );
-  await expect(page.getByText(/Revision 1 · preview/)).toBeVisible();
+  await expect(
+    page.getByText(/^Revision 1 · preview\. Template/),
+  ).toBeVisible();
   await pool.query(
     "UPDATE event_entry SET admission_state='accepted',admission_version=admission_version+1 WHERE id=$1",
     [f.entries[0]],
@@ -252,5 +260,7 @@ test("publication rechecks admission-only changes and a newly accepted peer with
   await expect(page.getByRole("main").getByRole("alert")).toContainText(
     "complete current accepted field",
   );
-  await expect(page.getByText(/Revision 1 · preview/)).toBeVisible();
+  await expect(
+    page.getByText(/^Revision 1 · preview\. Template/),
+  ).toBeVisible();
 });
