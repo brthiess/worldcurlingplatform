@@ -134,6 +134,33 @@ export async function assessmentFixture(
     playoff: boolean;
   }[] = [];
   if (options.platformSingle) {
+    await accepted(send, "/api/v1/registration", {
+      action: "open",
+      requestId: randomUUID(),
+      divisionId,
+      version: 0,
+      terms: {
+        mode: "open",
+        capacity: 8,
+        requirements:
+          "Fictional four-player field; ranking evidence remains separate",
+        feeMinor: 0,
+        currency: "CAD",
+        paymentTerms: "No entry fee",
+        paymentWindowMinutes: 60,
+        format: "single_knockout",
+        formatNotes:
+          "Eight actual accepted entries; supported seeded single elimination, no bronze",
+      },
+    });
+    for (const entryId of entries)
+      await accepted(send, "/api/v1/registration", {
+        action: "request",
+        requestId: randomUUID(),
+        divisionId,
+        entryId,
+        version: 0,
+      });
     await accepted(send, `/api/v1/divisions/${divisionId}/draw`, {
       action: "preview",
       requestId: randomUUID(),
