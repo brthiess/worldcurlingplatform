@@ -152,6 +152,13 @@ test("complete real event queues immutable duplicate-safe assessment and worker 
     ),
     /immutable/,
   );
+  await assert.rejects(
+    db.query(
+      "UPDATE event_calculation_job SET assessment_id=$2 WHERE assessment_id=$1",
+      [first.id, randomUUID()],
+    ),
+    /association is immutable/,
+  );
   const adminGrant = (
     await db.query(
       "SELECT * FROM role_grant WHERE user_id='demo-administrator' AND role='administrator'",
@@ -361,6 +368,15 @@ test("queue and audit are atomic, failed real worker deliveries retry frozen inp
     assert.match(failed.error, /Controlled transient/);
     assert.equal(failed.resultContents, null);
     assert.equal(failed.deliveries[0].outcome, "failed");
+    assert.equal(
+      (
+        await db.query(
+          "SELECT count(*) FROM audit_record WHERE resource_id=$1 AND action='event_assessment_calculated'",
+          [failed.id],
+        )
+      ).rows[0].count,
+      "0",
+    );
   } finally {
     await db.query(
       "DROP TRIGGER fail_wcp033_result ON event_assessment_result;DROP FUNCTION fail_wcp033_result()",
@@ -380,6 +396,15 @@ test("queue and audit are atomic, failed real worker deliveries retry frozen inp
   assert.ok(completed.attempts >= 2);
   assert.equal(completed.deliveries[0].outcome, "failed");
   assert.equal(completed.deliveries.at(-1).outcome, "completed");
+  assert.equal(
+    (
+      await db.query(
+        "SELECT count(*) FROM audit_record WHERE resource_id=$1 AND action='event_assessment_calculated'",
+        [completed.id],
+      )
+    ).rows[0].count,
+    "1",
+  );
   const replay = await send("/api/v1/event-assessments", retry);
   assert.equal(replay.status, 200);
   assert.equal((await replay.json()).id, completed.id);
