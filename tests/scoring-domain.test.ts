@@ -4,7 +4,40 @@ import {
   validateEnd,
   scoreTotals,
   commandDecision,
+  applyEnd,
 } from "../src/domain/scoring";
+test("a later played end makes missing earlier scores unknown and keeps genuine future ends upcoming", () => {
+  const result = applyEnd(
+    [
+      { state: "played", a: 2, b: 0 },
+      { state: "upcoming", a: null, b: null },
+      { state: "upcoming", a: null, b: null },
+    ],
+    4,
+    { state: "played", a: 0, b: 1 },
+  );
+  assert.deepEqual(result.slice(0, 5), [
+    { state: "played", a: 2, b: 0 },
+    { state: "unknown", a: null, b: null },
+    { state: "unknown", a: null, b: null },
+    { state: "played", a: 0, b: 1 },
+    { state: "upcoming", a: null, b: null },
+  ]);
+  assert.deepEqual(scoreTotals(result), { a: null, b: null });
+  assert.throws(
+    () => applyEnd(result, 2, { state: "upcoming", a: null, b: null }),
+    /later end/,
+  );
+  assert.throws(
+    () =>
+      applyEnd([{ state: "unplayed", a: null, b: null }], 2, {
+        state: "played",
+        a: 1,
+        b: 0,
+      }),
+    /not played/,
+  );
+});
 test("duplicate commands replay before version checks, conflicting requests and stale edits never apply", () => {
   assert.equal(commandDecision(4, 4, undefined), "apply");
   assert.equal(commandDecision(5, 4, true), "replay");

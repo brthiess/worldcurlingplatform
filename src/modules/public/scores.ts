@@ -68,14 +68,21 @@ async function projectEvent(
     sql`SELECT s.game_id,s.side,s.end_number,s.state,s.points FROM game_end_score s JOIN game g ON g.id=s.game_id JOIN draw_session ds ON ds.id=g.draw_id WHERE ds.division_id=${row.divisionId} ORDER BY s.end_number`,
   );
   function ends(id: unknown, side: string): Score[] {
-    const rows = endsResult.rows.filter(
-      (e) => e.game_id === id && e.side === side,
-    );
-    const length = Math.max(8, ...rows.map((e) => Number(e.end_number)));
+    const gameRows = endsResult.rows.filter((e) => e.game_id === id);
+    const rows = gameRows.filter((e) => e.side === side);
+    const length = Math.max(8, ...gameRows.map((e) => Number(e.end_number)));
+    const last = gameRows
+      .filter((e) => e.state === "played" || e.state === "unknown")
+      .reduce((n, e) => Math.max(n, Number(e.end_number)), 0);
     return Array.from({ length }, (_, i) => {
       const e = rows.find((e) => Number(e.end_number) === i + 1);
       return {
-        state: e ? String(e.state) : "upcoming",
+        state:
+          (!e || e.state === "upcoming") && i + 1 <= last
+            ? "unknown"
+            : e
+              ? String(e.state)
+              : "upcoming",
         points:
           e?.points === undefined || e.points === null
             ? null
@@ -90,6 +97,14 @@ async function projectEvent(
     endsA: ends(g.id, "a"),
     endsB: ends(g.id, "b"),
   })) as PublicGame[];
+  for (const game of games)
+    if (
+      game.state === "live" &&
+      [...game.endsA, ...game.endsB].some((e) => e.state === "unknown")
+    ) {
+      game.totalA = null;
+      game.totalB = null;
+    }
   const hammers = await connection.execute(
     sql`SELECT h.game_id,h.end_number,h.hammer FROM game_end_hammer h JOIN game g ON g.id=h.game_id JOIN draw_session ds ON ds.id=g.draw_id WHERE ds.division_id=${row.divisionId}`,
   );

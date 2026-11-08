@@ -3,6 +3,41 @@ export type End = {
   a: number | null;
   b: number | null;
 };
+export function normalizeEnds(ends: End[]): End[] {
+  const last = ends.findLastIndex(
+    (e) => e.state === "played" || e.state === "unknown",
+  );
+  return ends.map((e, i) =>
+    i < last && e.state === "upcoming"
+      ? { state: "unknown", a: null, b: null }
+      : e,
+  );
+}
+export function applyEnd(ends: End[], endNumber: number, value: End): End[] {
+  const next: End[] = Array.from(
+    { length: Math.max(8, ends.length, endNumber) },
+    (_, i) => ends[i] ?? { state: "upcoming", a: null, b: null },
+  );
+  const actual = value.state === "played" || value.state === "unknown";
+  if (
+    actual &&
+    next.slice(0, endNumber - 1).some((e) => e.state === "unplayed")
+  )
+    throw new Error(
+      "An earlier end is marked not played; correct that state before recording a later end",
+    );
+  if (
+    !actual &&
+    next
+      .slice(endNumber)
+      .some((e) => e.state === "played" || e.state === "unknown")
+  )
+    throw new Error(
+      "A later end is recorded; earlier scores must remain played or unknown",
+    );
+  next[endNumber - 1] = value;
+  return normalizeEnds(next);
+}
 export function commandDecision(
   version: number,
   expected: number,
@@ -37,6 +72,7 @@ export function validateEnd(value: unknown): End {
   return { state: end.state, a: end.a, b: end.b };
 }
 export function scoreTotals(ends: End[]) {
+  ends = normalizeEnds(ends);
   if (ends.some((e) => e.state === "unknown")) return { a: null, b: null };
   return ends.reduce<{ a: number; b: number }>(
     (sum, e) => ({ a: sum.a + (e.a ?? 0), b: sum.b + (e.b ?? 0) }),

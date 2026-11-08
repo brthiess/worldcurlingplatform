@@ -319,7 +319,32 @@ test("real PostgreSQL scoring: start, scores, concurrency, retries, scope, sourc
     await t.test(
       "out-of-order end entry keeps its real end number in public scores",
       async () => {
-        const before = await get();
+        let before = await get();
+        assert.equal(
+          (
+            await post(
+              command(before.version, {
+                endNumber: 10,
+                end: { state: "played", a: 0, b: 2 },
+                hammer: "a",
+              }),
+            )
+          ).status,
+          409,
+        );
+        assert.equal(
+          (
+            await post(
+              command(before.version, {
+                endNumber: 3,
+                end: { state: "unknown", a: null, b: null },
+                hammer: null,
+              }),
+            )
+          ).status,
+          200,
+        );
+        before = await get();
         assert.equal(
           (
             await post(
@@ -340,10 +365,30 @@ test("real PostgreSQL scoring: start, scores, concurrency, retries, scope, sourc
           points: 2,
         });
         assert.deepEqual(published.games[0].endsB[8], {
-          state: "upcoming",
+          state: "unknown",
           points: null,
         });
         assert.equal(published.games[0].endHammer[9], "a");
+        assert.equal(published.games[0].totalA, null);
+        assert.equal(published.games[0].totalB, null);
+        const stored = await get();
+        assert.deepEqual(stored.ends[8], {
+          state: "unknown",
+          a: null,
+          b: null,
+        });
+        assert.equal(
+          (
+            await post(
+              command(stored.version, {
+                endNumber: 9,
+                end: { state: "upcoming", a: null, b: null },
+                hammer: null,
+              }),
+            )
+          ).status,
+          409,
+        );
       },
     );
   } finally {

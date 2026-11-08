@@ -6,6 +6,8 @@ import {
   validateEnd,
   scoreTotals,
   commandDecision,
+  applyEnd,
+  normalizeEnds,
   type End,
 } from "@/domain/scoring";
 export class ScoringError extends Error {
@@ -76,15 +78,17 @@ async function snapshot(client: PoolClient, id: string) {
     )
   ).rows;
   const count = Math.max(8, ...rows.map((r) => r.end_number));
-  const ends: End[] = Array.from({ length: count }, (_, i) => {
-    const a = rows.find((r) => r.end_number === i + 1 && r.side === "a"),
-      b = rows.find((r) => r.end_number === i + 1 && r.side === "b");
-    return {
-      state: a?.state === b?.state ? (a?.state ?? "upcoming") : "unknown",
-      a: a?.points ?? null,
-      b: b?.points ?? null,
-    };
-  });
+  const ends: End[] = normalizeEnds(
+    Array.from({ length: count }, (_, i) => {
+      const a = rows.find((r) => r.end_number === i + 1 && r.side === "a"),
+        b = rows.find((r) => r.end_number === i + 1 && r.side === "b");
+      return {
+        state: a?.state === b?.state ? (a?.state ?? "upcoming") : "unknown",
+        a: a?.points ?? null,
+        b: b?.points ?? null,
+      };
+    }),
+  );
   const last = rows
     .filter((r) => r.state === "played" || r.state === "unknown")
     .reduce((n, r) => Math.max(n, r.end_number), 0);
@@ -95,6 +99,9 @@ async function snapshot(client: PoolClient, id: string) {
   );
   return {
     ...g,
+    ...(g.state === "live" && ends.some((e) => e.state === "unknown")
+      ? { totalA: null, totalB: null }
+      : {}),
     ends,
     endHammer,
     hammerEnd,
@@ -196,14 +203,24 @@ export async function saveScoring(actorId: string, id: string, input: unknown) {
           409,
           "Start this game before saving live ends; confirmed results use the correction workflow",
         );
-      for (const [side, points] of [
-        ["a", command.end!.a],
-        ["b", command.end!.b],
-      ])
-        await client.query(
-          "INSERT INTO game_end_score(game_id,side,end_number,state,points) VALUES($1,$2,$3,$4,$5) ON CONFLICT(game_id,side,end_number) DO UPDATE SET state=EXCLUDED.state,points=EXCLUDED.points",
-          [id, side, command.endNumber, command.end!.state, points],
-        );
+      let next: End[];
+      try {
+        next = applyEnd(before.ends, command.endNumber!, command.end!);
+      } catch (e) {
+        throw new ScoringError(409, (e as Error).message);
+      }
+      for (const [i, end] of next.entries()) {
+        if (i !== command.endNumber! - 1 && before.ends[i]?.state === end.state)
+          continue;
+        for (const [side, points] of [
+          ["a", end.a],
+          ["b", end.b],
+        ])
+          await client.query(
+            "INSERT INTO game_end_score(game_id,side,end_number,state,points) VALUES($1,$2,$3,$4,$5) ON CONFLICT(game_id,side,end_number) DO UPDATE SET state=EXCLUDED.state,points=EXCLUDED.points",
+            [id, side, i + 1, end.state, points],
+          );
+      }
     }
     await client.query(
       "INSERT INTO game_end_hammer(game_id,end_number,hammer) VALUES($1,$2,$3) ON CONFLICT(game_id,end_number) DO UPDATE SET hammer=EXCLUDED.hammer",

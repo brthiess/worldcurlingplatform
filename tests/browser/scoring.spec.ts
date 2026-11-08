@@ -295,3 +295,67 @@ test("assigned scorekeeper starts an actual scheduled fixture with end-one hamme
     await pool.query("DELETE FROM game WHERE id=$1", [id]);
   }
 });
+test("normal mobile fixture can record end nine and its hammer without pre-existing extra-end rows", async ({
+  page,
+}, info) => {
+  const id = `wcp002-extra-${randomUUID()}`;
+  await pool.query(
+    "INSERT INTO game(id,draw_id,sheet,phase,state,entry_a,entry_b,slot_a,slot_b,total_a,total_b) VALUES($1,'draw-2','T','Extra end review','live','entry-1','entry-3','Team North','Team Prairie',3,2)",
+    [id],
+  );
+  await pool.query(
+    "INSERT INTO game_end_score SELECT $1,side,end_number,state,points FROM game_end_score WHERE game_id='game-2' AND end_number<=8",
+    [id],
+  );
+  await pool.query(
+    "INSERT INTO role_grant VALUES($1,'demo-scorekeeper','scorekeeper','prairie-2026',$2)",
+    [id, id],
+  );
+  try {
+    const before = await (
+      await session.request.get(`/api/v1/games/${id}/scoring`)
+    ).json();
+    expect(before.ends).toHaveLength(8);
+    await page.setViewportSize({ width: 360, height: 800 });
+    await page.goto(`/admin/games/${id}`);
+    await page.getByLabel("End", { exact: true }).selectOption("9");
+    await page.getByLabel("Team North points").fill("0");
+    await page.getByLabel("Team Prairie points").fill("2");
+    await page.getByLabel("Known hammer (selected end)").selectOption("a");
+    await page.getByRole("button", { name: "Save end", exact: true }).click();
+    await expect(page.getByText(/Saved · version 1/)).toBeVisible();
+    const stored = await (
+      await session.request.get(`/api/v1/games/${id}/scoring`)
+    ).json();
+    expect(stored.ends[8]).toEqual({ state: "played", a: 0, b: 2 });
+    expect(stored.endHammer[8]).toBe("a");
+    expect(stored.ends[4]).toEqual({ state: "unknown", a: null, b: null });
+    expect(stored.totalA).toBe(null);
+    expect(stored.totalB).toBe(null);
+    await page.reload();
+    await page.getByLabel("End", { exact: true }).selectOption("9");
+    await expect(page.getByLabel("Team Prairie points")).toHaveValue("2");
+    await expect(page.getByLabel("Known hammer (selected end)")).toHaveValue(
+      "a",
+    );
+    await page.goto(`/games/${id}`);
+    await expect(
+      page.getByRole("cell", { name: "End 9: 2 points", exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByText(/Recorded hammer:.*End 9: Team North/),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("cell", { name: "Total unknown", exact: true }),
+    ).toHaveCount(2);
+    await page.screenshot({
+      path: info.outputPath("phone-extra-end-nine.png"),
+      fullPage: true,
+    });
+  } finally {
+    await pool.query("DELETE FROM scoring_command WHERE game_id=$1", [id]);
+    await pool.query("DELETE FROM audit_record WHERE resource_id=$1", [id]);
+    await pool.query("DELETE FROM role_grant WHERE game_id=$1", [id]);
+    await pool.query("DELETE FROM game WHERE id=$1", [id]);
+  }
+});

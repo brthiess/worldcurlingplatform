@@ -311,14 +311,12 @@ export function ScoringEditor({ gameId }: { gameId: string }) {
                     value={edit.endNumber}
                     onChange={(e) => chooseEnd(Number(e.target.value))}
                   >
-                    {Array.from(
-                      { length: Math.max(8, game.ends.length) },
-                      (_, i) => (
-                        <option key={i} value={i + 1}>
-                          {i + 1}
-                        </option>
-                      ),
-                    )}
+                    {Array.from({ length: 20 }, (_, i) => (
+                      <option key={i} value={i + 1}>
+                        {i + 1}
+                        {i >= 8 ? " · further end" : ""}
+                      </option>
+                    ))}
                   </select>
                   <label htmlFor="end-state">End state</label>
                   <select
