@@ -1388,7 +1388,7 @@
       "file": "27-finalize-division-results-and-preserve-revised-snapshots.md",
       "id": "WCP-027",
       "path": "issues/27-finalize-division-results-and-preserve-revised-snapshots.md",
-      "status": "ready-for-agent",
+      "status": "in-progress",
       "labels": [
         "ready-for-agent"
       ],
@@ -1645,13 +1645,17 @@
       "file": "32-review-official-rosters-wctrs-sources-and-starting-entitlements.md",
       "id": "WCP-032",
       "path": "issues/32-review-official-rosters-wctrs-sources-and-starting-entitlements.md",
-      "status": "in-progress",
+      "status": "completed",
       "labels": [
         "ready-for-agent"
       ],
       "blocked_by": [
         "WCP-006"
-      ]
+      ],
+      "completion": {
+        "commit": "2e1fe25c9ce76948422f6c12077eec931edc3142",
+        "evidence": "docs/verification/WCP-032.md"
+      }
     },
     {
       "n": 33,
