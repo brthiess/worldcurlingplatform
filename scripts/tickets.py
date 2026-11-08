@@ -107,6 +107,11 @@ def main():
         state['tickets_completed'] = [t['id'] for t in tickets.values() if t['status'] == 'completed']
         state['active_tickets'] = [t['id'] for t in tickets.values() if t['status'] == 'in-progress']
         state['frontier'] = frontier(tickets)
+        state['verification'] = {
+            'policy': 'Only completed tickets have reviewed required-check evidence; each record is limited to its ticket scope.',
+            'records': {t['id']: t['completion'] for t in tickets.values()
+                        if t['status'] == 'completed'}
+        }
         state.setdefault('events', []).append({'time': state['updated_at'], 'ticket': args.ticket,
                                               'status': status, 'reason': args.reason,
                                               'commit': args.commit, 'evidence': args.evidence})

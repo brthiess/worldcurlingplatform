@@ -13,7 +13,9 @@
   "tickets_started": [
     "WCP-001"
   ],
-  "tickets_completed": [],
+  "tickets_completed": [
+    "WCP-001"
+  ],
   "workflow": {
     "fresh_agent_per_ticket": true,
     "max_parallel_implementers": 3,
@@ -32,11 +34,13 @@
     "baseline_commit": "f6d6d8d"
   },
   "verification": {
-    "completion_claims": "none",
-    "browser": "pending_first_slice",
-    "frontend_quality": "pending_first_slice",
-    "unit_tests": "pending_first_slice",
-    "postgresql_api": "pending_first_slice"
+    "policy": "Only completed tickets have reviewed required-check evidence; each record is limited to its ticket scope.",
+    "records": {
+      "WCP-001": {
+        "commit": "4304b15",
+        "evidence": "docs/verification/WCP-001.md"
+      }
+    }
   },
   "crawler": {
     "accessed": true,
@@ -56,11 +60,15 @@
     "Close only reviewed integrated tickets with meaningful unit/PostgreSQL/API/frontend/browser evidence.",
     "Continue unblocked work and report provider/deployment limitations honestly."
   ],
-  "updated_at": "2026-11-08T09:37:35.684583-06:00",
-  "active_tickets": [
-    "WCP-001"
+  "updated_at": "2026-11-08T16:10:45.286395+00:00",
+  "active_tickets": [],
+  "frontier": [
+    "WCP-002",
+    "WCP-004",
+    "WCP-012",
+    "WCP-044",
+    "WCP-045"
   ],
-  "frontier": [],
   "events": [
     {
       "time": "2026-11-08T09:37:35.684583-06:00",
@@ -69,6 +77,14 @@
       "reason": null,
       "commit": null,
       "evidence": null
+    },
+    {
+      "time": "2026-11-08T16:10:45.286395+00:00",
+      "ticket": "WCP-001",
+      "status": "completed",
+      "reason": null,
+      "commit": "4304b15",
+      "evidence": "docs/verification/WCP-001.md"
     }
   ],
   "research": {

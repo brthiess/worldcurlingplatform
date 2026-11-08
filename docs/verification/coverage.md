@@ -4,7 +4,7 @@ Execution began 2026-11-08. This file describes the bounded acceptance inventory
 
 | Capability | Approved configuration / boundary | Main tickets | State |
 |---|---|---|---|
-| Application foundation | PostgreSQL persistence, scoped demo sign-in, public scores, web/worker runtime | WCP-001 | In progress |
+| Application foundation | PostgreSQL persistence, scoped demo sign-in, public scores, web/worker runtime | WCP-001 | Verified locally; see WCP-001.md and WCP-001-merge.md |
 | Fan follows main event (D-01) | 16-team four-player triple knockout; stored A/B/C routes, qualifiers, phone list/bracket | 002,003,017–020,046 | Planned |
 | Event admission (D-02) | Dated editions/divisions, responsible approver, explicit delegation; registration/ranking separate | 004,005,046 | Planned |
 | Mobile scoring (D-03) | Assigned scorekeeper starts/scores/confirms/corrects; stale/idempotent commands and honest save status | 002,003,026,046 | Planned |

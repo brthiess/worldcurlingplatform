@@ -4,7 +4,7 @@ number: 1
 title: "Open a persisted event and sign in with scoped demo roles"
 parent: WCP-SPEC-001
 type: implementation
-status: in-progress
+status: completed
 labels: [ready-for-agent]
 blocked_by: []
 source_spec_sha256: 045B46988225B6C8C0020B23C8C5D4EAA8E2E1916256148A0FDA26B5DA8673FD
@@ -18,7 +18,7 @@ published: 2026-11-07
 
 **Blocked by:** None (can start immediately).
 
-**Status:** in-progress
+**Status:** completed
 
 ## Parent and scope
 
@@ -31,13 +31,13 @@ published: 2026-11-07
 
 ## Acceptance criteria
 
-- [ ] Bootstrap only the web/worker runtime, migrations, isolated demo seed and test harness needed by this slice; do not prebuild the entire schema.
-- [ ] The public scorecard and game detail show stored participants, current/latest draw, honest unknown scores, venue time and result state; reload/restart preserves data.
-- [ ] Seeded sessions enforce role/resource checks, and no public response exposes credentials, private person fields or internal payloads.
-- [ ] **Unit testing:** Test current/latest/next draw selection, score-cell states and initial role/scope decisions using explicit expected outputs.
-- [ ] **Database/API verification:** Use real PostgreSQL for migrations, seed repeatability, session-scoped reads and denied writes; exercise the minimal worker/job runtime without mocking application persistence.
-- [ ] **Frontend quality:** Establish the shared scores-first visual standard at phone, tablet and desktop widths: aligned/tabular scores, readable hierarchy, keyboard focus, loading/empty/error states and no placeholder controls.
-- [ ] Record actual verification commands/results and relevant browser/screenshots or API evidence. Report meaningful uncovered branches or limitations; do not claim checks that were not run.
+- [x] Bootstrap only the web/worker runtime, migrations, isolated demo seed and test harness needed by this slice; do not prebuild the entire schema.
+- [x] The public scorecard and game detail show stored participants, current/latest draw, honest unknown scores, venue time and result state; reload/restart preserves data.
+- [x] Seeded sessions enforce role/resource checks, and no public response exposes credentials, private person fields or internal payloads.
+- [x] **Unit testing:** Test current/latest/next draw selection, score-cell states and initial role/scope decisions using explicit expected outputs.
+- [x] **Database/API verification:** Use real PostgreSQL for migrations, seed repeatability, session-scoped reads and denied writes; exercise the minimal worker/job runtime without mocking application persistence.
+- [x] **Frontend quality:** Establish the shared scores-first visual standard at phone, tablet and desktop widths: aligned/tabular scores, readable hierarchy, keyboard focus, loading/empty/error states and no placeholder controls.
+- [x] Record actual verification commands/results and relevant browser/screenshots or API evidence. Report meaningful uncovered branches or limitations; do not claim checks that were not run.
 
 ## Slice boundary
 
