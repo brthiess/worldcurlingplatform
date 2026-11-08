@@ -128,6 +128,9 @@ export default function Admin() {
             <a href="/admin/registration">Division entry places & terms</a>
           </p>
           <p>
+            <a href="/admin/entry-charges">Entry charges & external receipts</a>
+          </p>
+          <p>
             <a href="/admin/representatives">Team-season representatives</a>
           </p>
           <p>
@@ -136,7 +139,9 @@ export default function Admin() {
           <p>
             <a href="/admin/schedule">Draw scheduling</a>
           </p>
-          <p><a href="/admin/draws">Single knockout draws</a></p>
+          <p>
+            <a href="/admin/draws">Single knockout draws</a>
+          </p>
           <p>
             <a href="/admin/news">News sources and moderation</a>
           </p>
@@ -188,7 +193,8 @@ export default function Admin() {
               {workspace.games.map((game) => (
                 <li key={game.id}>
                   <p className="eyebrow">
-                    {game.eventName} · {game.sheet?`Sheet ${game.sheet}`:'Sheet not assigned'}
+                    {game.eventName} ·{" "}
+                    {game.sheet ? `Sheet ${game.sheet}` : "Sheet not assigned"}
                   </p>
                   <h3>
                     {game.nameA} vs {game.nameB}

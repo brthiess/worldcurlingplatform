@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { canonicalEntryCommand } from "@/domain/entries";
 import type { RegistrationTerms, AdmissionState } from "@/domain/registration";
 import { AuthorityRecovery, useAuthorityCommand } from "./authority-command";
+import { currencyDigits, formatMoney } from "@/domain/payments";
 type Division = Partial<RegistrationTerms> & {
   id: string;
   name: string;
@@ -129,6 +130,7 @@ export function RegistrationWorkbench() {
       </p>
       <p>
         <a href="/admin/entries">Create or amend a team entry →</a> ·{" "}
+        <a href="/admin/entry-charges">Entry charge ledger →</a> ·{" "}
         <a href="/admin">Your workspace</a>
       </p>
       {error && (
@@ -212,7 +214,10 @@ export function RegistrationWorkbench() {
                             <dd>
                               {d.feeMinor === 0
                                 ? "No entry fee"
-                                : `${d.feeMinor} ${d.currency} minor units`}
+                                : d.currency &&
+                                    Object.hasOwn(currencyDigits, d.currency)
+                                  ? formatMoney(d.feeMinor!, d.currency)
+                                  : `${d.feeMinor} ${d.currency} minor units (unsupported currency; staff review required)`}
                             </dd>
                             <dt>Payment terms</dt>
                             <dd>{d.paymentTerms}</dd>
@@ -227,9 +232,12 @@ export function RegistrationWorkbench() {
                             </dd>
                           </dl>
                           <p>
-                            Terms are retained as opened. A held place is
-                            unpaid. Late payment after expiry requires staff
-                            attention and cannot restore a released place.
+                            Capacity, requirements and format are retained as
+                            opened. The fee shown applies to new charges; each
+                            entry retains its frozen fee in the charge ledger. A
+                            held place has an unpaid balance. Late settlement
+                            after expiry requires staff attention and cannot
+                            restore a released place.
                           </p>
                           {d.manual && (
                             <button
@@ -447,11 +455,9 @@ export function RegistrationWorkbench() {
                               )}
                               <p>
                                 Lineup: {e.rosterStatus}. Payment:{" "}
-                                {d.feeMinor === 0
-                                  ? "not required under these terms"
-                                  : d.mode
-                                    ? "unpaid; checkout handled separately"
-                                    : "terms not open"}
+                                {e.state === "held"
+                                  ? "unpaid balance; review the entry charge ledger"
+                                  : "review the entry charge ledger for frozen fees, exceptions and external receipts"}
                                 . Ranking eligibility: separate assessment.
                               </p>
                               {d.mode &&

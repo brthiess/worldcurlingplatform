@@ -38,7 +38,7 @@ function valid(value: unknown): value is RetainedAuthorityCommand {
     typeof c.path !== "string" ||
     typeof c.actorId !== "string" ||
     !(
-      /^\/api\/v1\/(approval-delegations|role-grants|team-representation|entries|division-finalizations|registration)$/.test(
+      /^\/api\/v1\/(approval-delegations|role-grants|team-representation|entries|division-finalizations|registration|entry-charges)$/.test(
         c.path,
       ) ||
       /^\/api\/v1\/entries\/[-\w]{1,80}$/.test(c.path) ||
@@ -315,6 +315,20 @@ export function AuthorityRecovery({
               )}
               <dt>Reason</dt>
               <dd>{body.reason ?? body.note}</dd>
+              {body.amountMinor !== undefined && (
+                <>
+                  <dt>Amount (currency minor units)</dt>
+                  <dd>
+                    {body.amountMinor} {body.currency}
+                  </dd>
+                </>
+              )}
+              {body.externalReference && (
+                <>
+                  <dt>External receipt reference</dt>
+                  <dd>{body.externalReference}</dd>
+                </>
+              )}
               {body.divisionId && (
                 <>
                   <dt>Division</dt>
