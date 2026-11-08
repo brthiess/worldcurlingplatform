@@ -307,23 +307,27 @@ export function ScoringEditor({ gameId }: { gameId: string }) {
                     ? "Confirmed live scores"
                     : "Record or correct a live end"}
               </legend>
-              <label htmlFor="hammer">Known hammer (selected end)</label>
-              <select
-                id="hammer"
-                value={edit.hammer ?? "unknown"}
-                onChange={(e) =>
-                  change({
-                    hammer:
-                      e.target.value === "unknown"
-                        ? null
-                        : (e.target.value as "a" | "b"),
-                  })
-                }
-              >
-                <option value="unknown">Not recorded</option>
-                <option value="a">{game.nameA}</option>
-                <option value="b">{game.nameB}</option>
-              </select>
+              {game.state !== "confirmed" && (
+                <>
+                  <label htmlFor="hammer">Known hammer (selected end)</label>
+                  <select
+                    id="hammer"
+                    value={edit.hammer ?? "unknown"}
+                    onChange={(e) =>
+                      change({
+                        hammer:
+                          e.target.value === "unknown"
+                            ? null
+                            : (e.target.value as "a" | "b"),
+                      })
+                    }
+                  >
+                    <option value="unknown">Not recorded</option>
+                    <option value="a">{game.nameA}</option>
+                    <option value="b">{game.nameB}</option>
+                  </select>
+                </>
+              )}
               {game.state === "live" && (
                 <>
                   <label htmlFor="end">End</label>

@@ -229,6 +229,11 @@ test("result loading failure, stale edit and accepted-response loss retain an ho
   await page.unroute(url);
   await page.getByRole("button", { name: "Retry loading game" }).click();
   await page.getByLabel("Result winner").selectOption("entry-1");
+  await page
+    .getByRole("button", { name: "Discard result draft", exact: true })
+    .click();
+  await expect(page.getByLabel("End", { exact: true })).toBeEnabled();
+  await page.getByLabel("Result winner").selectOption("entry-1");
   await page.reload();
   await expect(page.getByLabel("Result winner")).toHaveValue("entry-1");
   await expect(

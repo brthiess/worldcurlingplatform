@@ -155,3 +155,72 @@ test("normal completion uses the eight-end four-player profile; an early stop is
     /eight/,
   );
 });
+test("corrections retain unknown scores and reject ties or contradictory end histories", () => {
+  const tied = Array.from({ length: 8 }, () => ({
+    state: "played" as const,
+    a: 0,
+    b: 0,
+  }));
+  assert.throws(
+    () =>
+      validateResult("confirmed", "correct", ["north", "prairie"], {
+        outcome: "normal",
+        winnerEntryId: "north",
+        reason: "Correction",
+        ends: tied,
+      }),
+    /decisive|winner/,
+  );
+  const unknown = validateResult("confirmed", "correct", ["north", "prairie"], {
+    outcome: "conceded",
+    winnerEntryId: "prairie",
+    reason: "Concession with missing scores",
+    ends: [{ state: "unknown", a: null, b: null }],
+  });
+  assert.equal(unknown.totalA, null);
+  assert.equal(unknown.totalB, null);
+  assert.deepEqual(unknown.ends, [{ state: "unknown", a: null, b: null }]);
+  assert.throws(
+    () =>
+      validateResult("confirmed", "correct", ["north", "prairie"], {
+        outcome: "conceded",
+        winnerEntryId: "prairie",
+        reason: "Correction",
+        ends: [
+          { state: "unplayed", a: null, b: null },
+          { state: "played", a: 0, b: 2 },
+        ],
+      }),
+    /unplayed end/,
+  );
+  assert.throws(
+    () =>
+      validateResult("live", "correct", ["north", "prairie"], {
+        outcome: "conceded",
+        winnerEntryId: "prairie",
+        reason: "Correction",
+        ends: [],
+      }),
+    /confirmed/,
+  );
+  assert.throws(
+    () =>
+      validateResult("scheduled", "confirm", ["north", "prairie"], {
+        outcome: "conceded",
+        winnerEntryId: "prairie",
+        reason: "No start",
+        ends: [],
+      }),
+    /Start/,
+  );
+  assert.throws(
+    () =>
+      validateResult("live", "confirm", ["north", "north"], {
+        outcome: "conceded",
+        winnerEntryId: "north",
+        reason: "Invalid participants",
+        ends: [],
+      }),
+    /distinct/,
+  );
+});
