@@ -19,6 +19,7 @@ a:hover {
 }
 button,
 input,
+textarea,
 select {
   font: inherit;
 }
@@ -32,6 +33,7 @@ button {
 a:focus-visible,
 button:focus-visible,
 input:focus-visible,
+textarea:focus-visible,
 select:focus-visible {
   outline: 3px solid #da7200;
   outline-offset: 4px;
@@ -48,6 +50,7 @@ select:focus-visible {
   top: 8px;
 }
 .site-header {
+  flex-wrap: wrap;
   background: #102c3c;
   color: white;
   display: flex;
@@ -74,6 +77,7 @@ select:focus-visible {
   margin-top: 5px;
 }
 nav {
+  flex-wrap: wrap;
   display: flex;
   gap: 24px;
   font-size: 14px;
@@ -300,12 +304,39 @@ button {
   margin: 18px 0 8px;
 }
 .form-card input,
+.form-card textarea,
 .form-card select {
   display: block;
   width: 100%;
   padding: 12px;
   border: 1px solid #8c9ea8;
   border-radius: 4px;
+}
+.form-card textarea {
+  resize: vertical;
+}
+.account-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 18px 0;
+}
+.account-actions button {
+  margin-top: 0;
+}
+.account-actions [aria-pressed="true"] {
+  border: 2px solid #005b67;
+  font-weight: bold;
+}
+.workspace section {
+  margin-top: 32px;
+}
+.player-biography {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.workspace-list p {
+  overflow-wrap: anywhere;
 }
 .form-card button {
   margin-top: 20px;

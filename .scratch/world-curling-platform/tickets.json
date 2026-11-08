@@ -588,13 +588,17 @@
       "file": "12-create-accounts-approve-player-claims-and-edit-profiles.md",
       "id": "WCP-012",
       "path": "issues/12-create-accounts-approve-player-claims-and-edit-profiles.md",
-      "status": "in-progress",
+      "status": "completed",
       "labels": [
         "ready-for-agent"
       ],
       "blocked_by": [
         "WCP-001"
-      ]
+      ],
+      "completion": {
+        "commit": "bae3812",
+        "evidence": "docs/verification/WCP-012.md"
+      }
     },
     {
       "n": 13,
@@ -632,7 +636,7 @@
       "file": "13-review-private-photo-submissions-and-publish-approved-images.md",
       "id": "WCP-013",
       "path": "issues/13-review-private-photo-submissions-and-publish-approved-images.md",
-      "status": "ready-for-agent",
+      "status": "in-progress",
       "labels": [
         "ready-for-agent"
       ],

@@ -15,10 +15,12 @@
     "WCP-002",
     "WCP-004",
     "WCP-012",
+    "WCP-013",
     "WCP-045"
   ],
   "tickets_completed": [
-    "WCP-001"
+    "WCP-001",
+    "WCP-012"
   ],
   "workflow": {
     "fresh_agent_per_ticket": true,
@@ -46,6 +48,10 @@
       "WCP-001": {
         "commit": "4304b15",
         "evidence": "docs/verification/WCP-001.md"
+      },
+      "WCP-012": {
+        "commit": "bae3812",
+        "evidence": "docs/verification/WCP-012.md"
       }
     }
   },
@@ -67,11 +73,11 @@
     "Close only reviewed integrated tickets with meaningful unit/PostgreSQL/API/frontend/browser evidence.",
     "Continue unblocked work and report provider/deployment limitations honestly."
   ],
-  "updated_at": "2026-11-08T16:25:51.756875+00:00",
+  "updated_at": "2026-11-08T16:42:36.966886+00:00",
   "active_tickets": [
     "WCP-002",
     "WCP-004",
-    "WCP-012"
+    "WCP-013"
   ],
   "frontier": [
     "WCP-044"
@@ -122,6 +128,22 @@
       "ticket": "WCP-045",
       "status": "blocked",
       "reason": "User explicitly left hosting pending and domain pending on 2026-11-08; no Render workspace selected, domain/DNS or reviewed provisioning quote. Continue local implementation and other unblocked tickets.",
+      "commit": null,
+      "evidence": null
+    },
+    {
+      "time": "2026-11-08T16:42:32.760728+00:00",
+      "ticket": "WCP-012",
+      "status": "completed",
+      "reason": null,
+      "commit": "bae3812",
+      "evidence": "docs/verification/WCP-012.md"
+    },
+    {
+      "time": "2026-11-08T16:42:36.966886+00:00",
+      "ticket": "WCP-013",
+      "status": "in-progress",
+      "reason": null,
       "commit": null,
       "evidence": null
     }
