@@ -18,7 +18,7 @@ type Game = {
   nameA: string;
   nameB: string;
   sheet: string;
-  drawNumber: number;
+    drawNumber: number | null;
   state: string;
   version: number;
   scoringSource: string;
@@ -268,7 +268,7 @@ export function ScoringEditor({ gameId }: { gameId: string }) {
             {game.nameA} vs {game.nameB}
           </h2>
           <p>
-            Game {game.id} · Draw {game.drawNumber} · Sheet {game.sheet} ·{" "}
+            Game {game.id} · {game.drawNumber===null?'Not scheduled':`Draw ${game.drawNumber}`} · {game.sheet?`Sheet ${game.sheet}`:'Sheet not assigned'} ·{" "}
             {game.state}
           </p>
           <p>

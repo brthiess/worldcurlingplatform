@@ -8,7 +8,7 @@ export async function GET(
   try {
     const id = (await params).id;
     const result = await pool.query(
-      "SELECT d.event_id,d.id AS division_id FROM game g JOIN draw_session ds ON ds.id=g.draw_id JOIN division d ON d.id=ds.division_id WHERE g.id=$1",
+      "SELECT d.event_id,d.id AS division_id FROM game g LEFT JOIN draw_session ds ON ds.id=g.draw_id JOIN division d ON d.id=g.division_id WHERE g.id=$1",
       [id],
     );
     const data = result.rows[0]

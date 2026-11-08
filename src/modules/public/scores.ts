@@ -36,7 +36,7 @@ export type PublicGame = {
   }[];
   attention: { downstreamGameId: string; resultVersion: number }[];
   id: string;
-  drawId: string;
+  drawId: string | null;
   sheet: string;
   phase: string;
   state: string;
@@ -124,10 +124,10 @@ async function projectEvent(
     state: String(d.state),
   }));
   const gamesResult = await connection.execute(
-    sql`SELECT g.id,g.draw_id AS "drawId",g.sheet,g.phase,g.state,g.entry_a AS "entryA",g.entry_b AS "entryB",coalesce(a.display_name,g.slot_a) AS "nameA",coalesce(b.display_name,g.slot_b) AS "nameB",g.total_a AS "totalA",g.total_b AS "totalB",g.hammer,g.hammer_end AS "hammerEnd",g.updated_at AS "updatedAt" FROM game g JOIN draw_session ds ON ds.id=g.draw_id LEFT JOIN event_entry a ON a.id=g.entry_a LEFT JOIN event_entry b ON b.id=g.entry_b WHERE ds.division_id=${row.divisionId} ORDER BY ds.starts_at,g.sheet,g.id`,
+    sql`SELECT g.id,g.draw_id AS "drawId",g.sheet,g.phase,g.state,g.entry_a AS "entryA",g.entry_b AS "entryB",coalesce(a.display_name,g.slot_a) AS "nameA",coalesce(b.display_name,g.slot_b) AS "nameB",g.total_a AS "totalA",g.total_b AS "totalB",g.hammer,g.hammer_end AS "hammerEnd",g.updated_at AS "updatedAt" FROM game g LEFT JOIN draw_session ds ON ds.id=g.draw_id LEFT JOIN event_entry a ON a.id=g.entry_a LEFT JOIN event_entry b ON b.id=g.entry_b WHERE g.division_id=${row.divisionId} ORDER BY ds.starts_at,g.sheet,g.id`,
   );
   const endsResult = await connection.execute(
-    sql`SELECT s.game_id,s.side,s.end_number,s.state,s.points FROM game_end_score s JOIN game g ON g.id=s.game_id JOIN draw_session ds ON ds.id=g.draw_id WHERE ds.division_id=${row.divisionId} ORDER BY s.end_number`,
+    sql`SELECT s.game_id,s.side,s.end_number,s.state,s.points FROM game_end_score s JOIN game g ON g.id=s.game_id WHERE g.division_id=${row.divisionId} ORDER BY s.end_number`,
   );
   function ends(id: unknown, side: string, gameState: string): Score[] {
     const gameRows = endsResult.rows.filter((e) => e.game_id === id);
@@ -165,13 +165,13 @@ async function projectEvent(
     endsB: ends(g.id, "b", String(g.state)),
   })) as unknown as PublicGame[];
   const results = await connection.execute(
-    sql`SELECT r.game_id,r.version,r.confirmed_by AS "confirmedBy",r.created_at AS "createdAt",r.result FROM game_result_version r JOIN game g ON g.id=r.game_id JOIN draw_session ds ON ds.id=g.draw_id WHERE ds.division_id=${row.divisionId} ORDER BY r.version DESC`,
+    sql`SELECT r.game_id,r.version,r.confirmed_by AS "confirmedBy",r.created_at AS "createdAt",r.result FROM game_result_version r JOIN game g ON g.id=r.game_id WHERE g.division_id=${row.divisionId} ORDER BY r.version DESC`,
   );
   const lineups = await connection.execute(
-    sql`SELECT DISTINCT ON(l.game_id,l.side) l.game_id,l.side,l.entry_id AS "entryId",l.event_lineup_version AS "eventLineupVersion",l.mode,l.members FROM game_lineup_version l JOIN game g ON g.id=l.game_id JOIN draw_session ds ON ds.id=g.draw_id WHERE ds.division_id=${row.divisionId} AND l.entry_id=CASE l.side WHEN 'a' THEN g.entry_a ELSE g.entry_b END ORDER BY l.game_id,l.side,l.version DESC`,
+    sql`SELECT DISTINCT ON(l.game_id,l.side) l.game_id,l.side,l.entry_id AS "entryId",l.event_lineup_version AS "eventLineupVersion",l.mode,l.members FROM game_lineup_version l JOIN game g ON g.id=l.game_id WHERE g.division_id=${row.divisionId} AND l.entry_id=CASE l.side WHEN 'a' THEN g.entry_a ELSE g.entry_b END ORDER BY l.game_id,l.side,l.version DESC`,
   );
   const attention = await connection.execute(
-    sql`SELECT a.upstream_game_id,a.downstream_game_id AS "downstreamGameId",a.result_version AS "resultVersion" FROM game_assignment_attention a JOIN game g ON g.id=a.upstream_game_id JOIN draw_session ds ON ds.id=g.draw_id WHERE ds.division_id=${row.divisionId}`,
+    sql`SELECT a.upstream_game_id,a.downstream_game_id AS "downstreamGameId",a.result_version AS "resultVersion" FROM game_assignment_attention a JOIN game g ON g.id=a.upstream_game_id WHERE g.division_id=${row.divisionId}`,
   );
   for (const game of games) {
     game.lineupA =
@@ -206,7 +206,7 @@ async function projectEvent(
       game.totalB = null;
     }
   const hammers = await connection.execute(
-    sql`SELECT h.game_id,h.end_number,h.hammer FROM game_end_hammer h JOIN game g ON g.id=h.game_id JOIN draw_session ds ON ds.id=g.draw_id WHERE ds.division_id=${row.divisionId}`,
+    sql`SELECT h.game_id,h.end_number,h.hammer FROM game_end_hammer h JOIN game g ON g.id=h.game_id WHERE g.division_id=${row.divisionId}`,
   );
   for (const game of games)
     game.endHammer = Array.from(

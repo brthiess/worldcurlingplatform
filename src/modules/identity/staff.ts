@@ -15,7 +15,7 @@ export async function staffWorkspace(userId: string) {
   const ids = events.map((e) => e.id);
   const games = (
     await pool.query(
-      'SELECT g.id,d.event_id AS "eventId",g.sheet,ds.number AS "drawNumber" FROM game g JOIN draw_session ds ON ds.id=g.draw_id JOIN division d ON d.id=ds.division_id WHERE d.event_id=ANY($1::text[]) ORDER BY ds.starts_at,g.sheet',
+      'SELECT g.id,d.event_id AS "eventId",g.sheet,ds.number AS "drawNumber" FROM game g LEFT JOIN draw_session ds ON ds.id=g.draw_id JOIN division d ON d.id=g.division_id WHERE d.event_id=ANY($1::text[]) ORDER BY ds.starts_at,g.sheet',
       [ids],
     )
   ).rows;
@@ -138,7 +138,7 @@ export async function staffCommand(userId: string, raw: unknown) {
       if (
         !(
           await c.query(
-            "SELECT e.id FROM event_edition e JOIN auth_user u ON u.id=$2 WHERE e.id=$1 AND ($3::text IS NULL OR EXISTS(SELECT 1 FROM game g JOIN draw_session ds ON ds.id=g.draw_id JOIN division d ON d.id=ds.division_id WHERE g.id=$3 AND d.event_id=e.id))",
+            "SELECT e.id FROM event_edition e JOIN auth_user u ON u.id=$2 WHERE e.id=$1 AND ($3::text IS NULL OR EXISTS(SELECT 1 FROM game g LEFT JOIN draw_session ds ON ds.id=g.draw_id JOIN division d ON d.id=g.division_id WHERE g.id=$3 AND d.event_id=e.id))",
             [input.eventId, input.userId, input.gameId],
           )
         ).rowCount

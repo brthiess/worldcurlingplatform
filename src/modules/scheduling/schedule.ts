@@ -127,7 +127,7 @@ async function snapshot(c: PoolClient, eventId: string) {
   ).rows.map((d) => ({ ...d, startsAt: d.startsAt.toISOString() }));
   const rows = (
     await c.query(
-      'SELECT g.id,g.draw_id AS "drawId",ds.division_id AS "divisionId",g.sheet,g.state,g.entry_a AS "entryA",g.entry_b AS "entryB",coalesce(a.display_name,g.slot_a) AS "nameA",coalesce(b.display_name,g.slot_b) AS "nameB" FROM game g JOIN draw_session ds ON ds.id=g.draw_id JOIN division d ON d.id=ds.division_id LEFT JOIN event_entry a ON a.id=g.entry_a LEFT JOIN event_entry b ON b.id=g.entry_b WHERE d.event_id=$1 ORDER BY g.id',
+      'SELECT g.id,g.draw_id AS "drawId",ds.division_id AS "divisionId",g.sheet,g.state,g.entry_a AS "entryA",g.entry_b AS "entryB",coalesce(a.display_name,g.slot_a) AS "nameA",coalesce(b.display_name,g.slot_b) AS "nameB" FROM game g LEFT JOIN draw_session ds ON ds.id=g.draw_id JOIN division d ON d.id=g.division_id LEFT JOIN event_entry a ON a.id=g.entry_a LEFT JOIN event_entry b ON b.id=g.entry_b WHERE d.event_id=$1 ORDER BY g.id',
       [eventId],
     )
   ).rows;
@@ -189,7 +189,7 @@ async function snapshot(c: PoolClient, eventId: string) {
     });
   }
   const conflicts = scheduleConflicts(
-    games.map((g) => {
+    games.filter((g) => draws.some(d=>d.id===g.drawId)).map((g) => {
       const d = draws.find((d) => d.id === g.drawId)!;
       return {
         id: g.id,
@@ -266,7 +266,7 @@ export async function saveSchedule(
     }
     // Serialize with actual scoring/lineup commands. No game score/version/source is rewritten.
     await c.query(
-      "SELECT g.id FROM game g JOIN draw_session ds ON ds.id=g.draw_id JOIN division d ON d.id=ds.division_id WHERE d.event_id=$1 ORDER BY g.id FOR UPDATE OF g",
+      "SELECT g.id FROM game g LEFT JOIN draw_session ds ON ds.id=g.draw_id JOIN division d ON d.id=g.division_id WHERE d.event_id=$1 ORDER BY g.id FOR UPDATE OF g",
       [eventId],
     );
     await c.query(
