@@ -4,6 +4,8 @@ import { readFileSync } from "node:fs";
 export function eventEngineIdentity() {
   const paths = [
     "package-lock.json",
+    "tsconfig.json",
+    "scripts/run-next.mjs",
     "scripts/event-engine-identity.mjs",
     "next.config.mjs",
     "src/domain/event-assessments.ts",
