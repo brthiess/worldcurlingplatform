@@ -76,6 +76,7 @@ export async function recordAuthority(
       JSON.stringify(after),
     ],
   );
+  return id;
 }
 export async function delegationWorkspace(userId: string) {
   const admin = await isAdministrator(pool, userId);

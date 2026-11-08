@@ -4,7 +4,7 @@ number: 8
 title: "Grant team-season representatives self-entry authority"
 parent: WCP-SPEC-001
 type: implementation
-status: in-progress
+status: completed
 labels: [ready-for-agent]
 blocked_by: [WCP-006]
 source_spec_sha256: 045B46988225B6C8C0020B23C8C5D4EAA8E2E1916256148A0FDA26B5DA8673FD
@@ -18,7 +18,7 @@ published: 2026-11-07
 
 **Blocked by:** [06: Manually enter teams and resolve core-composition identities](06-manually-enter-teams-and-resolve-core-composition-identities.md).
 
-**Status:** in-progress
+**Status:** completed
 
 ## Parent and scope
 
@@ -31,13 +31,13 @@ published: 2026-11-07
 
 ## Acceptance criteria
 
-- [ ] Support scoped submit/amend/withdraw/payment authority for the represented team-season.
-- [ ] A player-profile link grants no team powers, and authority does not transfer automatically to a different core-composition identity.
-- [ ] Use the existing canonical resolution and event-lineup behavior, with clear on-behalf-of actor attribution.
-- [ ] **Unit testing:** Test team-season/action matching, profile-versus-team authority and denial after a core identity change or grant revocation.
-- [ ] **Database/API verification:** Exercise staff grants and permitted/forbidden self-entry commands with real sessions and database audit records.
-- [ ] **Frontend quality:** Expose a representative's permitted teams/entries and staff grant controls; make team/season context and lack of authority explicit.
-- [ ] Record actual verification commands/results and relevant browser/screenshots or API evidence. Report meaningful uncovered branches or limitations; do not claim checks that were not run.
+- [x] Support scoped submit/amend/withdraw/payment authority for the represented team-season.
+- [x] A player-profile link grants no team powers, and authority does not transfer automatically to a different core-composition identity.
+- [x] Use the existing canonical resolution and event-lineup behavior, with clear on-behalf-of actor attribution.
+- [x] **Unit testing:** Test team-season/action matching, profile-versus-team authority and denial after a core identity change or grant revocation.
+- [x] **Database/API verification:** Exercise staff grants and permitted/forbidden self-entry commands with real sessions and database audit records.
+- [x] **Frontend quality:** Expose a representative's permitted teams/entries and staff grant controls; make team/season context and lack of authority explicit.
+- [x] Record actual verification commands/results and relevant browser/screenshots or API evidence. Report meaningful uncovered branches or limitations; do not claim checks that were not run.
 
 ## Slice boundary
 
