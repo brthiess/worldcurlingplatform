@@ -20,4 +20,6 @@ Git/npm/Node entry scripts can fail in the Windows sandbox while resolving `C:/U
 
 PostgreSQL 13 binaries are installed under `C:/Program Files/PostgreSQL/13/bin`. WCP-001 established an isolated local instance on loopback port 55431, with data under the project's ignored `.runtime/wcp001`. Inspect its setup record before using it; create a separate database per ticket. Docker's daemon was unavailable at preflight. Do not alter the existing unrelated Windows PostgreSQL service/databases. Hosted credentials/domain inputs are separate from local acceptance.
 
+When inherited acceptance includes news, configure one unique loopback `NEWS_FIXTURE_ORIGIN` for that worktree in both its running app and test environment. Run API/browser fixture suites sequentially within the worktree; independent worktrees must not share a fixture listener port. The fixture exception is optional local operator configuration, never a production default. Keep inherited media storage outside the disposable worktree as required by its storage adapter.
+
 The coordinator reviews/merges and pushes completed work, closes only verified tickets and continues the unblocked graph with at most three implementers. Report genuine blockers without inventing successful checks.
