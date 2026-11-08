@@ -11,7 +11,11 @@
     "WCP-001"
   ],
   "tickets_started": [
-    "WCP-001"
+    "WCP-001",
+    "WCP-002",
+    "WCP-004",
+    "WCP-012",
+    "WCP-045"
   ],
   "tickets_completed": [
     "WCP-001"
@@ -28,7 +32,10 @@
     "last_verified_remote_integration_commit": "72e4144ca18a0c657acd80096d67a5e9b3002620",
     "integration_branch": "integration/world-curling-platform",
     "worktrees_created": [
-      ".worktrees/WCP-001"
+      ".worktrees/WCP-001",
+      ".worktrees/WCP-002",
+      ".worktrees/WCP-004",
+      ".worktrees/WCP-012"
     ],
     "initialized": true,
     "baseline_commit": "f6d6d8d"
@@ -50,7 +57,7 @@
   "external_inputs": [
     {
       "ticket": "WCP-045",
-      "status": "not_supplied",
+      "status": "user_left_hosting_and_domain_pending_2026-11-08",
       "required": "Domain/DNS, hosting access and reviewed quote; provider credentials when exercised"
     }
   ],
@@ -60,14 +67,14 @@
     "Close only reviewed integrated tickets with meaningful unit/PostgreSQL/API/frontend/browser evidence.",
     "Continue unblocked work and report provider/deployment limitations honestly."
   ],
-  "updated_at": "2026-11-08T16:10:45.286395+00:00",
-  "active_tickets": [],
-  "frontier": [
+  "updated_at": "2026-11-08T16:25:51.756875+00:00",
+  "active_tickets": [
     "WCP-002",
     "WCP-004",
-    "WCP-012",
-    "WCP-044",
-    "WCP-045"
+    "WCP-012"
+  ],
+  "frontier": [
+    "WCP-044"
   ],
   "events": [
     {
@@ -85,6 +92,38 @@
       "reason": null,
       "commit": "4304b15",
       "evidence": "docs/verification/WCP-001.md"
+    },
+    {
+      "time": "2026-11-08T16:10:49.743080+00:00",
+      "ticket": "WCP-002",
+      "status": "in-progress",
+      "reason": null,
+      "commit": null,
+      "evidence": null
+    },
+    {
+      "time": "2026-11-08T16:10:49.961105+00:00",
+      "ticket": "WCP-004",
+      "status": "in-progress",
+      "reason": null,
+      "commit": null,
+      "evidence": null
+    },
+    {
+      "time": "2026-11-08T16:10:50.163579+00:00",
+      "ticket": "WCP-012",
+      "status": "in-progress",
+      "reason": null,
+      "commit": null,
+      "evidence": null
+    },
+    {
+      "time": "2026-11-08T16:25:51.756875+00:00",
+      "ticket": "WCP-045",
+      "status": "blocked",
+      "reason": "User explicitly left hosting pending and domain pending on 2026-11-08; no Render workspace selected, domain/DNS or reviewed provisioning quote. Continue local implementation and other unblocked tickets.",
+      "commit": null,
+      "evidence": null
     }
   ],
   "research": {

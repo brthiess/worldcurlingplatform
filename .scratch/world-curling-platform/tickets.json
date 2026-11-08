@@ -103,7 +103,7 @@
       "file": "02-save-live-end-scores-from-a-mobile-scorekeeper-screen.md",
       "id": "WCP-002",
       "path": "issues/02-save-live-end-scores-from-a-mobile-scorekeeper-screen.md",
-      "status": "ready-for-agent",
+      "status": "in-progress",
       "labels": [
         "ready-for-agent"
       ],
@@ -205,7 +205,7 @@
       "file": "04-submit-and-approve-next-year-s-event-onto-the-calendar.md",
       "id": "WCP-004",
       "path": "issues/04-submit-and-approve-next-year-s-event-onto-the-calendar.md",
-      "status": "ready-for-agent",
+      "status": "in-progress",
       "labels": [
         "ready-for-agent"
       ],
@@ -588,7 +588,7 @@
       "file": "12-create-accounts-approve-player-claims-and-edit-profiles.md",
       "id": "WCP-012",
       "path": "issues/12-create-accounts-approve-player-claims-and-edit-profiles.md",
-      "status": "ready-for-agent",
+      "status": "in-progress",
       "labels": [
         "ready-for-agent"
       ],
@@ -2324,13 +2324,14 @@
       "file": "45-host-the-working-review-environment-on-the-supplied-domain.md",
       "id": "WCP-045",
       "path": "issues/45-host-the-working-review-environment-on-the-supplied-domain.md",
-      "status": "ready-for-agent",
+      "status": "blocked",
       "labels": [
         "ready-for-agent"
       ],
       "blocked_by": [
         "WCP-001"
-      ]
+      ],
+      "execution_blocker": "User explicitly left hosting pending and domain pending on 2026-11-08; no Render workspace selected, domain/DNS or reviewed provisioning quote. Continue local implementation and other unblocked tickets."
     },
     {
       "n": 46,

@@ -11,6 +11,7 @@ Started 2026-11-08 under the user's explicit implementation authorization.
 - Closure: mark a published issue and graph entry completed only after acceptance evidence is reviewed and its commit integrated. Unverified implementations remain in progress. External-input blockers affect only dependent work.
 - Evidence: `docs/verification/WCP-NNN.md`, plus machine-readable execution state. Preserve commands, outcomes, failures, limitations and browser artifact paths. Never commit credentials.
 - Curling Crawler: read-only initial import source; no source changes or crawler runtime dependency.
+- Hosting direction (2026-11-08): user answered “Leave hosting pending” and domain “pending.” Keep WCP-045 blocked on those external inputs, make no Render workspace selection/provisioning, and continue local/unblocked work. Do not ask routine hosting questions again.
 
 ## Agreed test seams
 
