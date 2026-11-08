@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { PhotoManager } from "@/components/photo-manager";
 type Player = {
   id: string;
   name: string;
@@ -131,6 +132,10 @@ export default function Profiles() {
         </p>
       ) : (
         <>
+          <PhotoManager
+            owned={workspace.owned}
+            canReview={workspace.canReview}
+          />
           <button
             className="secondary"
             disabled={busy}

@@ -65,6 +65,7 @@ test("public players are independent of accounts; approved claims permit only th
     "id",
     "name",
     "origin",
+    "photoUrl",
   ]);
   const cookie = fixtureData.cookie,
     admin = await login("administrator"),
