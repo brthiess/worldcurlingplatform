@@ -122,7 +122,8 @@ export default function Admin() {
             <a href="/admin/authority">Authority & event staff</a>
           </p>
           <p>
-            <a href="/admin/entries">Manual team entries</a>
+            <a href="/admin/entries">Team entries</a>
+            <a href="/admin/representatives">Team-season representatives</a>
           </p>
           <p>
             <a href="/admin/news">News sources and moderation</a>

@@ -17,6 +17,7 @@ type Registration = {
   members: Player[];
 };
 type Entry = {
+  entryAdmission: string;
   id: string;
   name: string;
   eventId: string;
@@ -39,6 +40,7 @@ type Team = {
   core: Player[];
   registrations: Registration[];
   entries: {
+    entryAdmission: string;
     id: string;
     name: string;
     eventId: string;
@@ -186,6 +188,12 @@ export function PublicRoster({
     const e = data as Entry;
     return (
       <main id="main">
+        {e.entryAdmission === "submitted_pending" && (
+          <p className="notice">
+            Team submission recorded. Entry acceptance, capacity and payment are
+            unresolved; this submission does not reserve a place.
+          </p>
+        )}
         <a
           className="back"
           href={`/events/${e.eventId}?division=${e.divisionId}`}
@@ -266,6 +274,9 @@ export function PublicRoster({
         <ul className="workspace-list">
           {t.entries.map((e) => (
             <li key={e.id}>
+              {e.entryAdmission === "submitted_pending" && (
+                <p className="muted">Submitted · acceptance unresolved</p>
+              )}
               <h3>
                 <a href={`/entries/${e.id}`}>{e.name}</a>
               </h3>
@@ -296,6 +307,7 @@ export function EventEntryLinks({
           status: string;
           divisionId: string;
           divisionName: string;
+          entryAdmission: string;
         }[]
       | null
     >(null),
@@ -337,6 +349,9 @@ export function EventEntryLinks({
                 <a href={`/entries/${e.id}`}>{e.name}</a>
                 <span className="muted">
                   {e.divisionName} ·{" "}
+                  {e.entryAdmission === "submitted_pending"
+                    ? "Submitted · acceptance unresolved · "
+                    : ""}
                   {e.version
                     ? `${e.status} · lineup v${e.version}`
                     : "Provisional · no lineup recorded"}
