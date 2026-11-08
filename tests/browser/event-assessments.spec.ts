@@ -248,7 +248,8 @@ test("staff complete ordinary sourced controls, queue real awards and review res
     });
     if (name === "phone") {
       await page
-        .getByRole("heading", { name: "Event awards", exact: true })
+        .getByRole("listitem")
+        .filter({ hasText: "Place 1 · Fictional team 1" })
         .scrollIntoViewIfNeeded();
       await page.screenshot({
         path: info.outputPath("phone-award-details.png"),
