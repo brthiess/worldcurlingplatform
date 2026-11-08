@@ -1,9 +1,10 @@
+import { authRequest } from "./auth-request";
 import "dotenv/config";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 const base = process.env.BETTER_AUTH_URL!;
 async function signIn(role: string) {
-  const response = await fetch(`${base}/api/auth/sign-in/email`, {
+  const response = await authRequest(`${base}/api/auth/sign-in/email`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Origin: base },
     body: JSON.stringify({

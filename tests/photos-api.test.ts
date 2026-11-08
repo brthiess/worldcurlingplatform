@@ -1,3 +1,4 @@
+import { authRequest } from "./auth-request";
 import "dotenv/config";
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -8,7 +9,7 @@ import { pool } from "../src/db";
 const base = process.env.BETTER_AUTH_URL!;
 async function login(role: string) {
   const signIn = () =>
-    fetch(base + "/api/auth/sign-in/email", {
+    authRequest(base + "/api/auth/sign-in/email", {
       method: "POST",
       headers: { Origin: base, "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -17,10 +18,6 @@ async function login(role: string) {
       }),
     });
   let r = await signIn();
-  if (r.status === 429) {
-    await new Promise((resolve) => setTimeout(resolve, 60000));
-    r = await signIn();
-  }
   assert.equal(r.status, 200);
   return r.headers
     .getSetCookie()
@@ -158,6 +155,36 @@ test("linked player submits private immutable bytes and administrator publishes 
     403,
   );
   assert.equal((await review(first, "approved", "0".repeat(64))).status, 409);
+  // Exercise an actual PostgreSQL constraint failure after the public reference
+  // update. The HTTP workflow must expose neither a partial approval nor image.
+  await pool.query(
+    `CREATE FUNCTION wcp013_acceptance_audit_failure() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.resource_id='${first.id}' AND NEW.action='player_photo_approved' THEN RAISE EXCEPTION 'Controlled acceptance audit failure'; END IF; RETURN NEW; END $$`,
+  );
+  await pool.query(
+    "CREATE TRIGGER wcp013_acceptance_audit_failure BEFORE INSERT ON audit_record FOR EACH ROW EXECUTE FUNCTION wcp013_acceptance_audit_failure()",
+  );
+  try {
+    assert.equal((await review(first, "approved")).status, 503);
+    assert.equal(
+      (await call("/api/v1/public/photos/" + first.assetId)).status,
+      404,
+    );
+    const rolledBack = await (await call("/api/v1/photos", owner)).json();
+    assert.equal(
+      rolledBack.submissions.find((p: { id: string }) => p.id === first.id)
+        .status,
+      "pending",
+    );
+    assert.equal(
+      (await (await call("/api/v1/public/players/" + id)).json()).photoUrl,
+      null,
+    );
+  } finally {
+    await pool.query(
+      "DROP TRIGGER wcp013_acceptance_audit_failure ON audit_record",
+    );
+    await pool.query("DROP FUNCTION wcp013_acceptance_audit_failure()");
+  }
   assert.equal((await review(first, "approved")).status, 200);
   const publicBytes = await call("/api/v1/public/photos/" + first.assetId);
   assert.equal(publicBytes.status, 200);

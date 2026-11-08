@@ -1,10 +1,15 @@
+import { signInWithRateWindow } from "./auth-fixture";
 import "dotenv/config";
 import { test, expect } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 import sharp from "sharp";
 import { mkdir } from "node:fs/promises";
 import { hashPassword } from "better-auth/crypto";
-import { pool } from "../../src/db";
+import pg from "pg";
+const pool = new pg.Pool({
+  connectionString: process.env.DATABASE_URL,
+  max: 2,
+});
 test("player photo upload, review comparison, rejection and exact-image publication work across responsive layouts", async ({
   page,
   browser,
@@ -13,10 +18,11 @@ test("player photo upload, review comparison, rejection and exact-image publicat
   const key = crypto.randomUUID(),
     playerId = "browser-photo-" + key,
     userId = "photo-owner-" + key,
-    email = userId + "@example.invalid";
+    email = userId + "@example.invalid",
+    playerName = "Geometric fixture · synthetic demo " + key.slice(0, 6);
   await pool.query(
-    "INSERT INTO player(id,name,origin) VALUES($1,'Geometric fixture · synthetic demo','fictional_demo')",
-    [playerId],
+    "INSERT INTO player(id,name,origin) VALUES($1,$2,'fictional_demo')",
+    [playerId, playerName],
   );
   await pool.query(
     "INSERT INTO auth_user(id,name,email,email_verified) VALUES($1,'Synthetic photo owner',$2,true)",
@@ -45,10 +51,10 @@ test("player photo upload, review comparison, rejection and exact-image publicat
   await page
     .getByLabel("Password", { exact: true })
     .fill(process.env.DEMO_PASSWORD!);
-  await page
-    .getByRole("button", { name: "Sign in", exact: true })
-    .last()
-    .click();
+  await signInWithRateWindow(
+    page,
+    page.getByRole("button", { name: "Sign in", exact: true }).last(),
+  );
   await expect(page.getByLabel("Replacement photo")).toBeVisible();
   await page.setViewportSize({ width: 360, height: 800 });
   await page.getByLabel("Replacement photo").focus();
@@ -86,16 +92,22 @@ test("player photo upload, review comparison, rejection and exact-image publicat
   const adminContext = await browser.newContext();
   const review = await adminContext.newPage();
   review.on("pageerror", (e) => errors.push(e.message));
+  review.on("response", (r) => {
+    if (r.status() >= 500) failures.push(r.status());
+  });
   await review.goto(process.env.BETTER_AUTH_URL! + "/admin");
   await review.getByLabel("Demo persona").selectOption("administrator");
   await review.getByLabel("Demo password").fill(process.env.DEMO_PASSWORD!);
-  await review.getByRole("button", { name: "Sign in", exact: true }).click();
+  await signInWithRateWindow(
+    review,
+    review.getByRole("button", { name: "Sign in", exact: true }),
+  );
   await expect(review.getByText("Signed in as")).toBeVisible();
   await review.goto(process.env.BETTER_AUTH_URL! + "/account/profile");
   const pending = () =>
     review
       .locator(".photo-card")
-      .filter({ hasText: "Geometric fixture · synthetic demo" })
+      .filter({ hasText: playerName })
       .filter({ hasText: "Pending" });
   await pending()
     .getByLabel("Photo review reason")
@@ -108,9 +120,13 @@ test("player photo upload, review comparison, rejection and exact-image publicat
   await expect(page.getByText("Approved", { exact: true })).toBeVisible();
   const publicContext = await browser.newContext();
   const publicPage = await publicContext.newPage();
+  publicPage.on("pageerror", (e) => errors.push(e.message));
+  publicPage.on("response", (r) => {
+    if (r.status() >= 500) failures.push(r.status());
+  });
   await publicPage.goto(process.env.BETTER_AUTH_URL! + "/players/" + playerId);
   const publicPhoto = publicPage.getByAltText(
-    "Approved photo of Geometric fixture · synthetic demo",
+    "Approved photo of " + playerName,
   );
   await expect(publicPhoto).toBeVisible();
   const initial = await publicPhoto.getAttribute("src");

@@ -1,3 +1,4 @@
+import { authRequest } from "./auth-request";
 import "dotenv/config";
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -9,7 +10,7 @@ const sessions = new Map<string, string>();
 async function login(role: string) {
   if (sessions.has(role)) return sessions.get(role)!;
   const signIn = () =>
-    fetch(`${base}/api/auth/sign-in/email`, {
+    authRequest(`${base}/api/auth/sign-in/email`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Origin: base },
       body: JSON.stringify({
@@ -18,15 +19,6 @@ async function login(role: string) {
       }),
     });
   let r = await signIn();
-  if (r.status === 429) {
-    const wait = Math.min(
-      60000,
-      Math.max(1000, Number(r.headers.get("X-Retry-After") ?? 60) * 1000),
-    );
-    await new Promise((resolve) => setTimeout(resolve, wait));
-    await new Promise((resolve) => setTimeout(resolve, 250));
-    r = await signIn();
-  }
   assert.equal(r.status, 200);
   const cookie = r.headers
     .getSetCookie()
