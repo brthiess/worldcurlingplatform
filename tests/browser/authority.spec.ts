@@ -172,9 +172,12 @@ for (const [label, width, height] of [
         () => document.documentElement.scrollWidth <= innerWidth,
       ),
     ).toBe(true);
-    await page.getByRole("group", { name: "Assign a scorekeeper" }).screenshot({
-      path: info.outputPath(`${label}-staff.png`),
-    });
+    await page
+      .getByRole("heading", { name: "Scoring assignments", exact: true })
+      .locator("..")
+      .screenshot({
+        path: info.outputPath(`${label}-staff.png`),
+      });
     await page.request.post("/api/auth/sign-out", {
       headers: { Origin: base },
       data: {},
@@ -258,9 +261,20 @@ for (const [label, width, height] of [
         exact: true,
       }),
     ).toBeVisible();
-    await page.getByRole("region", { name: "Application details" }).screenshot({
-      path: info.outputPath(`${label}-responsibility-history.png`),
-    });
+    const queueRow = page
+      .getByRole("listitem")
+      .filter({
+        has: page.getByRole("heading", { name: application.name, exact: true }),
+      });
+    await expect(queueRow).toContainText("rejected");
+    await expect(queueRow).toContainText("v5");
+    expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+    await page
+      .getByRole("heading", { name: "Application history", exact: true })
+      .locator("..")
+      .screenshot({
+        path: info.outputPath(`${label}-responsibility-history.png`),
+      });
     const delegations = await (
       await page.request.get("/api/v1/approval-delegations")
     ).json();

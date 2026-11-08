@@ -705,7 +705,21 @@ export function ApplicationsWorkbench() {
                           <ResponsibilityControls
                             id={detail.id}
                             version={detail.version}
-                            onSaved={() => void open(detail.id)}
+                            onSaved={async () => {
+                              await open(detail.id);
+                              try {
+                                const response = await fetch(
+                                  "/api/v1/applications",
+                                  { cache: "no-store" },
+                                );
+                                if (!response.ok) throw new Error();
+                                setWorkspace(await response.json());
+                              } catch {
+                                setError(
+                                  "Responsibility changed, but the queue could not be refreshed. Reload the current version.",
+                                );
+                              }
+                            }}
                           />
                         )}
                         <h3>Application history</h3>
