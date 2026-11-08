@@ -57,7 +57,7 @@ async function source(c: PoolClient, id: string, lock = false) {
     lineups.push({ ...entry, lineup: await readEventLineup(c, entry.id) });
   const games = (
     await c.query(
-      'SELECT g.id,g.draw_id AS "drawId",g.sheet,g.phase,g.state,g.version,g.entry_a AS "entryA",g.entry_b AS "entryB" FROM game g JOIN draw_session ds ON ds.id=g.draw_id WHERE ds.division_id=$1 ORDER BY g.id' +
+      'SELECT g.id,g.draw_id AS "drawId",g.sheet,g.phase,g.state,g.version,g.entry_a AS "entryA",g.entry_b AS "entryB" FROM game g WHERE g.division_id=$1 ORDER BY g.id' +
         (lock ? " FOR SHARE OF g" : ""),
       [id],
     )

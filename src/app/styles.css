@@ -1247,3 +1247,24 @@ footer {
 .assessment-workbench fieldset {min-width:0;border:1px solid var(--line,#c5cdd4);padding:1rem;}
 .assessment-workbench select,.assessment-workbench input,.assessment-workbench textarea {max-width:100%;}
 .assessment-workbench dd {overflow-wrap:anywhere;}
+/* Competition routes use actual game records; the mobile list avoids a wide bracket. */
+.draw-controls { display:flex; align-items:end; gap:1rem; flex-wrap:wrap; margin:1rem 0; }
+.draw-workspace fieldset { min-width:0; }
+.draw-workspace select,.draw-controls select { width:100%; max-width:100%; }
+.draw-workspace > p { overflow-wrap:anywhere; }
+.draw-controls > div { min-width:0; }
+.draw-controls [role="group"] { display:flex; gap:.5rem; flex-wrap:wrap; }
+.draw-graph { overflow-x:auto; max-width:100%; margin:1.5rem 0; padding:.25rem; }
+.draw-rounds { display:grid; grid-template-columns:repeat(3,minmax(220px,1fr)); gap:1rem; min-width:740px; }
+.draw-round { display:flex; flex-direction:column; gap:1rem; min-width:0; }
+.draw-round h3 { margin:0; }
+.bracket-game { border:1px solid #c2ced4; border-radius:.4rem; padding:1rem; background:#fff; overflow-wrap:anywhere; }
+.bracket-side { display:flex; justify-content:space-between; gap:.75rem; margin:.65rem 0; }
+.bracket-side strong { font-variant-numeric:tabular-nums; }
+.path-game { border:3px solid #12634e; padding:calc(1rem - 2px); background:#f0faf6; }
+.path-label,.winner-label { color:#15553f; font-weight:700; }
+.draw-list .draw-rounds { display:block; min-width:0; }
+.draw-list .draw-round { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr)); margin-bottom:1.5rem; }
+.draw-list .draw-round h3 { grid-column:1/-1; }
+.draw-graph:focus-visible { outline:3px solid #12634e; outline-offset:2px; }
+

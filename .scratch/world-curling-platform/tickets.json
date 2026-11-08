@@ -983,13 +983,17 @@
       "file": "19-preview-and-run-a-single-knockout-draw-through-public-views.md",
       "id": "WCP-019",
       "path": "issues/19-preview-and-run-a-single-knockout-draw-through-public-views.md",
-      "status": "in-progress",
+      "status": "completed",
       "labels": [
         "ready-for-agent"
       ],
       "blocked_by": [
         "WCP-018"
-      ]
+      ],
+      "completion": {
+        "commit": "18b46550d9b5c52844d1ca9bb23be7bdc65cff8e",
+        "evidence": "docs/verification/WCP-019-merge.md"
+      }
     },
     {
       "n": 20,
@@ -1038,7 +1042,7 @@
       "file": "20-run-the-main-16-team-triple-knockout-demonstration.md",
       "id": "WCP-020",
       "path": "issues/20-run-the-main-16-team-triple-knockout-demonstration.md",
-      "status": "ready-for-agent",
+      "status": "in-progress",
       "labels": [
         "ready-for-agent"
       ],

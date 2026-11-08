@@ -245,6 +245,7 @@ export function ScoresView({
                         {d.name} · scores
                       </a>
                       <span> · Ranking eligibility: {d.rankingStatus}</span>
+                      {d.hasPublishedDraw&&<span> · <a href={`/events/${data.event.id}/bracket?division=${encodeURIComponent(d.id)}`}>Competition bracket / game list</a></span>}
                     </li>
                   ))}
                 </ul>
@@ -351,7 +352,7 @@ export function ScoresView({
                 <article className="game-card" key={game.id}>
                   <div className="game-meta">
                     <span>
-                      Sheet {game.sheet} · {game.phase}
+                      {game.sheet ? `Sheet ${game.sheet}` : 'Sheet not assigned'} · {game.phase}
                     </span>
                     <span
                       className={`badge ${game.state === "live" ? "live" : ""}`}
@@ -363,13 +364,13 @@ export function ScoresView({
                           ? "Live · provisional"
                           : game.state === "confirmed"
                             ? "Confirmed result"
-                            : "Scheduled"}
+                          : game.drawId ? "Scheduled" : "Not scheduled"}
                     </span>
                   </div>
                   <ScoreTable game={game} />
                   <div className="game-bottom">
                     <span>
-                      {gameId
+                      {gameId && !game.drawId ? "Time and sheet not scheduled" : gameId
                         ? venueTime(
                             data.draws.find((d) => d.id === game.drawId)!
                               .startsAt,
@@ -501,6 +502,7 @@ export function ScoresView({
           )}
         </>
       )}
+      {gameId&&data?.divisions.find(d=>d.id===data.selectedDivisionId)?.hasPublishedDraw&&<p><a href={`/events/${data.event.id}/bracket?division=${encodeURIComponent(data.selectedDivisionId!)}`}>Competition bracket / game list →</a></p>}
     </main>
   );
 }
