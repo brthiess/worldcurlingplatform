@@ -3,6 +3,13 @@ import type { PoolClient } from "pg";
 import { pool } from "@/db";
 import { permitted, type Grant } from "@/domain/permissions";
 import {
+  validateResult,
+  lineupDifference,
+  type Outcome,
+  type DifferenceMember,
+} from "@/domain/results";
+import { gameLineup, freezeLineups } from "./lineups";
+import {
   validateEnd,
   scoreTotals,
   commandDecision,
@@ -21,10 +28,18 @@ export class ScoringError extends Error {
 export type Command = {
   requestId: string;
   expectedVersion: number;
-  action: "start" | "end";
+  action: "start" | "end" | "confirm" | "correct" | "lineup";
   hammer: "a" | "b" | null;
   endNumber?: number;
   end?: End;
+  outcome?: Outcome;
+  winnerEntryId?: string;
+  reason?: string;
+  ends?: End[];
+  endHammer?: ("a" | "b" | null)[];
+  side?: "a" | "b";
+  members?: { playerId: string; position: string }[];
+  lineups?: Partial<Record<"a" | "b", DifferenceMember[]>>;
 };
 export function parseCommand(value: unknown): Command {
   const c = value as Command;
@@ -34,7 +49,7 @@ export function parseCommand(value: unknown): Command {
     !/^[a-zA-Z0-9-]{1,80}$/.test(c.requestId) ||
     !Number.isSafeInteger(c.expectedVersion) ||
     c.expectedVersion < 0 ||
-    !["start", "end"].includes(c.action) ||
+    !["start", "end", "confirm", "correct", "lineup"].includes(c.action) ||
     ![null, "a", "b"].includes(c.hammer)
   )
     throw new ScoringError(
@@ -48,6 +63,65 @@ export function parseCommand(value: unknown): Command {
     hammer: c.hammer,
   };
   if (c.action === "start") return base;
+  if (c.action === "confirm" || c.action === "correct") {
+    if (
+      !["normal", "conceded", "forfeit"].includes(c.outcome!) ||
+      typeof c.winnerEntryId !== "string" ||
+      typeof c.reason !== "string" ||
+      (c.action === "correct" && !Array.isArray(c.ends))
+    )
+      throw new ScoringError(
+        400,
+        "Provide outcome, participating winner and reason; corrections require the full line score",
+      );
+    let lineups: Command["lineups"];
+    if (
+      c.endHammer !== undefined &&
+      (c.action !== "correct" ||
+        !Array.isArray(c.endHammer) ||
+        c.endHammer.length !== c.ends!.length ||
+        c.endHammer.some((h) => ![null, "a", "b"].includes(h)))
+    )
+      throw new ScoringError(
+        400,
+        "Provide known or unknown hammer for each corrected end",
+      );
+    if (c.lineups !== undefined) {
+      if (
+        c.action !== "correct" ||
+        !c.lineups ||
+        typeof c.lineups !== "object" ||
+        Object.keys(c.lineups).some((k) => !["a", "b"].includes(k))
+      )
+        throw new ScoringError(400, "Only corrections accept lineup changes");
+      try {
+        lineups = {};
+        for (const side of ["a", "b"] as const)
+          if (c.lineups[side] !== undefined)
+            lineups[side] = lineupDifference(c.lineups[side]);
+      } catch (e) {
+        throw new ScoringError(400, (e as Error).message);
+      }
+    }
+    return {
+      ...base,
+      outcome: c.outcome,
+      winnerEntryId: c.winnerEntryId,
+      reason: c.reason,
+      ...(c.action === "correct" ? { ends: c.ends } : {}),
+      ...(lineups ? { lineups } : {}),
+      ...(c.endHammer ? { endHammer: c.endHammer } : {}),
+    };
+  }
+  if (c.action === "lineup") {
+    if (!["a", "b"].includes(c.side!))
+      throw new ScoringError(400, "Choose a lineup side");
+    try {
+      return { ...base, side: c.side, members: lineupDifference(c.members) };
+    } catch (e) {
+      throw new ScoringError(400, (e as Error).message);
+    }
+  }
   if (!Number.isInteger(c.endNumber) || c.endNumber! < 1 || c.endNumber! > 20)
     throw new ScoringError(400, "Choose an end from 1 to 20");
   try {
@@ -83,7 +157,10 @@ async function snapshot(client: PoolClient, id: string) {
       const a = rows.find((r) => r.end_number === i + 1 && r.side === "a"),
         b = rows.find((r) => r.end_number === i + 1 && r.side === "b");
       return {
-        state: a?.state === b?.state ? (a?.state ?? "upcoming") : "unknown",
+        state:
+          a?.state === b?.state
+            ? (a?.state ?? (g.state === "confirmed" ? "unknown" : "upcoming"))
+            : "unknown",
         a: a?.points ?? null,
         b: b?.points ?? null,
       };
@@ -97,12 +174,32 @@ async function snapshot(client: PoolClient, id: string) {
     { length: count },
     (_, i) => hammers.find((h) => h.end_number === i + 1)?.hammer ?? null,
   );
+  const results = (
+    await client.query(
+      'SELECT version,actor_id AS "actorId",confirmed_by AS "confirmedBy",created_at AS "createdAt",result FROM game_result_version WHERE game_id=$1 ORDER BY version DESC',
+      [id],
+    )
+  ).rows;
+  const attention = (
+    await client.query(
+      'SELECT upstream_game_id AS "upstreamGameId",result_version AS "resultVersion",downstream_game_id AS "downstreamGameId",side,actual_entry_id AS "actualEntryId",expected_entry_id AS "expectedEntryId",downstream_state AS "downstreamState" FROM game_assignment_attention WHERE upstream_game_id=$1 OR downstream_game_id=$1 ORDER BY result_version DESC',
+      [id],
+    )
+  ).rows;
   return {
     ...g,
     ...(g.state === "live" && ends.some((e) => e.state === "unknown")
       ? { totalA: null, totalB: null }
       : {}),
     ends,
+    results,
+    attention,
+    lineupA: g.entryA
+      ? await gameLineup(client, id, "a", g.entryA, g.state === "confirmed")
+      : null,
+    lineupB: g.entryB
+      ? await gameLineup(client, id, "b", g.entryB, g.state === "confirmed")
+      : null,
     endHammer,
     hammerEnd,
     hammer:
@@ -127,6 +224,46 @@ async function authorize(client: PoolClient, actorId: string, id: string) {
     );
   return g;
 }
+async function saveDifference(
+  client: PoolClient,
+  id: string,
+  version: number,
+  side: "a" | "b",
+  members: DifferenceMember[],
+  before: Awaited<ReturnType<typeof snapshot>>,
+  auditId: string,
+) {
+  const lineup = side === "a" ? before.lineupA : before.lineupB;
+  if (!lineup)
+    throw new ScoringError(
+      409,
+      "Assign both participants before recording lineups",
+    );
+  const selected = await client.query(
+    'SELECT id AS "playerId",name,identity_status AS "identityStatus" FROM player WHERE id=ANY($1::text[])',
+    [members.map((m) => m.playerId)],
+  );
+  if (selected.rowCount !== members.length)
+    throw new ScoringError(400, "Every lineup player must exist");
+  await client.query(
+    "INSERT INTO game_lineup_version(game_id,version,side,entry_id,event_lineup_version,mode,members,audit_id) VALUES($1,$2,$3,$4,$5,'difference',$6,$7)",
+    [
+      id,
+      version,
+      side,
+      lineup.entryId,
+      lineup.eventLineupVersion,
+      JSON.stringify(
+        members.map((m) => ({
+          ...selected.rows.find((p) => p.playerId === m.playerId),
+          position: m.position,
+          participation: "declared",
+        })),
+      ),
+      auditId,
+    ],
+  );
+}
 export async function scoringGame(actorId: string, id: string) {
   const client = await pool.connect();
   try {
@@ -148,7 +285,8 @@ export async function scoringGame(actorId: string, id: string) {
   }
 }
 export async function saveScoring(actorId: string, id: string, input: unknown) {
-  const command = parseCommand(input),
+  const auditId = randomUUID(),
+    command = parseCommand(input),
     client = await pool.connect();
   try {
     await client.query("BEGIN");
@@ -190,13 +328,105 @@ export async function saveScoring(actorId: string, id: string, input: unknown) {
       );
     if (!["men_four", "women_four"].includes(before.discipline))
       throw new ScoringError(400, "This editor supports four-player games");
-    if (command.action === "start") {
+    let result: ReturnType<typeof validateResult> | undefined;
+    if (command.action === "confirm" || command.action === "correct") {
+      try {
+        result = validateResult(
+          before.state,
+          command.action,
+          [before.entryA, before.entryB],
+          {
+            outcome: command.outcome!,
+            winnerEntryId: command.winnerEntryId!,
+            reason: command.reason!,
+            ends: command.action === "correct" ? command.ends! : before.ends,
+          },
+        );
+      } catch (e) {
+        throw new ScoringError(409, (e as Error).message);
+      }
+      if (
+        before.results[0] &&
+        (before.results[0].result.entryA !== before.entryA ||
+          before.results[0].result.entryB !== before.entryB)
+      )
+        throw new ScoringError(
+          409,
+          "Recorded result participants must be preserved; review the assignment inconsistency",
+        );
+      result.ends = Array.from(
+        { length: Math.max(8, result.ends.length) },
+        (_, i) => result!.ends[i] ?? { state: "unplayed", a: null, b: null },
+      );
+      for (const side of ["a", "b"] as const)
+        if (command.lineups?.[side] !== undefined)
+          await saveDifference(
+            client,
+            id,
+            before.version + 1,
+            side,
+            command.lineups[side]!,
+            before,
+            auditId,
+          );
+      await freezeLineups(client, id, before.version + 1, before, auditId);
+      await client.query(
+        "UPDATE game SET state='confirmed',total_a=$2,total_b=$3 WHERE id=$1",
+        [id, result.totalA, result.totalB],
+      );
+      await client.query("DELETE FROM game_end_score WHERE game_id=$1", [id]);
+      if (command.endHammer)
+        for (const [i, hammer] of command.endHammer.entries())
+          await client.query(
+            "INSERT INTO game_end_hammer(game_id,end_number,hammer) VALUES($1,$2,$3) ON CONFLICT(game_id,end_number) DO UPDATE SET hammer=EXCLUDED.hammer",
+            [id, i + 1, hammer],
+          );
+      for (const [i, end] of result.ends.entries())
+        for (const [side, points] of [
+          ["a", end.a],
+          ["b", end.b],
+        ])
+          await client.query(
+            "INSERT INTO game_end_score(game_id,side,end_number,state,points) VALUES($1,$2,$3,$4,$5)",
+            [id, side, i + 1, end.state, points],
+          );
+    } else if (command.action === "lineup") {
+      if (before.state === "confirmed")
+        throw new ScoringError(
+          409,
+          "Record lineup changes in a result correction",
+        );
+      const entryId = command.side === "a" ? before.entryA : before.entryB;
+      if (!entryId)
+        throw new ScoringError(
+          409,
+          "Assign the participant before recording its game lineup",
+        );
+      await freezeLineups(
+        client,
+        id,
+        before.version + 1,
+        before,
+        auditId,
+        command.side,
+      );
+      await saveDifference(
+        client,
+        id,
+        before.version + 1,
+        command.side!,
+        command.members!,
+        before,
+        auditId,
+      );
+    } else if (command.action === "start") {
       if (before.state !== "scheduled" || !before.entryA || !before.entryB)
         throw new ScoringError(
           409,
           "Start requires a scheduled game with both opponents assigned",
         );
       await client.query("UPDATE game SET state='live' WHERE id=$1", [id]);
+      await freezeLineups(client, id, before.version + 1, before, auditId);
     } else {
       if (before.state !== "live")
         throw new ScoringError(
@@ -222,32 +452,131 @@ export async function saveScoring(actorId: string, id: string, input: unknown) {
           );
       }
     }
-    await client.query(
-      "INSERT INTO game_end_hammer(game_id,end_number,hammer) VALUES($1,$2,$3) ON CONFLICT(game_id,end_number) DO UPDATE SET hammer=EXCLUDED.hammer",
-      [id, command.action === "start" ? 1 : command.endNumber, command.hammer],
-    );
+    if (command.action === "start" || command.action === "end")
+      await client.query(
+        "INSERT INTO game_end_hammer(game_id,end_number,hammer) VALUES($1,$2,$3) ON CONFLICT(game_id,end_number) DO UPDATE SET hammer=EXCLUDED.hammer",
+        [
+          id,
+          command.action === "start" ? 1 : command.endNumber,
+          command.hammer,
+        ],
+      );
     const changed = await snapshot(client, id),
       totals = scoreTotals(changed.ends);
     await client.query(
       "UPDATE game SET version=version+1,hammer=$2,hammer_end=$5,total_a=$3,total_b=$4,updated_at=now() WHERE id=$1",
-      [id, changed.hammer, totals.a, totals.b, changed.hammerEnd],
+      [
+        id,
+        changed.hammer,
+        result
+          ? result.totalA
+          : command.action === "lineup"
+            ? before.totalA
+            : totals.a,
+        result
+          ? result.totalB
+          : command.action === "lineup"
+            ? before.totalB
+            : totals.b,
+        changed.hammerEnd,
+      ],
     );
     const after = await snapshot(client, id),
-      auditId = randomUUID(),
       response = { requestId: command.requestId, version: after.version };
+    const frozenResult = result
+      ? {
+          ...result,
+          endHammer: after.endHammer,
+          correction: command.action === "correct",
+          entryA: before.entryA,
+          entryB: before.entryB,
+          nameA: before.nameA,
+          nameB: before.nameB,
+          lineupA: after.lineupA,
+          lineupB: after.lineupB,
+          ...(command.action === "correct" && !before.results.length
+            ? {
+                legacyBefore: {
+                  entryA: before.entryA,
+                  entryB: before.entryB,
+                  nameA: before.nameA,
+                  nameB: before.nameB,
+                  totalA: before.totalA,
+                  totalB: before.totalB,
+                  ends: before.ends,
+                  endHammer: before.endHammer,
+                  attribution: "Not recorded",
+                },
+              }
+            : {}),
+        }
+      : undefined;
     await client.query(
       "INSERT INTO audit_record(id,actor_id,action,resource_id,request_id,resource_version,before_state,after_state) VALUES($1,$2,$3,$4,$5,$6,$7,$8)",
       [
         auditId,
         actorId,
-        command.action === "start" ? "game_started" : "end_saved",
+        command.action === "start"
+          ? "game_started"
+          : command.action === "confirm"
+            ? "result_confirmed"
+            : command.action === "correct"
+              ? "result_corrected"
+              : command.action === "lineup"
+                ? "game_lineup_recorded"
+                : "end_saved",
         id,
         command.requestId,
         after.version,
         before,
-        after,
+        result
+          ? {
+              ...after,
+              confirmedResult: frozenResult,
+            }
+          : after,
       ],
     );
+    if (result) {
+      const name = (
+        await client.query("SELECT name FROM auth_user WHERE id=$1", [actorId])
+      ).rows[0].name;
+      await client.query(
+        "INSERT INTO game_result_version(game_id,version,actor_id,confirmed_by,result,audit_id) VALUES($1,$2,$3,$4,$5,$6)",
+        [id, after.version, actorId, name, frozenResult, auditId],
+      );
+      if (
+        command.action === "correct" &&
+        before.results[0]?.result.winnerEntryId !== result.winnerEntryId
+      ) {
+        const deps = await client.query(
+          "SELECT d.*,g.state,g.entry_a,g.entry_b FROM game_assignment_dependency d JOIN game g ON g.id=d.downstream_game_id WHERE upstream_game_id=$1 ORDER BY g.id FOR UPDATE OF g",
+          [id],
+        );
+        for (const dep of deps.rows) {
+          const expected =
+            dep.route === "winner"
+              ? result.winnerEntryId
+              : [before.entryA, before.entryB].find(
+                  (e) => e !== result!.winnerEntryId,
+                );
+          const actual = dep.side === "a" ? dep.entry_a : dep.entry_b;
+          if (actual !== expected)
+            await client.query(
+              "INSERT INTO game_assignment_attention(upstream_game_id,result_version,downstream_game_id,side,actual_entry_id,expected_entry_id,downstream_state) VALUES($1,$2,$3,$4,$5,$6,$7)",
+              [
+                id,
+                after.version,
+                dep.downstream_game_id,
+                dep.side,
+                actual,
+                expected,
+                dep.state,
+              ],
+            );
+        }
+      }
+    }
     await client.query(
       "INSERT INTO scoring_command(game_id,actor_id,request_id,command,response,audit_id) VALUES($1,$2,$3,$4,$5,$6)",
       [id, actorId, command.requestId, command, response, auditId],

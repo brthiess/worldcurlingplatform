@@ -3,8 +3,17 @@ import { useEffect, useState, useRef } from "react";
 import { saveTransition, type SaveState } from "@/domain/save-state";
 import { validateEnd, type End } from "@/domain/scoring";
 import type { Command } from "@/modules/scoring/commands";
+import { ResultEditor } from "./result-editor";
+import type { GameLineup } from "@/modules/scoring/lineups";
+import type { PublicGame } from "@/modules/public/scores";
 type Game = {
   id: string;
+  entryA: string;
+  entryB: string;
+  lineupA: GameLineup | null;
+  lineupB: GameLineup | null;
+  results: PublicGame["results"];
+  attention: { downstreamGameId: string }[];
   actorId: string;
   nameA: string;
   nameB: string;
@@ -50,6 +59,7 @@ export function ScoringEditor({ gameId }: { gameId: string }) {
     [ready, setReady] = useState(false);
   const key = useRef(""),
     sending = useRef(false);
+  const [resultBusy, setResultBusy] = useState(false);
   const url = `/api/v1/games/${encodeURIComponent(gameId)}/scoring`;
   async function read() {
     const r = await fetch(url, { cache: "no-store" });
@@ -136,7 +146,7 @@ export function ScoringEditor({ gameId }: { gameId: string }) {
       hammer: game!.endHammer[n - 1] ?? null,
     });
   }
-  async function send(action: "start" | "end") {
+  async function send(action: Command["action"]) {
     if (sending.current) return;
     let command = pending;
     if (!command) {
@@ -227,7 +237,10 @@ export function ScoringEditor({ gameId }: { gameId: string }) {
     }
   }
   const locked =
-    save === "saving" || save === "uncertain" || save === "conflict";
+    save === "saving" ||
+    save === "uncertain" ||
+    save === "conflict" ||
+    resultBusy;
   return (
     <main id="main" className="workspace">
       <a href="/admin">← Your workspace</a>
@@ -280,29 +293,41 @@ export function ScoringEditor({ gameId }: { gameId: string }) {
               void send("end");
             }}
           >
-            <fieldset disabled={locked || game.scoringSource !== "manual"}>
+            <fieldset
+              disabled={
+                locked ||
+                game.scoringSource !== "manual" ||
+                game.state === "confirmed"
+              }
+            >
               <legend>
                 {game.state === "scheduled"
                   ? "Start game"
-                  : "Record or correct a live end"}
+                  : game.state === "confirmed"
+                    ? "Confirmed live scores"
+                    : "Record or correct a live end"}
               </legend>
-              <label htmlFor="hammer">Known hammer (selected end)</label>
-              <select
-                id="hammer"
-                value={edit.hammer ?? "unknown"}
-                onChange={(e) =>
-                  change({
-                    hammer:
-                      e.target.value === "unknown"
-                        ? null
-                        : (e.target.value as "a" | "b"),
-                  })
-                }
-              >
-                <option value="unknown">Not recorded</option>
-                <option value="a">{game.nameA}</option>
-                <option value="b">{game.nameB}</option>
-              </select>
+              {game.state !== "confirmed" && (
+                <>
+                  <label htmlFor="hammer">Known hammer (selected end)</label>
+                  <select
+                    id="hammer"
+                    value={edit.hammer ?? "unknown"}
+                    onChange={(e) =>
+                      change({
+                        hammer:
+                          e.target.value === "unknown"
+                            ? null
+                            : (e.target.value as "a" | "b"),
+                      })
+                    }
+                  >
+                    <option value="unknown">Not recorded</option>
+                    <option value="a">{game.nameA}</option>
+                    <option value="b">{game.nameB}</option>
+                  </select>
+                </>
+              )}
               {game.state === "live" && (
                 <>
                   <label htmlFor="end">End</label>
@@ -409,13 +434,22 @@ export function ScoringEditor({ gameId }: { gameId: string }) {
           <p>
             <a href={`/games/${gameId}`}>Open public game →</a>
           </p>
+          <ResultEditor
+            game={game}
+            disabled={save !== "saved"}
+            onBusy={setResultBusy}
+            onApplied={async () => {
+              const g = await read();
+              setGame(g);
+              setBaseVersion(g.version);
+            }}
+          />
           <h2>Accepted history</h2>
           <ul className="workspace-list">
             {game.history.slice(0, 3).map((h) => (
               <li key={h.version}>
-                Version {h.version} ·{" "}
-                {h.action === "game_started" ? "Game started" : "End saved"} ·{" "}
-                {h.actorId} · {new Date(h.createdAt).toLocaleString()}
+                Version {h.version} · {historyLabel(h.action)} · {h.actorId} ·{" "}
+                {new Date(h.createdAt).toLocaleString()}
               </li>
             ))}
           </ul>
@@ -427,9 +461,8 @@ export function ScoringEditor({ gameId }: { gameId: string }) {
               <ul className="workspace-list">
                 {game.history.slice(3).map((h) => (
                   <li key={h.version}>
-                    Version {h.version} ·{" "}
-                    {h.action === "game_started" ? "Game started" : "End saved"}{" "}
-                    · {h.actorId} · {new Date(h.createdAt).toLocaleString()}
+                    Version {h.version} · {historyLabel(h.action)} · {h.actorId}{" "}
+                    · {new Date(h.createdAt).toLocaleString()}
                   </li>
                 ))}
               </ul>
@@ -439,5 +472,18 @@ export function ScoringEditor({ gameId }: { gameId: string }) {
         </>
       )}
     </main>
+  );
+}
+function historyLabel(action: string) {
+  return (
+    (
+      {
+        game_started: "Game started",
+        end_saved: "End saved",
+        result_confirmed: "Result confirmed",
+        result_corrected: "Result corrected",
+        game_lineup_recorded: "Game lineup recorded",
+      } as Record<string, string>
+    )[action] ?? action
   );
 }

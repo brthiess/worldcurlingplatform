@@ -1,4 +1,9 @@
-import type { Locator, Page, APIResponse } from "@playwright/test";
+import type {
+  Locator,
+  Page,
+  APIResponse,
+  APIRequestContext,
+} from "@playwright/test";
 export async function authApiWithRateWindow(send: () => Promise<APIResponse>) {
   for (let attempt = 0; attempt < 3; attempt++) {
     const response = await send();
@@ -47,4 +52,16 @@ export async function signInWithRateWindow(page: Page, button: Locator) {
     );
     await new Promise((resolve) => setTimeout(resolve, 250));
   }
+}
+export function signInApiWithRateWindow(
+  request: APIRequestContext,
+  email: string,
+  password: string | undefined,
+) {
+  return authApiWithRateWindow(() =>
+    request.post("/api/auth/sign-in/email", {
+      headers: { Origin: process.env.BETTER_AUTH_URL! },
+      data: { email, password },
+    }),
+  );
 }

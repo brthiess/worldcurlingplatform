@@ -4,7 +4,7 @@ number: 3
 title: "Confirm results and make ordinary auditable corrections"
 parent: WCP-SPEC-001
 type: implementation
-status: in-progress
+status: completed
 labels: [ready-for-agent]
 blocked_by: [WCP-002]
 source_spec_sha256: 045B46988225B6C8C0020B23C8C5D4EAA8E2E1916256148A0FDA26B5DA8673FD
@@ -18,7 +18,7 @@ published: 2026-11-07
 
 **Blocked by:** [02: Save live end scores from a mobile scorekeeper screen](02-save-live-end-scores-from-a-mobile-scorekeeper-screen.md).
 
-**Status:** in-progress
+**Status:** completed
 
 ## Parent and scope
 
@@ -31,13 +31,13 @@ published: 2026-11-07
 
 ## Acceptance criteria
 
-- [ ] Support normal/conceded/forfeit outcome distinctions under the implemented four-player profile; retain result versions and participant identities.
-- [ ] Default game lineup from the referenced event lineup; record differences without mandatory unchanged-lineup confirmation or claims that every declared player delivered stones.
-- [ ] Permit post-confirmation corrections with audit history and no second approver; preserve played-game evidence and flag downstream-started effects instead of building the deferred repair policy.
-- [ ] **Unit testing:** Test outcome/confirmation/correction transitions, participant/winner validation and defaulted-versus-declared-difference lineup behavior.
-- [ ] **Database/API verification:** Confirm, retry and correct through authenticated APIs; assert original result versions remain recoverable and unrelated actors cannot alter them.
-- [ ] **Frontend quality:** Make confirm/correct actions usable on a phone, distinguish provisional/final/corrected states by text and show useful correction feedback in scorer and public game views.
-- [ ] Record actual verification commands/results and relevant browser/screenshots or API evidence. Report meaningful uncovered branches or limitations; do not claim checks that were not run.
+- [x] Support normal/conceded/forfeit outcome distinctions under the implemented four-player profile; retain result versions and participant identities.
+- [x] Default game lineup from the referenced event lineup; record differences without mandatory unchanged-lineup confirmation or claims that every declared player delivered stones.
+- [x] Permit post-confirmation corrections with audit history and no second approver; preserve played-game evidence and flag downstream-started effects instead of building the deferred repair policy.
+- [x] **Unit testing:** Test outcome/confirmation/correction transitions, participant/winner validation and defaulted-versus-declared-difference lineup behavior.
+- [x] **Database/API verification:** Confirm, retry and correct through authenticated APIs; assert original result versions remain recoverable and unrelated actors cannot alter them.
+- [x] **Frontend quality:** Make confirm/correct actions usable on a phone, distinguish provisional/final/corrected states by text and show useful correction feedback in scorer and public game views.
+- [x] Record actual verification commands/results and relevant browser/screenshots or API evidence. Report meaningful uncovered branches or limitations; do not claim checks that were not run.
 
 ## Slice boundary
 
