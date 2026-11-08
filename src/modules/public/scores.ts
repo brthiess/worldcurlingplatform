@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import { db } from "@/db";
 import { selectDraws, type Score } from "@/domain/scores";
+import { drawEvidenceState } from "@/domain/scheduling";
 export type PublicGame = {
   lineupA: import("@/modules/scoring/lineups").GameLineup | null;
   lineupB: import("@/modules/scoring/lineups").GameLineup | null;
@@ -72,7 +73,7 @@ export type PublicEvent = {
     format: string;
     registrationStatus: string;
   };
-  draws: { id: string; number: number; startsAt: string; state: string }[];
+  draws: { id: string; number: number; startsAt: string; durationMinutes: number; state: string }[];
   games: PublicGame[];
   selection: ReturnType<typeof selectDraws>;
 };
@@ -113,12 +114,13 @@ async function projectEvent(
     format: selected?.format ?? "Select a division for competition details",
   } as PublicEvent["event"] & { divisionId: string | null };
   const drawsResult = await connection.execute(
-    sql`SELECT id,number,starts_at AS "startsAt",state FROM draw_session WHERE division_id=${row.divisionId} ORDER BY starts_at,number`,
+    sql`SELECT id,number,starts_at AS "startsAt",duration_minutes AS "durationMinutes",state FROM draw_session WHERE division_id=${row.divisionId} ORDER BY starts_at,number,id`,
   );
   const draws = drawsResult.rows.map((d) => ({
     id: String(d.id),
     number: Number(d.number),
     startsAt: new Date(d.startsAt as string).toISOString(),
+    durationMinutes: Number(d.durationMinutes),
     state: String(d.state),
   }));
   const gamesResult = await connection.execute(
@@ -217,6 +219,7 @@ async function projectEvent(
       },
     );
   const { divisionId: _, ...event } = row;
+  for (const draw of draws) draw.state = drawEvidenceState(games.filter(g=>g.drawId===draw.id).map(g=>g.state));
   return {
     event,
     divisions,
