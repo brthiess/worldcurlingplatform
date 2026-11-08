@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   venueInstant,
+  venueFields,
   scheduleConflicts,
   drawEvidenceState,
 } from "../src/domain/scheduling";
@@ -20,6 +21,23 @@ test("venue wall time requires the explicit matching offset, independent of host
     () => venueInstant("2026-11-08T17:00", "America/Regina", "-07:00"),
     /offset/,
   );
+});
+
+test("stored seconds and milliseconds never change the venue UTC offset when editing at minute precision", () => {
+  for (const instant of [
+    "2026-11-08T23:00:00.000Z",
+    "2026-11-08T23:00:30.000Z",
+    "2026-11-08T23:00:45.000Z",
+    "2026-11-08T23:00:59.999Z",
+  ])
+    assert.deepEqual(venueFields(instant, "America/Regina"), {
+      local: "2026-11-08T17:00",
+      offset: "-06:00",
+    });
+  assert.deepEqual(venueFields("2026-01-01T00:00:59.999Z", "Asia/Kathmandu"), {
+    local: "2026-01-01T05:45",
+    offset: "+05:45",
+  });
 });
 
 test("draw status follows actual games and never the clock; latest and next use chronological order", () => {
@@ -79,6 +97,27 @@ test("DST folds require an explicit occurrence, gaps and impossible calendar dat
     assert.throws(() => venueInstant(date, "America/Edmonton", offset));
   assert.throws(() =>
     venueInstant("2026-11-08T17:00", "Invalid/Zone", "-06:00"),
+  );
+});
+
+test("draw ordering compares instants across offsets, with stable identity for simultaneous sessions", () => {
+  assert.deepEqual(
+    selectDraws([
+      {
+        id: "local-five",
+        startsAt: "2026-11-01T10:00:00+05:00",
+        state: "completed",
+      },
+      { id: "utc-six", startsAt: "2026-11-01T06:00:00Z", state: "completed" },
+    ]),
+    { selected: "utc-six", next: null, label: "Latest draw" },
+  );
+  assert.equal(
+    selectDraws([
+      { id: "z", startsAt: "2026-11-01T06:00:00Z", state: "scheduled" },
+      { id: "a", startsAt: "2026-11-01T01:00:00-05:00", state: "scheduled" },
+    ]).selected,
+    "a",
   );
 });
 

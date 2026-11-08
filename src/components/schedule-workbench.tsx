@@ -203,7 +203,13 @@ export function ScheduleWorkbench() {
           {error}
           {!data && (
             <p>
-              <a href="/admin">Sign in with an authorized organizer account</a>
+              <a href="/admin">Sign in with an authorized organizer account</a>{" "}
+              <button
+                className="secondary"
+                onClick={() => window.location.reload()}
+              >
+                Try again
+              </button>
             </p>
           )}
         </div>
@@ -276,6 +282,7 @@ export function ScheduleWorkbench() {
                 className="form-card"
                 key={`${sessionId}-${data.version}`}
                 onSubmit={(e) => submit(e, "session")}
+                onChange={() => setStatus("Unsaved schedule edit.")}
               >
                 <fieldset disabled={busy || !!pending || stale || loading}>
                   <legend>
@@ -328,9 +335,10 @@ export function ScheduleWorkbench() {
                     aria-describedby="offset-help"
                   />
                   <p id="offset-help" className="legend">
-                    Offset must match {data.event.timezone} on this date. At a
-                    repeated daylight-saving hour, choose the intended
-                    occurrence explicitly.
+                    Schedule edits use minute precision. Offset must match{" "}
+                    {data.event.timezone} on this date. At a repeated
+                    daylight-saving hour, choose the intended occurrence
+                    explicitly.
                   </p>
                   <label htmlFor="session-duration">Duration in minutes</label>
                   <input
@@ -366,6 +374,7 @@ export function ScheduleWorkbench() {
                 <form
                   className="form-card"
                   onSubmit={(e) => submit(e, "assign")}
+                  onChange={() => setStatus("Unsaved schedule edit.")}
                 >
                   <fieldset disabled={busy || !!pending || stale || loading}>
                     <legend>Assign an existing game</legend>

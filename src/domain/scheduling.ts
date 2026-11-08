@@ -25,7 +25,7 @@ export function venueFields(instant: string, timezone: string) {
   const value = (name: string) => parts.find((p) => p.type === name)!.value;
   const local = `${value("year")}-${value("month")}-${value("day")}T${value("hour")}:${value("minute")}`;
   const minutes = Math.round(
-    (Date.parse(local + "Z") - Date.parse(instant)) / 60000,
+    Date.parse(local + "Z") / 60000 - Math.floor(Date.parse(instant) / 60000),
   );
   const offset = `${minutes < 0 ? "-" : "+"}${String(Math.floor(Math.abs(minutes) / 60)).padStart(2, "0")}:${String(Math.abs(minutes) % 60).padStart(2, "0")}`;
   return { local, offset };
