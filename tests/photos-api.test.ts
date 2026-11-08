@@ -18,7 +18,7 @@ async function login(role: string) {
     });
   let r = await signIn();
   if (r.status === 429) {
-    await new Promise((resolve) => setTimeout(resolve, 59000));
+    await new Promise((resolve) => setTimeout(resolve, 60000));
     r = await signIn();
   }
   assert.equal(r.status, 200);
@@ -229,6 +229,26 @@ test("linked player submits private immutable bytes and administrator publishes 
     workspace.submissions.find((p: { id: string }) => p.id === second.id)
       .reason,
     "Reviewed synthetic geometry for local acceptance.",
+  );
+  const competing = await Promise.all([upload(owner), upload(owner)]);
+  assert.deepEqual(competing.map((r) => r.status).sort(), [201, 409]);
+  const last = await competing.find((r) => r.status === 201)!.json();
+  const decisions = await Promise.all([
+    review(last, "approved"),
+    review(last, "rejected"),
+  ]);
+  assert.deepEqual(decisions.map((r) => r.status).sort(), [200, 409]);
+  const winningDecision = decisions[0].status === 200 ? "approved" : "rejected";
+  const finalWorkspace = await (await call("/api/v1/photos", owner)).json();
+  assert.equal(
+    finalWorkspace.submissions.find((p: { id: string }) => p.id === last.id)
+      .status,
+    winningDecision,
+  );
+  assert.equal(
+    (await (await call("/api/v1/public/players/" + id)).json()).photoUrl,
+    "/api/v1/public/photos/" +
+      (winningDecision === "approved" ? last.assetId : third.assetId),
   );
 });
 test.after(async () => {

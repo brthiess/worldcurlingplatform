@@ -23,6 +23,8 @@ function PhotoReview({
   refresh: () => Promise<void>;
 }) {
   const [loaded, setLoaded] = useState(false),
+    [beforeLoaded, setBeforeLoaded] = useState(!photo.currentAssetId),
+    [beforeFailed, setBeforeFailed] = useState(false),
     [failed, setFailed] = useState(false),
     [busy, setBusy] = useState(false),
     [error, setError] = useState("");
@@ -40,9 +42,23 @@ function PhotoReview({
               className="player-photo"
               src={"/api/v1/public/photos/" + photo.currentAssetId}
               alt="Current approved player photo"
+              onLoad={() => {
+                setBeforeLoaded(true);
+                setBeforeFailed(false);
+              }}
+              onError={() => {
+                setBeforeLoaded(false);
+                setBeforeFailed(true);
+              }}
             />
           ) : (
             <p className="empty">No approved photo</p>
+          )}
+          {beforeFailed && (
+            <p role="alert">
+              Current photo unavailable. Refresh the comparison before
+              reviewing.
+            </p>
           )}
         </figure>
         <figure>
@@ -120,10 +136,12 @@ function PhotoReview({
             <option value="approved">Approve photo</option>
             <option value="rejected">Reject photo</option>
           </select>
-          <button disabled={!loaded || busy}>
+          <button disabled={!loaded || !beforeLoaded || busy}>
             {busy ? "Recording review…" : "Record photo decision"}
           </button>
-          {!loaded && !failed && <p role="status">Loading reviewed image…</p>}
+          {(!loaded || !beforeLoaded) && !failed && !beforeFailed && (
+            <p role="status">Loading reviewed comparison…</p>
+          )}
         </form>
       ) : (
         <p>
@@ -151,6 +169,7 @@ export function PhotoManager({
   canReview: boolean;
 }) {
   const [photos, setPhotos] = useState<Submission[] | null>(null),
+    [revision, setRevision] = useState(0),
     [error, setError] = useState(""),
     [notice, setNotice] = useState(""),
     [busy, setBusy] = useState(false),
@@ -167,6 +186,7 @@ export function PhotoManager({
         "Photo status could not be loaded. Refresh to try again.",
       );
     setPhotos((await r.json()).submissions);
+    setRevision((value) => value + 1);
   }, []);
   useEffect(() => {
     void load().catch((e) => setError(e.message));
@@ -360,7 +380,13 @@ export function PhotoManager({
                 canReview ? (
                   <PhotoReview
                     key={
-                      photo.id + "-" + photo.status + "-" + photo.currentAssetId
+                      photo.id +
+                      "-" +
+                      photo.status +
+                      "-" +
+                      photo.currentAssetId +
+                      "-" +
+                      revision
                     }
                     photo={photo}
                     refresh={load}

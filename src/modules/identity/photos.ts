@@ -82,7 +82,10 @@ export async function submitPhoto(
     )
       throw new ProfileError("Profile ownership changed.", 403);
     const previous = (
-      await c.query("SELECT * FROM player_photo_submission WHERE id=$1", [id])
+      await c.query(
+        "SELECT s.*,a.digest FROM player_photo_submission s JOIN player_photo_asset a ON a.id=s.asset_id WHERE s.id=$1",
+        [id],
+      )
     ).rows[0];
     if (previous) {
       if (
@@ -97,7 +100,7 @@ export async function submitPhoto(
       return {
         id,
         assetId: previous.asset_id,
-        digest: processed.digest,
+        digest: previous.digest,
         currentAssetId: p.photo_asset_id,
       };
     }

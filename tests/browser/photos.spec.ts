@@ -63,13 +63,11 @@ test("player photo upload, review comparison, rejection and exact-image publicat
   })
     .png()
     .toBuffer();
-  await page
-    .getByLabel("Replacement photo")
-    .setInputFiles({
-      name: "synthetic-cyan.png",
-      mimeType: "image/png",
-      buffer: cyan,
-    });
+  await page.getByLabel("Replacement photo").setInputFiles({
+    name: "synthetic-cyan.png",
+    mimeType: "image/png",
+    buffer: cyan,
+  });
   await expect(page.getByAltText("Selected replacement photo")).toBeVisible();
   await page.route(
     "**/api/v1/players/" + playerId + "/photos",
@@ -116,18 +114,28 @@ test("player photo upload, review comparison, rejection and exact-image publicat
   );
   await expect(publicPhoto).toBeVisible();
   const initial = await publicPhoto.getAttribute("src");
-  await page
-    .getByLabel("Replacement photo")
-    .setInputFiles({
-      name: "synthetic-orange.png",
-      mimeType: "image/png",
-      buffer: orange,
-    });
+  await page.getByLabel("Replacement photo").setInputFiles({
+    name: "synthetic-orange.png",
+    mimeType: "image/png",
+    buffer: orange,
+  });
   await page.getByRole("button", { name: "Submit photo for review" }).click();
   await expect(page.getByText("Pending", { exact: true })).toBeVisible();
   await publicPage.reload();
   await expect(publicPhoto).toHaveAttribute("src", initial!);
+  await review.route("**" + initial, (route) => route.abort());
   await review.getByRole("button", { name: "Refresh photo status" }).click();
+  await expect(
+    pending().getByRole("button", { name: "Record photo decision" }),
+  ).toBeDisabled();
+  await expect(pending().getByRole("alert")).toContainText(
+    "Current photo unavailable",
+  );
+  await review.unroute("**" + initial);
+  await review.getByRole("button", { name: "Refresh photo status" }).click();
+  await expect(
+    pending().getByRole("button", { name: "Record photo decision" }),
+  ).toBeEnabled();
   await pending()
     .getByLabel("Photo review reason")
     .fill("Please submit a different synthetic geometric fixture.");
@@ -142,13 +150,11 @@ test("player photo upload, review comparison, rejection and exact-image publicat
   ).toBeVisible();
   await publicPage.reload();
   await expect(publicPhoto).toHaveAttribute("src", initial!);
-  await page
-    .getByLabel("Replacement photo")
-    .setInputFiles({
-      name: "synthetic-orange-v2.png",
-      mimeType: "image/png",
-      buffer: orange,
-    });
+  await page.getByLabel("Replacement photo").setInputFiles({
+    name: "synthetic-orange-v2.png",
+    mimeType: "image/png",
+    buffer: orange,
+  });
   await page.getByRole("button", { name: "Submit photo for review" }).click();
   await expect(page.getByText("Pending", { exact: true })).toBeVisible();
   await review.getByRole("button", { name: "Refresh photo status" }).click();

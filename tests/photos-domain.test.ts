@@ -42,6 +42,21 @@ test("rejects deceptive types, corrupt decoders, tiny, oversized and animated in
     .png()
     .toBuffer();
   await assert.rejects(() => processPhoto(tiny, "image/png"));
+  const frames = Buffer.alloc(64 * 128 * 3, 30);
+  frames.fill(200, 64 * 64 * 3);
+  const animated = await sharp(frames, {
+    raw: { width: 64, height: 128, channels: 3, pageHeight: 64 },
+  })
+    .webp({ delay: [100, 100] })
+    .toBuffer();
+  assert.equal((await sharp(animated, { animated: true }).metadata()).pages, 2);
+  await assert.rejects(() => processPhoto(animated, "image/webp"));
+  const tooManyPixels = await sharp({
+    create: { width: 4001, height: 4000, channels: 3, background: "#eeeeee" },
+  })
+    .png()
+    .toBuffer();
+  await assert.rejects(() => processPhoto(tooManyPixels, "image/png"));
 });
 
 test("JPEG and WebP are decoded and re-encoded without EXIF", async () => {
