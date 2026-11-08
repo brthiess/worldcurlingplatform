@@ -11,6 +11,8 @@ import {
   type LineupMember,
 } from "@/domain/entries";
 type Reader = Pick<PoolClient, "query">;
+const admissionColumns = (alias: string) =>
+  `,CASE WHEN ${alias}.admission_state='held' AND ${alias}.reservation_deadline<=clock_timestamp() THEN 'expired' ELSE ${alias}.admission_state END AS "admissionState",EXISTS(SELECT 1 FROM division_registration dr WHERE dr.division_id=${alias}.division_id) AS "registrationConfigured"`;
 export type EventLineup = {
   entryId: string;
   version: number;
@@ -91,7 +93,7 @@ async function detail(
     };
   }
   const e = await c.query(
-    'SELECT e.division_id AS "divisionId",e.entry_admission AS "entryAdmission",d.event_id AS "eventId",d.discipline,ev.name AS "eventName",ev.origin FROM event_entry e JOIN division d ON d.id=e.division_id JOIN event_edition ev ON ev.id=d.event_id WHERE e.id=$1',
+    `SELECT e.division_id AS "divisionId",e.entry_admission AS "entryAdmission"${admissionColumns("e")},d.event_id AS "eventId",d.discipline,ev.name AS "eventName",ev.origin FROM event_entry e JOIN division d ON d.id=e.division_id JOIN event_edition ev ON ev.id=d.event_id WHERE e.id=$1`,
     [id],
   );
   const core = await c.query(
@@ -583,7 +585,7 @@ export async function publicTeams(id?: string, q = "") {
         [t.id],
       );
       const entries = await c.query(
-        `SELECT en.id,en.display_name AS name,en.version,en.entry_admission AS "entryAdmission",d.id AS "divisionId",d.event_id AS "eventId",e.name AS "eventName" FROM event_entry en JOIN division d ON d.id=en.division_id JOIN event_edition e ON e.id=d.event_id WHERE en.team_id=$1 AND e.published AND e.admission_status='approved' ORDER BY e.starts_on DESC,en.id`,
+        `SELECT en.id,en.display_name AS name,en.version,en.entry_admission AS "entryAdmission"${admissionColumns("en")},d.id AS "divisionId",d.event_id AS "eventId",e.name AS "eventName" FROM event_entry en JOIN division d ON d.id=en.division_id JOIN event_edition e ON e.id=d.event_id WHERE en.team_id=$1 AND e.published AND e.admission_status='approved' ORDER BY e.starts_on DESC,en.id`,
         [t.id],
       );
       result.push({
@@ -606,7 +608,7 @@ export async function publicTeams(id?: string, q = "") {
 }
 export async function publicEventEntries(eventId: string) {
   const result = await pool.query(
-    `SELECT en.id,en.display_name AS name,en.entry_admission AS "entryAdmission",en.division_id AS "divisionId",d.name AS "divisionName",en.team_id AS "teamId",en.version,coalesce(v.status,'provisional') AS status FROM event_entry en JOIN division d ON d.id=en.division_id JOIN event_edition e ON e.id=d.event_id LEFT JOIN event_lineup_version v ON v.entry_id=en.id AND v.version=en.version WHERE e.id=$1 AND e.published AND e.admission_status='approved' ORDER BY en.display_name,en.id`,
+    `SELECT en.id,en.display_name AS name,en.entry_admission AS "entryAdmission"${admissionColumns("en")},en.division_id AS "divisionId",d.name AS "divisionName",en.team_id AS "teamId",en.version,coalesce(v.status,'provisional') AS status FROM event_entry en JOIN division d ON d.id=en.division_id JOIN event_edition e ON e.id=d.event_id LEFT JOIN event_lineup_version v ON v.entry_id=en.id AND v.version=en.version WHERE e.id=$1 AND e.published AND e.admission_status='approved' ORDER BY en.display_name,en.id`,
     [eventId],
   );
   return result.rows;
