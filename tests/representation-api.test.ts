@@ -142,6 +142,23 @@ test("WC grants explicit team-season actions; representatives self-enter with im
   const saved = await r.json();
   assert.equal(saved.teamId, source.teamId);
   assert.equal(saved.entryAdmission, "submitted_pending");
+  assert.equal(
+    (await request("/api/v1/ranking-inputs", representative)).status,
+    403,
+  );
+  assert.equal(
+    (
+      await request("/api/v1/ranking-inputs", representative, {
+        id: randomUUID(),
+        requestId: randomUUID(),
+        kind: "season",
+        version: 0,
+        state: "draft",
+        data: {},
+      })
+    ).status,
+    403,
+  );
   assert.equal(saved.attribution.actorId, "demo-reviewer");
   assert.equal(saved.attribution.representationGrantId, grant.id);
   assert.equal(saved.attribution.season, "2026-27");
@@ -367,6 +384,34 @@ test("WC grants explicit team-season actions; representatives self-enter with im
       ),
       onlySubmit.id,
     );
+    const unconfiguredDivision = randomUUID(),
+      unconfiguredEntry = randomUUID();
+    await db.query(
+      "INSERT INTO division(id,event_id,name,discipline,format) VALUES($1,'prairie-2026','Unconfigured entry season','men_four','fixture')",
+      [unconfiguredDivision],
+    );
+    try {
+      const denied = await request("/api/v1/entries", representative, {
+        ...command,
+        id: unconfiguredEntry,
+        requestId: randomUUID(),
+        entry: { ...entry, divisionId: unconfiguredDivision },
+      });
+      assert.equal(denied.status, 403);
+      assert.match(
+        (await denied.json()).error,
+        /configured division entry season/,
+      );
+      assert.equal(
+        (await request(`/api/v1/public/entries/${unconfiguredEntry}`, ""))
+          .status,
+        404,
+      );
+    } finally {
+      await db.query("DELETE FROM division WHERE id=$1", [
+        unconfiguredDivision,
+      ]);
+    }
     for (const action of ["amend", "withdraw", "payment"] as const)
       await assert.rejects(
         representationFor(
