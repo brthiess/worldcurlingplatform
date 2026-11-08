@@ -148,6 +148,39 @@ test("opening requires terms and scoped current actor; competing zero-fee accept
   );
 });
 
+test("competing paid reservations consume only one place and a full request joins the waitlist", async () => {
+  const cookie = await login("organizer"),
+    f = await fixture();
+  assert.equal(
+    (
+      await command(cookie, {
+        action: "open",
+        divisionId: f.division,
+        version: 0,
+        terms: { ...terms, feeMinor: 10000 },
+      })
+    ).status,
+    200,
+  );
+  const responses = await Promise.all(
+    f.entries.map((entryId) =>
+      command(cookie, {
+        action: "request",
+        divisionId: f.division,
+        entryId,
+        version: 0,
+      }),
+    ),
+  );
+  assert.deepEqual(
+    responses.map((r) => r.status),
+    [200, 200],
+  );
+  const results = await Promise.all(responses.map((r) => r.json()));
+  assert.deepEqual(results.map((r) => r.state).sort(), ["held", "waitlisted"]);
+  assert.equal((await read(cookie, f.division)).division.remaining, 0);
+});
+
 async function read(cookie: string, divisionId: string) {
   const r = await fetch(base + "/api/v1/registration", { headers: { cookie } });
   assert.equal(r.status, 200);
@@ -273,7 +306,7 @@ async function waitBlocked(pid: number) {
       "SELECT pid FROM pg_stat_activity WHERE datname=current_database() AND $1=ANY(pg_blocking_pids(pid))",
       [pid],
     );
-    if (blocked.rowCount) return;
+    if (blocked.rowCount) return blocked.rows[0].pid as number;
     await new Promise((r) => setTimeout(r, 20));
   }
   assert.fail("HTTP admission must actually wait at the edition lock barrier");
@@ -461,4 +494,358 @@ test("invitation is explicit, reviewed request reserves nothing, and actor revoc
   assert.equal((await command(rep, request, "demo-reviewer")).status, 403);
   w = await read(rep, f.division);
   assert.equal(w.entries.length, 0);
+});
+
+test("exact receipt replay cannot carry old authority across a queued division edition move", async () => {
+  const cookie = await login("organizer"),
+    f = await fixture(),
+    other = await fixture();
+  await pool.query(
+    "DELETE FROM role_grant WHERE user_id='demo-organizer' AND event_id=$1",
+    [other.edition],
+  );
+  const original = {
+    action: "open",
+    divisionId: f.division,
+    version: 0,
+    terms,
+    requestId: randomUUID(),
+  };
+  assert.equal((await command(cookie, original)).status, 200);
+  const barrier = await pool.connect();
+  let replay: Promise<Response> | undefined;
+  try {
+    await barrier.query("BEGIN");
+    const pid = (await barrier.query("SELECT pg_backend_pid() AS pid")).rows[0]
+      .pid;
+    await barrier.query("SELECT id FROM event_edition WHERE id=$1 FOR UPDATE", [
+      f.edition,
+    ]);
+    replay = command(cookie, original);
+    await waitBlocked(pid);
+    await barrier.query("UPDATE division SET event_id=$2 WHERE id=$1", [
+      f.division,
+      other.edition,
+    ]);
+    await barrier.query("COMMIT");
+    assert.equal((await replay).status, 409);
+    const w = await read(cookie, f.division);
+    assert.equal(w.division, undefined);
+  } finally {
+    await barrier.query("ROLLBACK");
+    barrier.release();
+    if (replay) await replay;
+    await pool.query("UPDATE division SET event_id=$2 WHERE id=$1", [
+      f.division,
+      f.edition,
+    ]);
+  }
+});
+
+test("an audit/receipt persistence failure rolls admission and capacity back together", async () => {
+  const cookie = await login("organizer"),
+    f = await fixture();
+  assert.equal(
+    (
+      await command(cookie, {
+        action: "open",
+        divisionId: f.division,
+        version: 0,
+        terms,
+      })
+    ).status,
+    200,
+  );
+  const requestId = randomUUID(),
+    name = `wcp009_${requestId.replaceAll("-", "")}`;
+  await pool.query(
+    `CREATE FUNCTION ${name}() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'Owned registration audit failure fixture'; END $$`,
+  );
+  await pool.query(
+    `CREATE TRIGGER ${name} BEFORE INSERT ON registration_command FOR EACH ROW WHEN(NEW.request_id='${requestId}') EXECUTE FUNCTION ${name}()`,
+  );
+  try {
+    assert.equal(
+      (
+        await command(cookie, {
+          action: "accept",
+          divisionId: f.division,
+          entryId: f.entries[0],
+          version: 0,
+          requestId,
+        })
+      ).status,
+      503,
+    );
+    const w = await read(cookie, f.division);
+    assert.equal(w.division.remaining, 1);
+    assert.equal(w.entries[0].state, "pending");
+    assert.equal(w.entries[0].version, 0);
+    assert.equal(
+      w.receipts.some((r: { requestId: string }) => r.requestId === requestId),
+      false,
+    );
+    assert.equal(
+      (
+        await pool.query(
+          "SELECT id FROM audit_record WHERE action='registration_accept' AND resource_id=$1",
+          [f.entries[0]],
+        )
+      ).rowCount,
+      0,
+    );
+  } finally {
+    await pool.query(`DROP TRIGGER ${name} ON registration_command`);
+    await pool.query(`DROP FUNCTION ${name}()`);
+  }
+});
+
+test("one known team cannot consume two active places, including through an active lineup amendment; historical receipts remain read-only", async () => {
+  const cookie = await login("organizer"),
+    f = await fixture();
+  function assemble(name: string) {
+    const ids = Array.from({ length: 4 }, () => randomUUID());
+    return {
+      divisionId: f.division,
+      name,
+      coreKnown: true,
+      corePlayerIds: ids,
+      members: ids.map((playerId) => ({
+        playerId,
+        role: "core",
+        position: "",
+        participation: "declared",
+      })),
+      newPlayers: ids.map((id, i) => ({
+        id,
+        name: `${name} player ${i + 1}`,
+        provisional: false,
+      })),
+    };
+  }
+  async function entry(raw: unknown, id = randomUUID(), version = 0) {
+    return fetch(base + `/api/v1/entries${version ? `/${id}` : ""}`, {
+      method: "POST",
+      headers: { cookie, Origin: base, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        id,
+        version,
+        requestId: randomUUID(),
+        entry: raw,
+      }),
+    });
+  }
+  const a = assemble("Known team A"),
+    b = assemble("Known team B");
+  let r = await entry(a);
+  assert.equal(r.status, 201);
+  const first = await r.json();
+  r = await entry({
+    ...a,
+    newPlayers: [],
+    teamId: first.teamId,
+    name: "Duplicate submission for known team A",
+  });
+  assert.equal(r.status, 201);
+  const duplicate = await r.json();
+  r = await entry(b);
+  assert.equal(r.status, 201);
+  const other = await r.json();
+  assert.equal(
+    (
+      await command(cookie, {
+        action: "open",
+        divisionId: f.division,
+        version: 0,
+        terms: { ...terms, capacity: 2, feeMinor: 10000 },
+      })
+    ).status,
+    200,
+  );
+  const acceptA = {
+    action: "request",
+    divisionId: f.division,
+    entryId: first.id,
+    version: 0,
+    requestId: randomUUID(),
+  };
+  assert.equal((await command(cookie, acceptA)).status, 200);
+  r = await command(cookie, {
+    action: "request",
+    divisionId: f.division,
+    entryId: duplicate.id,
+    version: 0,
+  });
+  assert.equal(r.status, 409);
+  assert.match((await r.json()).error, /known team|active place/i);
+  let w = await read(cookie, f.division);
+  assert.equal(
+    w.entries.find((e: { id: string }) => e.id === duplicate.id).state,
+    "pending",
+  );
+  assert.equal(w.division.remaining, 1);
+  assert.equal(
+    (
+      await command(cookie, {
+        action: "request",
+        divisionId: f.division,
+        entryId: other.id,
+        version: 0,
+      })
+    ).status,
+    200,
+  );
+  r = await entry(
+    {
+      ...a,
+      newPlayers: [],
+      teamId: first.teamId,
+      name: "Cannot replace known B with known A",
+    },
+    other.id,
+    1,
+  );
+  assert.equal(r.status, 409);
+  const current = await (
+    await fetch(base + `/api/v1/entries/${other.id}`, { headers: { cookie } })
+  ).json();
+  assert.equal(current.teamId, other.teamId);
+  assert.equal(current.version, 1);
+  await pool.query(
+    "UPDATE event_entry SET reservation_deadline=clock_timestamp()-interval '1 second' WHERE id=$1",
+    [first.id],
+  );
+  assert.equal(
+    (
+      await command(cookie, {
+        action: "request",
+        divisionId: f.division,
+        entryId: duplicate.id,
+        version: 0,
+      })
+    ).status,
+    200,
+  );
+  // The original receipt remains valid after expiry and replacement, without reserving again.
+  assert.equal((await command(cookie, acceptA)).status, 200);
+  w = await read(cookie, f.division);
+  assert.equal(
+    w.entries.find((e: { id: string }) => e.id === first.id).state,
+    "expired",
+  );
+  assert.equal(
+    w.entries.find((e: { id: string }) => e.id === duplicate.id).state,
+    "held",
+  );
+  assert.equal(w.division.remaining, 0);
+});
+
+test("two active lineup amendments to one known identity serialize before lower entry locks", async () => {
+  const cookie = await login("organizer"),
+    f = await fixture();
+  const ids = Array.from({ length: 4 }, () => randomUUID());
+  const core = {
+    divisionId: f.division,
+    name: "Concurrent known core",
+    coreKnown: true,
+    corePlayerIds: ids,
+    members: ids.map((playerId) => ({
+      playerId,
+      role: "core",
+      position: "",
+      participation: "declared",
+    })),
+    newPlayers: ids.map((id, i) => ({
+      id,
+      name: `Concurrent core player ${i}`,
+      provisional: false,
+    })),
+  };
+  let r = await fetch(base + "/api/v1/entries", {
+    method: "POST",
+    headers: { cookie, Origin: base, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      id: randomUUID(),
+      version: 0,
+      requestId: randomUUID(),
+      entry: core,
+    }),
+  });
+  assert.equal(r.status, 201);
+  const known = await r.json();
+  assert.equal(
+    (
+      await command(cookie, {
+        action: "open",
+        divisionId: f.division,
+        version: 0,
+        terms: { ...terms, capacity: 2 },
+      })
+    ).status,
+    200,
+  );
+  for (const entryId of f.entries)
+    assert.equal(
+      (
+        await command(cookie, {
+          action: "request",
+          divisionId: f.division,
+          entryId,
+          version: 0,
+        })
+      ).status,
+      200,
+    );
+  const barrier = await pool.connect();
+  let first: Promise<Response> | undefined,
+    second: Promise<Response> | undefined;
+  const amend = (id: string) =>
+    fetch(base + `/api/v1/entries/${id}`, {
+      method: "POST",
+      headers: { cookie, Origin: base, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        version: 0,
+        requestId: randomUUID(),
+        entry: { ...core, teamId: known.teamId, newPlayers: [] },
+      }),
+    });
+  try {
+    await barrier.query("BEGIN");
+    const pid = (await barrier.query("SELECT pg_backend_pid() AS pid")).rows[0]
+      .pid;
+    await barrier.query("SELECT id FROM division WHERE id=$1 FOR UPDATE", [
+      f.division,
+    ]);
+    first = amend(f.entries[0]);
+    const firstPid = await waitBlocked(pid);
+    second = amend(f.entries[1]);
+    await waitBlocked(firstPid);
+    await barrier.query("ROLLBACK");
+    const results = await Promise.all([first, second]);
+    assert.deepEqual(
+      results.map((r) => r.status),
+      [200, 409],
+    );
+    const current = await Promise.all(
+      f.entries.map(async (id) =>
+        (
+          await fetch(base + `/api/v1/entries/${id}`, { headers: { cookie } })
+        ).json(),
+      ),
+    );
+    assert.equal(current.filter((e) => e.teamId === known.teamId).length, 1);
+    assert.equal(current.filter((e) => e.teamId === null).length, 1);
+    const w = await read(cookie, f.division);
+    assert.equal(w.division.remaining, 0);
+    assert.equal(
+      w.entries.filter((e: { state: string }) => e.state === "accepted").length,
+      2,
+    );
+  } finally {
+    await barrier.query("ROLLBACK");
+    barrier.release();
+    await Promise.allSettled(
+      [first, second].filter((p): p is Promise<Response> => !!p),
+    );
+  }
 });

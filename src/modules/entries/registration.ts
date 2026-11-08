@@ -12,6 +12,7 @@ import {
   requestAdmission,
 } from "@/domain/registration";
 import { representationFor } from "@/modules/identity/representation";
+import { assertAdmissionTeamAvailable } from "./admission-identity";
 
 async function staff(
   c: Pick<PoolClient, "query">,
@@ -283,6 +284,15 @@ export async function registrationCommand(userId: string, raw: unknown) {
             action === "accept",
           );
         const version = entry.admission_version + 1;
+        if (["held", "accepted"].includes(next.state))
+          await assertAdmissionTeamAvailable(
+            c,
+            divisionId,
+            entry.team_id,
+            entryId!,
+            now,
+            manual,
+          );
         await c.query(
           "UPDATE event_entry SET admission_state=$2,reservation_deadline=$3,admission_version=$4 WHERE id=$1",
           [entryId, next.state, next.deadline, version],

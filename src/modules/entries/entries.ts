@@ -2,6 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import type { PoolClient } from "pg";
 import { pool } from "@/db";
 import { representationFor } from "@/modules/identity/representation";
+import { assertAdmissionTeamAvailable } from "./admission-identity";
 import {
   coreIdentity,
   canonicalEntryCommand,
@@ -221,6 +222,11 @@ export async function saveEntry(
       [eventId],
     );
     if (!edition.rowCount) throw new EntryError("Edition not found.", 404);
+    // Compatible SHARE lineup writers serialize known-team admission identity changes
+    // before locking entries; capacity commands exclude them via edition EXCLUSIVE.
+    await c.query("SELECT pg_advisory_xact_lock(hashtextextended($1,0))", [
+      `admission-identity:${divisionId}`,
+    ]);
     const existing = await c.query(
       "SELECT * FROM event_entry WHERE id=$1 FOR UPDATE",
       [id],
@@ -354,6 +360,24 @@ export async function saveEntry(
             p,
           ]);
       }
+    }
+    if (existing.rowCount && teamId) {
+      const now = (await c.query("SELECT clock_timestamp() AS now")).rows[0]
+        .now as Date;
+      const active =
+        existing.rows[0].admission_state === "accepted" ||
+        (existing.rows[0].admission_state === "held" &&
+          new Date(existing.rows[0].reservation_deadline).getTime() >
+            now.getTime());
+      if (active)
+        await assertAdmissionTeamAvailable(
+          c,
+          divisionId,
+          teamId,
+          id,
+          now,
+          manual,
+        );
     }
     let registrationId: string | null = input.registrationId ?? null,
       registrationVersion: number | null = null;
