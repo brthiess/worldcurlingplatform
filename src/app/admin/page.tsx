@@ -177,6 +177,13 @@ export default function Admin() {
                         ? "Assigned scoring scope"
                         : "Read-only scope"}
                   </p>
+                  {game.canScore && (
+                    <p>
+                      <a href={`/admin/games/${game.id}`}>
+                        Enter live scores →
+                      </a>
+                    </p>
+                  )}
                   {game.published ? (
                     <a href={`/games/${game.id}`}>Open game details →</a>
                   ) : (

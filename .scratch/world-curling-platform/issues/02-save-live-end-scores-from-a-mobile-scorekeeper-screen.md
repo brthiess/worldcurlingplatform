@@ -4,7 +4,7 @@ number: 2
 title: "Save live end scores from a mobile scorekeeper screen"
 parent: WCP-SPEC-001
 type: implementation
-status: in-progress
+status: completed
 labels: [ready-for-agent]
 blocked_by: [WCP-001]
 source_spec_sha256: 045B46988225B6C8C0020B23C8C5D4EAA8E2E1916256148A0FDA26B5DA8673FD
@@ -18,7 +18,7 @@ published: 2026-11-07
 
 **Blocked by:** [01: Open a persisted event and sign in with scoped demo roles](01-open-a-persisted-event-and-sign-in-with-scoped-demo-roles.md).
 
-**Status:** in-progress
+**Status:** completed
 
 ## Parent and scope
 
@@ -31,13 +31,13 @@ published: 2026-11-07
 
 ## Acceptance criteria
 
-- [ ] Persist end scores and known hammer with actor/request attribution and an atomic audit record.
-- [ ] Retries are duplicate-safe; stale or out-of-scope writes cannot overwrite accepted state.
-- [ ] Show saved, unsent/uncertain and connection states honestly, preserving an unfinished edit through a temporary interruption without claiming full offline synchronization.
-- [ ] **Unit testing:** Test four-player end validation, blank/unknown/unplayed distinctions, valid totals, version/idempotency decisions and save-state transitions.
-- [ ] **Database/API verification:** Submit valid, duplicate, conflicting and forbidden commands against real PostgreSQL; assert accepted scores and audit evidence commit together.
-- [ ] **Frontend quality:** Browser-check thumb-friendly entry, clear game/end identity, labelled errors and visible public refresh without losing the selected draw or expanded card.
-- [ ] Record actual verification commands/results and relevant browser/screenshots or API evidence. Report meaningful uncovered branches or limitations; do not claim checks that were not run.
+- [x] Persist end scores and known hammer with actor/request attribution and an atomic audit record.
+- [x] Retries are duplicate-safe; stale or out-of-scope writes cannot overwrite accepted state.
+- [x] Show saved, unsent/uncertain and connection states honestly, preserving an unfinished edit through a temporary interruption without claiming full offline synchronization.
+- [x] **Unit testing:** Test four-player end validation, blank/unknown/unplayed distinctions, valid totals, version/idempotency decisions and save-state transitions.
+- [x] **Database/API verification:** Submit valid, duplicate, conflicting and forbidden commands against real PostgreSQL; assert accepted scores and audit evidence commit together.
+- [x] **Frontend quality:** Browser-check thumb-friendly entry, clear game/end identity, labelled errors and visible public refresh without losing the selected draw or expanded card.
+- [x] Record actual verification commands/results and relevant browser/screenshots or API evidence. Report meaningful uncovered branches or limitations; do not claim checks that were not run.
 
 ## Slice boundary
 

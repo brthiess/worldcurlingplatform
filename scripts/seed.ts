@@ -86,6 +86,14 @@ try {
         );
       }
   }
+  // Migrations run before the first seed. Initialize its explicitly known
+  // current-end hammer once; repeated seeding must preserve later commands.
+  await client.query(
+    "UPDATE game g SET hammer_end=coalesce((SELECT max(end_number)+1 FROM game_end_score s WHERE s.game_id=g.id AND s.state IN ('played','unknown')),1) WHERE g.id IN ('game-2','game-3') AND g.state='live' AND g.version=0 AND g.hammer_end IS NULL",
+  );
+  await client.query(
+    "INSERT INTO game_end_hammer(game_id,end_number,hammer) SELECT id,hammer_end,hammer FROM game WHERE id IN ('game-2','game-3') AND version=0 AND hammer_end IS NOT NULL AND hammer IS NOT NULL ON CONFLICT DO NOTHING",
+  );
   await client.query(
     "INSERT INTO auth_user(id,name,email,email_verified) VALUES('demo-ungranted','Unassigned test persona','ungranted@demo.invalid',true) ON CONFLICT DO NOTHING",
   );
