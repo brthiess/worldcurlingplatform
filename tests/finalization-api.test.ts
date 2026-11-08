@@ -21,6 +21,20 @@ after(async () => {
   await pool.end();
 });
 const base = process.env.BETTER_AUTH_URL!;
+async function waitForBlockedSession(blockerPid: number) {
+  const deadline = Date.now() + 10000;
+  while (Date.now() < deadline) {
+    const waiting = await pool.query(
+      "SELECT pid FROM pg_stat_activity WHERE datname=current_database() AND $1=ANY(pg_blocking_pids(pid)) ORDER BY query_start",
+      [blockerPid],
+    );
+    if (waiting.rowCount) return waiting.rows[0].pid as number;
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+  throw new Error(
+    "The real command did not reach its expected row-lock barrier.",
+  );
+}
 const sessions = new Map<string, string>();
 async function login(role: string) {
   if (sessions.has(role)) return sessions.get(role)!;
@@ -839,3 +853,172 @@ test("a queued command cannot carry old organizer authority into a division's ch
     );
   }
 });
+for (const first of ["amendment", "finalization"] as const) {
+  test(`entry/finalization race: ${first} first preserves current source and immutable snapshots`, async () => {
+    const cookie = await login("organizer"),
+      f = await fixture(cookie),
+      path = `/api/v1/division-finalizations?division=${f.divisionId}`;
+    const read = async () => {
+      const r = await request(path, cookie);
+      assert.equal(r.status, 200);
+      return r.json();
+    };
+    const before = await read(),
+      original = f.registrations[0],
+      amendment = {
+        requestId: randomUUID(),
+        version: 1,
+        entry: {
+          divisionId: f.divisionId,
+          name: `Race ${first} amended`,
+          coreKnown: true,
+          corePlayerIds: original.core.map(
+            (p: { playerId: string }) => p.playerId,
+          ),
+          teamId: original.teamId,
+          members: original.lineup.members.map(
+            (m: {
+              playerId: string;
+              role: string;
+              position: string;
+              participation: string;
+            }) => ({
+              playerId: m.playerId,
+              role: m.role,
+              position: m.position,
+              participation: m.participation,
+            }),
+          ),
+          newPlayers: [],
+        },
+      },
+      finalization = {
+        divisionId: f.divisionId,
+        version: 0,
+        sourceDigest: before.sourceDigest,
+        requestId: randomUUID(),
+        placements: f.entries.map((entryId, i) => ({ entryId, place: i + 1 })),
+        note: "Real entry/finalization serialization regression",
+        rulesReference: "Fictional event rules edition 1",
+      },
+      barrier = await pool.connect();
+    let amending: Promise<Response> | undefined,
+      finalizing: Promise<Response> | undefined;
+    try {
+      await barrier.query("BEGIN");
+      const pid = (await barrier.query("SELECT pg_backend_pid() AS pid"))
+        .rows[0].pid;
+      // SHARE blocks the finalizer's division UPDATE; UPDATE blocks the
+      // amendment's division SHARE. Observe both real wait edges before release.
+      await barrier.query(
+        `SELECT id FROM division WHERE id=$1 FOR ${first === "amendment" ? "UPDATE" : "SHARE"}`,
+        [f.divisionId],
+      );
+      if (first === "amendment") {
+        amending = request(
+          `/api/v1/entries/${f.entries[0]}`,
+          cookie,
+          amendment,
+        );
+        const amendmentPid = await waitForBlockedSession(pid);
+        finalizing = request(
+          "/api/v1/division-finalizations",
+          cookie,
+          finalization,
+        );
+        await waitForBlockedSession(amendmentPid);
+      } else {
+        finalizing = request(
+          "/api/v1/division-finalizations",
+          cookie,
+          finalization,
+        );
+        const finalizerPid = await waitForBlockedSession(pid);
+        amending = request(
+          `/api/v1/entries/${f.entries[0]}`,
+          cookie,
+          amendment,
+        );
+        await waitForBlockedSession(finalizerPid);
+      }
+      await barrier.query("ROLLBACK");
+      const [amended, finalized] = await Promise.all([amending, finalizing]);
+      assert.equal(amended.status, 200, await amended.clone().text());
+      assert.equal(
+        finalized.status,
+        first === "amendment" ? 409 : 200,
+        await finalized.clone().text(),
+      );
+      const after = await read();
+      const current = after.source.entries.find(
+        (e: { id: string }) => e.id === f.entries[0],
+      );
+      assert.equal(current.version, 2);
+      assert.equal(current.name, amendment.entry.name);
+      assert.equal(current.lineup.version, 2);
+      assert.notEqual(after.sourceDigest, before.sourceDigest);
+      assert.equal(after.version, first === "amendment" ? 0 : 1);
+      assert.equal(after.history.length, first === "amendment" ? 0 : 1);
+      assert.equal(after.dirty, first === "finalization");
+      const frozenOriginal =
+        first === "finalization" ? after.selected.contents : null;
+      if (frozenOriginal) {
+        const frozen = JSON.parse(frozenOriginal).source.entries.find(
+          (e: { id: string }) => e.id === f.entries[0],
+        );
+        assert.equal(frozen.version, 1);
+        assert.equal(frozen.name, original.name);
+      }
+      const fresh = {
+        ...finalization,
+        version: after.version,
+        sourceDigest: after.sourceDigest,
+        requestId: randomUUID(),
+      };
+      const saved = await request(
+        "/api/v1/division-finalizations",
+        cookie,
+        fresh,
+      );
+      assert.equal(saved.status, 200, await saved.clone().text());
+      assert.equal(
+        (await request("/api/v1/division-finalizations", cookie, fresh)).status,
+        200,
+      );
+      assert.equal(
+        (await request(`/api/v1/entries/${f.entries[0]}`, cookie, amendment))
+          .status,
+        200,
+      );
+      const final = await read();
+      assert.equal(final.version, after.version + 1);
+      assert.equal(final.dirty, false);
+      assert.equal(final.history.length, after.version + 1);
+      const latest = JSON.parse(final.selected.contents).source.entries.find(
+        (e: { id: string }) => e.id === f.entries[0],
+      );
+      assert.equal(latest.version, 2);
+      assert.equal(latest.name, amendment.entry.name);
+      if (frozenOriginal) {
+        const historical = await (
+          await request(`${path}&version=1`, cookie)
+        ).json();
+        assert.equal(historical.selected.contents, frozenOriginal);
+      }
+      const audit = await pool.query(
+        "SELECT resource_version FROM audit_record WHERE action='division_finalized' AND resource_id=$1 ORDER BY resource_version",
+        [f.divisionId],
+      );
+      assert.deepEqual(
+        audit.rows.map((r) => r.resource_version),
+        first === "amendment" ? [1] : [1, 2],
+      );
+    } finally {
+      await barrier.query("ROLLBACK");
+      barrier.release();
+      await Promise.allSettled(
+        [amending, finalizing].filter((p): p is Promise<Response> => !!p),
+      );
+    }
+  });
+}

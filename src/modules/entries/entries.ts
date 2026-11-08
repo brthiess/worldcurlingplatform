@@ -1,8 +1,10 @@
 import { createHash, randomUUID } from "node:crypto";
 import type { PoolClient } from "pg";
 import { pool } from "@/db";
+import { representationFor } from "@/modules/identity/representation";
 import {
   coreIdentity,
+  canonicalEntryCommand,
   entryInput,
   EntryError,
   identifier,
@@ -29,11 +31,7 @@ async function authorize(c: Reader, userId: string, eventId: string) {
     "SELECT role FROM role_grant WHERE user_id=$1 AND ((role='administrator' AND event_id IS NULL AND game_id IS NULL) OR (role='organizer' AND event_id=$2 AND game_id IS NULL)) FOR SHARE",
     [userId, eventId],
   );
-  if (!r.rowCount)
-    throw new EntryError(
-      "Organizer authority for this edition is required.",
-      403,
-    );
+  return !!r.rowCount;
 }
 async function roster(c: Reader, id: string, version?: number) {
   const r = await c.query(
@@ -65,7 +63,12 @@ export async function readEventLineup(
   );
   return { ...row, members: m.rows };
 }
-async function detail(c: Reader, id: string, version?: number) {
+async function detail(
+  c: Reader,
+  id: string,
+  version?: number,
+  privateRead = false,
+) {
   let lineup = await readEventLineup(c, id, version);
   if (!lineup) {
     const legacy = await c.query(
@@ -88,15 +91,24 @@ async function detail(c: Reader, id: string, version?: number) {
     };
   }
   const e = await c.query(
-    'SELECT e.division_id AS "divisionId",d.event_id AS "eventId",d.discipline,ev.name AS "eventName",ev.origin FROM event_entry e JOIN division d ON d.id=e.division_id JOIN event_edition ev ON ev.id=d.event_id WHERE e.id=$1',
+    'SELECT e.division_id AS "divisionId",e.entry_admission AS "entryAdmission",d.event_id AS "eventId",d.discipline,ev.name AS "eventName",ev.origin FROM event_entry e JOIN division d ON d.id=e.division_id JOIN event_edition ev ON ev.id=d.event_id WHERE e.id=$1',
     [id],
   );
   const core = await c.query(
     'SELECT p.id AS "playerId",p.name,p.identity_status AS "identityStatus" FROM event_lineup_core m JOIN player p ON p.id=m.player_id WHERE m.entry_id=$1 AND m.version=$2 ORDER BY p.id',
     [id, lineup.version],
   );
+  const attribution = privateRead
+    ? ((
+        await c.query(
+          'SELECT v.actor_id AS "actorId",u.name AS "actorName",v.representation_grant_id AS "representationGrantId",v.team_id AS "teamId",v.represented_season AS season,v.request_id AS "requestId",v.command_digest AS "commandDigest" FROM event_lineup_version v JOIN auth_user u ON u.id=v.actor_id WHERE v.entry_id=$1 AND v.version=$2',
+          [id, lineup.version],
+        )
+      ).rows[0] ?? null)
+    : undefined;
   return {
     id,
+    ...(privateRead ? { attribution } : {}),
     ...e.rows[0],
     name: lineup.name,
     version: lineup.version,
@@ -123,12 +135,33 @@ export async function entryDetail(
   try {
     await c.query("BEGIN ISOLATION LEVEL REPEATABLE READ");
     const e = await c.query(
-      "SELECT d.event_id FROM event_entry e JOIN division d ON d.id=e.division_id WHERE e.id=$1",
+      "SELECT d.event_id,d.entry_season,e.team_id,e.season_registration_id FROM event_entry e JOIN division d ON d.id=e.division_id WHERE e.id=$1",
       [id],
     );
     if (!e.rowCount) throw new EntryError("Entry not found.", 404);
-    await authorize(c, userId, e.rows[0].event_id);
-    const result = await detail(c, id, version);
+    const current = e.rows[0];
+    if (!(await authorize(c, userId, current.event_id))) {
+      // Read only an entry currently represented; historical versions cannot widen scope.
+      await representationFor(
+        c,
+        userId,
+        current.team_id,
+        current.season_registration_id,
+        current.entry_season,
+        "read",
+      );
+    }
+    const result = await detail(c, id, version, true);
+    if (
+      result &&
+      !(await authorize(c, userId, current.event_id)) &&
+      (result.teamId !== current.team_id ||
+        result.registration?.season !== current.entry_season)
+    )
+      throw new EntryError(
+        "This historical entry belongs to another team-season.",
+        403,
+      );
     if (!result)
       throw new EntryError("No recorded lineup for this entry version.", 404);
     await c.query("COMMIT");
@@ -139,19 +172,6 @@ export async function entryDetail(
   } finally {
     c.release();
   }
-}
-function canonical(v: unknown): string {
-  if (Array.isArray(v)) return "[" + v.map(canonical).join(",") + "]";
-  if (v && typeof v === "object")
-    return (
-      "{" +
-      Object.entries(v)
-        .sort(([a], [b]) => a.localeCompare(b))
-        .map(([k, v]) => JSON.stringify(k) + ":" + canonical(v))
-        .join(",") +
-      "}"
-    );
-  return JSON.stringify(v) ?? "null";
 }
 export async function saveEntry(
   userId: string,
@@ -171,7 +191,7 @@ export async function saveEntry(
       "Provide the reviewed entry version (zero for a new entry).",
     );
   const digest = createHash("sha256")
-    .update(canonical({ id, command }))
+    .update(canonicalEntryCommand({ id, command }))
     .digest("hex");
   const c = await pool.connect();
   try {
@@ -180,19 +200,82 @@ export async function saveEntry(
       await c.query("SELECT pg_advisory_xact_lock(hashtextextended($1,0))", [
         key,
       ]);
-    const existing = await c.query(
-      "SELECT * FROM event_entry WHERE id=$1 FOR UPDATE",
+    // Discover without lower-level locks, then follow the shared edition-first
+    // order used by scheduling/finalization. Recheck membership after locking.
+    const observed = await c.query(
+      "SELECT division_id FROM event_entry WHERE id=$1",
       [id],
     );
     const candidate = (command.entry ?? {}) as Record<string, unknown>;
     const divisionId =
-      existing.rows[0]?.division_id ?? identifier(candidate.divisionId);
-    const d = await c.query(
-      "SELECT d.discipline,d.event_id,e.origin FROM division d JOIN event_edition e ON e.id=d.event_id WHERE d.id=$1 FOR SHARE OF d,e",
-      [divisionId],
+      observed.rows[0]?.division_id ?? identifier(candidate.divisionId);
+    const subject = await c.query("SELECT event_id FROM division WHERE id=$1", [
+      divisionId,
+    ]);
+    if (!subject.rowCount) throw new EntryError("Division not found.", 404);
+    const eventId = subject.rows[0].event_id;
+    const edition = await c.query(
+      "SELECT id FROM event_edition WHERE id=$1 FOR SHARE",
+      [eventId],
     );
-    if (!d.rowCount) throw new EntryError("Division not found.", 404);
-    await authorize(c, userId, d.rows[0].event_id);
+    if (!edition.rowCount) throw new EntryError("Edition not found.", 404);
+    const existing = await c.query(
+      "SELECT * FROM event_entry WHERE id=$1 FOR UPDATE",
+      [id],
+    );
+    if (existing.rowCount && existing.rows[0].division_id !== divisionId)
+      throw new EntryError(
+        "The entry's division changed. Reload before saving.",
+        409,
+      );
+    const d = await c.query(
+      "SELECT d.discipline,d.event_id,d.entry_season,e.origin,e.published,e.admission_status FROM division d JOIN event_edition e ON e.id=d.event_id WHERE d.id=$1 AND d.event_id=$2 FOR SHARE OF d",
+      [divisionId, eventId],
+    );
+    if (!d.rowCount)
+      throw new EntryError(
+        "The division's edition changed. Reload before saving.",
+        409,
+      );
+    const manual = await authorize(c, userId, d.rows[0].event_id);
+    const input = entryInput(command.entry, d.rows[0].discipline);
+    let representationGrantId: string | null = null;
+    if (!manual) {
+      if (!d.rows[0].published || d.rows[0].admission_status !== "approved")
+        throw new EntryError(
+          "Self-entry requires a published approved edition.",
+          403,
+        );
+      const team = input.coreKnown
+        ? (
+            await c.query("SELECT id FROM team WHERE core_key=$1", [
+              coreIdentity(d.rows[0].discipline, input.corePlayerIds),
+            ])
+          ).rows[0]?.id
+        : null;
+      representationGrantId = await representationFor(
+        c,
+        userId,
+        team ?? null,
+        input.registrationId ?? null,
+        d.rows[0].entry_season,
+        creating ? "submit" : "amend",
+      );
+      if (existing.rowCount)
+        await representationFor(
+          c,
+          userId,
+          existing.rows[0].team_id,
+          existing.rows[0].season_registration_id,
+          d.rows[0].entry_season,
+          "amend",
+        );
+      if (input.registerSeason)
+        throw new EntryError(
+          "Team representation does not grant season roster control. Save event-only lineup changes.",
+          403,
+        );
+    }
     const duplicate = await c.query(
       "SELECT entry_id,version,command_digest FROM event_lineup_version WHERE actor_id=$1 AND request_id=$2",
       [userId, requestId],
@@ -204,7 +287,7 @@ export async function saveEntry(
           "This request identifier was used for another command.",
           409,
         );
-      const result = await detail(c, id, old.version);
+      const result = await detail(c, id, old.version, true);
       await c.query("COMMIT");
       return result;
     }
@@ -217,7 +300,6 @@ export async function saveEntry(
         "This entry changed. Reload the current version before saving.",
         409,
       );
-    const input = entryInput(command.entry, d.rows[0].discipline);
     if (input.divisionId !== divisionId)
       throw new EntryError("An entry cannot move divisions.");
     for (const p of input.newPlayers)
@@ -350,8 +432,16 @@ export async function saveEntry(
     const version = Number(command.version) + 1;
     if (creating)
       await c.query(
-        "INSERT INTO event_entry(id,division_id,display_name,team_id,season_registration_id,version) VALUES($1,$2,$3,$4,$5,$6)",
-        [id, divisionId, input.name, teamId, registrationId, version],
+        "INSERT INTO event_entry(id,division_id,display_name,team_id,season_registration_id,version,entry_admission) VALUES($1,$2,$3,$4,$5,$6,$7)",
+        [
+          id,
+          divisionId,
+          input.name,
+          teamId,
+          registrationId,
+          version,
+          manual ? "organizer_recorded" : "submitted_pending",
+        ],
       );
     else
       await c.query(
@@ -371,7 +461,7 @@ export async function saveEntry(
       [auditId, userId, creating ? "entry_create" : "entry_lineup_update", id],
     );
     await c.query(
-      "INSERT INTO event_lineup_version(entry_id,version,team_id,registration_id,registration_version,display_name,core_known,status,audit_id,actor_id,request_id,command_digest) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)",
+      "INSERT INTO event_lineup_version(entry_id,version,team_id,registration_id,registration_version,display_name,core_known,status,audit_id,actor_id,request_id,command_digest,representation_grant_id,represented_season) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)",
       [
         id,
         version,
@@ -385,6 +475,8 @@ export async function saveEntry(
         userId,
         requestId,
         digest,
+        representationGrantId,
+        representationGrantId ? d.rows[0].entry_season : null,
       ],
     );
     for (const p of input.corePlayerIds)
@@ -398,7 +490,7 @@ export async function saveEntry(
         "INSERT INTO event_lineup_member VALUES($1,$2,$3,$4,$5,$6,$7)",
         [id, version, i, m.playerId, m.role, m.position, m.participation],
       );
-    const result = await detail(c, id, version);
+    const result = await detail(c, id, version, true);
     await c.query("COMMIT");
     return result;
   } catch (e) {
@@ -414,19 +506,34 @@ export async function saveEntry(
   }
 }
 export async function entryWorkspace(userId: string) {
+  const representations = (
+    await pool.query(
+      'SELECT g.id,g.actions,r.id AS "registrationId",r.team_id AS "teamId",r.season,t.discipline,v.display_name AS name FROM team_representation g JOIN season_registration r ON r.id=g.registration_id JOIN team t ON t.id=r.team_id JOIN season_roster_version v ON v.registration_id=r.id AND v.version=r.version WHERE g.user_id=$1 AND g.revoked_at IS NULL ORDER BY v.display_name,r.season',
+      [userId],
+    )
+  ).rows;
   const divisions = await pool.query(
-    `SELECT d.id,d.name,d.discipline,e.id AS "eventId",e.name AS "eventName" FROM division d JOIN event_edition e ON e.id=d.event_id WHERE EXISTS(SELECT 1 FROM role_grant r WHERE r.user_id=$1 AND ((r.role='administrator' AND r.event_id IS NULL AND r.game_id IS NULL) OR (r.role='organizer' AND r.event_id=e.id AND r.game_id IS NULL))) ORDER BY e.starts_on DESC,d.name`,
+    `SELECT d.id,d.name,d.discipline,d.entry_season AS season,e.id AS "eventId",e.name AS "eventName",EXISTS(SELECT 1 FROM role_grant r WHERE r.user_id=$1 AND ((r.role='administrator' AND r.event_id IS NULL AND r.game_id IS NULL) OR (r.role='organizer' AND r.event_id=e.id AND r.game_id IS NULL))) AS manual FROM division d JOIN event_edition e ON e.id=d.event_id WHERE EXISTS(SELECT 1 FROM role_grant r WHERE r.user_id=$1 AND ((r.role='administrator' AND r.event_id IS NULL AND r.game_id IS NULL) OR (r.role='organizer' AND r.event_id=e.id AND r.game_id IS NULL))) OR (e.published AND e.admission_status='approved' AND EXISTS(SELECT 1 FROM team_representation g JOIN season_registration r ON r.id=g.registration_id JOIN team t ON t.id=r.team_id WHERE g.user_id=$1 AND g.revoked_at IS NULL AND r.season=d.entry_season AND t.discipline=d.discipline)) ORDER BY e.starts_on DESC,d.name`,
     [userId],
   );
   const entries = await pool.query(
-    'SELECT id,division_id AS "divisionId",display_name AS name,version FROM event_entry WHERE division_id=ANY($1::text[]) ORDER BY display_name,id',
-    [divisions.rows.map((d) => d.id)],
+    'SELECT e.id,e.division_id AS "divisionId",e.display_name AS name,e.version,e.team_id AS "teamId",e.season_registration_id AS "registrationId" FROM event_entry e WHERE e.division_id=ANY($1::text[]) AND (e.division_id=ANY($2::text[]) OR EXISTS(SELECT 1 FROM team_representation g JOIN season_registration r ON r.id=g.registration_id JOIN division d ON d.id=e.division_id WHERE g.user_id=$3 AND g.revoked_at IS NULL AND r.id=e.season_registration_id AND r.team_id=e.team_id AND r.season=d.entry_season)) ORDER BY e.display_name,e.id',
+    [
+      divisions.rows.map((d) => d.id),
+      divisions.rows.filter((d) => d.manual).map((d) => d.id),
+      userId,
+    ],
   );
   const admin = await pool.query(
     "SELECT id FROM role_grant WHERE user_id=$1 AND role='administrator' AND event_id IS NULL AND game_id IS NULL",
     [userId],
   );
   return {
+    actorId: userId,
+    actorName: (
+      await pool.query("SELECT name FROM auth_user WHERE id=$1", [userId])
+    ).rows[0]?.name,
+    representations,
     divisions: divisions.rows,
     entries: entries.rows,
     isAdministrator: !!admin.rowCount,
@@ -476,7 +583,7 @@ export async function publicTeams(id?: string, q = "") {
         [t.id],
       );
       const entries = await c.query(
-        `SELECT en.id,en.display_name AS name,en.version,d.id AS "divisionId",d.event_id AS "eventId",e.name AS "eventName" FROM event_entry en JOIN division d ON d.id=en.division_id JOIN event_edition e ON e.id=d.event_id WHERE en.team_id=$1 AND e.published AND e.admission_status='approved' ORDER BY e.starts_on DESC,en.id`,
+        `SELECT en.id,en.display_name AS name,en.version,en.entry_admission AS "entryAdmission",d.id AS "divisionId",d.event_id AS "eventId",e.name AS "eventName" FROM event_entry en JOIN division d ON d.id=en.division_id JOIN event_edition e ON e.id=d.event_id WHERE en.team_id=$1 AND e.published AND e.admission_status='approved' ORDER BY e.starts_on DESC,en.id`,
         [t.id],
       );
       result.push({
@@ -499,7 +606,7 @@ export async function publicTeams(id?: string, q = "") {
 }
 export async function publicEventEntries(eventId: string) {
   const result = await pool.query(
-    `SELECT en.id,en.display_name AS name,en.division_id AS "divisionId",d.name AS "divisionName",en.team_id AS "teamId",en.version,coalesce(v.status,'provisional') AS status FROM event_entry en JOIN division d ON d.id=en.division_id JOIN event_edition e ON e.id=d.event_id LEFT JOIN event_lineup_version v ON v.entry_id=en.id AND v.version=en.version WHERE e.id=$1 AND e.published AND e.admission_status='approved' ORDER BY en.display_name,en.id`,
+    `SELECT en.id,en.display_name AS name,en.entry_admission AS "entryAdmission",en.division_id AS "divisionId",d.name AS "divisionName",en.team_id AS "teamId",en.version,coalesce(v.status,'provisional') AS status FROM event_entry en JOIN division d ON d.id=en.division_id JOIN event_edition e ON e.id=d.event_id LEFT JOIN event_lineup_version v ON v.entry_id=en.id AND v.version=en.version WHERE e.id=$1 AND e.published AND e.admission_status='approved' ORDER BY en.display_name,en.id`,
     [eventId],
   );
   return result.rows;

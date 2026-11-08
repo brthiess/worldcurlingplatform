@@ -1,5 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
+import { AuthorityRecovery, useAuthorityCommand } from "./authority-command";
+import { canonicalEntryCommand } from "@/domain/entries";
 type Person = { playerId: string; name: string; identityStatus: string };
 type Member = Person & {
   role: "core" | "alternate" | "coach" | "substitute";
@@ -35,12 +37,25 @@ type Entry = {
   registration: Registration | null;
 };
 type Workspace = {
+  actorId: string;
+  actorName: string;
+  representations: {
+    id: string;
+    teamId: string;
+    registrationId: string;
+    season: string;
+    actions: string[];
+    discipline: string;
+    name: string;
+  }[];
   divisions: {
     id: string;
     name: string;
     eventId: string;
     eventName: string;
     discipline: string;
+    season: string | null;
+    manual: boolean;
   }[];
   entries: { id: string; name: string; divisionId: string; version: number }[];
   isAdministrator: boolean;
@@ -73,8 +88,52 @@ export function EntriesWorkbench() {
     [newName, setNewName] = useState(""),
     [provisional, setProvisional] = useState(false),
     [newRole, setNewRole] = useState<Member["role"]>("core");
-  const [retry, setRetry] = useState<{ path: string; body: unknown } | null>(
-    null,
+  const recovery = useAuthorityCommand(
+    workspace ? `wcp-entry:${workspace.actorId}` : null,
+    workspace?.actorId,
+    async (saved) => {
+      const body = JSON.parse(saved.body),
+        entryId = body.id ?? saved.path.split("/").pop();
+      await load();
+      const r = await fetch(`/api/v1/entries/${entryId}`, {
+        cache: "no-store",
+      });
+      const result = await r.json();
+      if (!r.ok) throw new Error(result.error);
+      applyEntry(result);
+      setSaved(true);
+    },
+    async (saved) => {
+      const body = JSON.parse(saved.body),
+        entryId = body.id ?? saved.path.split("/").pop();
+      const r = await fetch(
+        `/api/v1/entries/${entryId}?version=${body.version + 1}`,
+        { cache: "no-store" },
+      );
+      if (!r.ok) return false;
+      const result = await r.json();
+      const digest = await crypto.subtle.digest(
+        "SHA-256",
+        new TextEncoder().encode(
+          canonicalEntryCommand({ id: entryId, command: body }),
+        ),
+      );
+      const hex = Array.from(new Uint8Array(digest), (b) =>
+        b.toString(16).padStart(2, "0"),
+      ).join("");
+      if (
+        result.attribution?.actorId !== saved.actorId ||
+        result.attribution.commandDigest !== hex
+      )
+        return false;
+      await load();
+      applyEntry(result);
+      setSaved(true);
+      return true;
+    },
+    (status) => {
+      if (status === 409) setStale(true);
+    },
   );
   async function load() {
     setLoading(true);
@@ -103,17 +162,17 @@ export function EntriesWorkbench() {
       setError("");
     } catch (e) {
       setError((e as Error).message);
+      throw e;
     } finally {
       setLoading(false);
     }
   }
   useEffect(() => {
-    void load();
+    void load().catch(() => {});
   }, []);
   function changed() {
     setDirty(true);
     setSaved(false);
-    setRetry(null);
   }
   function startNew() {
     setId(crypto.randomUUID());
@@ -154,7 +213,6 @@ export function EntriesWorkbench() {
     setRegisterSeason(false);
     setStale(false);
     setDirty(false);
-    setRetry(null);
   }
   async function openEntry(entryId: string) {
     setBusy(true);
@@ -174,6 +232,11 @@ export function EntriesWorkbench() {
     }
   }
   function selectTeam(t: Team, registration?: Registration) {
+    setNewRole(
+      workspace?.divisions.find((d) => d.id === divisionId)?.manual
+        ? "core"
+        : "substitute",
+    );
     setTeamId(t.id);
     setCoreKnown(true);
     setRegistrationId(registration?.id);
@@ -212,35 +275,6 @@ export function EntriesWorkbench() {
     ]);
     changed();
   }
-  async function send(path: string, body: unknown) {
-    setBusy(true);
-    setError("");
-    setSaved(false);
-    try {
-      const r = await fetch(path, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      const result = await r.json();
-      if (!r.ok) {
-        if (r.status === 409) {
-          setStale(true);
-          setRetry(null);
-        } else if (r.status >= 500) setRetry({ path, body });
-        else setRetry(null);
-        throw new Error(result.error);
-      }
-      applyEntry(result);
-      setSaved(true);
-      await load();
-    } catch (e) {
-      setError((e as Error).message || "Save could not be confirmed.");
-      if (e instanceof TypeError) setRetry({ path, body });
-    } finally {
-      setBusy(false);
-    }
-  }
   function save() {
     const entry = {
       divisionId,
@@ -276,28 +310,72 @@ export function EntriesWorkbench() {
           provisional: r.identityStatus === "provisional",
         })),
     };
-    void send(editing ? `/api/v1/entries/${id}` : "/api/v1/entries", {
-      id,
-      requestId: crypto.randomUUID(),
-      version,
-      entry,
-    });
+    void recovery.submit(
+      editing ? `/api/v1/entries/${id}` : "/api/v1/entries",
+      {
+        id,
+        requestId: crypto.randomUUID(),
+        version,
+        entry,
+      },
+      "Entry command recorded.",
+    );
   }
   const discipline = workspace?.divisions.find(
       (d) => d.id === divisionId,
     )?.discipline,
-    selectedTeam = teams.find((t) => t.id === teamId);
+    selectedTeam = teams.find((t) => t.id === teamId),
+    selectedDivision = workspace?.divisions.find((d) => d.id === divisionId),
+    manual = !!selectedDivision?.manual,
+    permitted =
+      workspace?.representations.filter(
+        (g) =>
+          g.season === selectedDivision?.season && g.discipline === discipline,
+      ) ?? [],
+    selectedAuthority = permitted.find(
+      (g) => g.teamId === teamId && g.registrationId === registrationId,
+    ),
+    canSave =
+      manual ||
+      !!selectedAuthority?.actions.includes(editing ? "amend" : "submit");
   return (
     <main id="main">
       <a className="back" href="/admin">
         ← Your workspace
       </a>
-      <p className="eyebrow">Organizer operations</p>
-      <h1>Manual entries</h1>
+      <p className="eyebrow">Team entry operations</p>
+      <h1>
+        {workspace?.divisions.some((d) => d.manual)
+          ? "Manual entries"
+          : "Team entries"}
+      </h1>
       <p>
         Choose an existing team or assemble existing and new player sport
         records. Player accounts are optional.
       </p>
+      <AuthorityRecovery
+        state={recovery}
+        label="entry"
+        retryLabel="Retry last save"
+      />
+      {workspace && !manual && (
+        <p className="notice">
+          Self-entry records a team submission. Entry acceptance, capacity and
+          payment are unresolved; saving does not reserve a place or open
+          registration.
+        </p>
+      )}
+      {workspace && (
+        <p className="notice">
+          Signed in as {workspace.actorName}.{" "}
+          {selectedDivision?.manual
+            ? "Organizer manual entry authority for this edition."
+            : selectedAuthority
+              ? `Acting on behalf of ${selectedAuthority.name} · ${selectedAuthority.season}. Permitted actions: ${selectedAuthority.actions.join(", ")}.`
+              : "Choose a granted team-season to submit or amend an entry. Profile ownership grants no team authority."}{" "}
+          <a href="/admin/representatives">Review team-season authority</a>
+        </p>
+      )}
       {error && (
         <p role="alert" className="error">
           {error}
@@ -310,17 +388,29 @@ export function EntriesWorkbench() {
       ) : !workspace ? (
         <p>
           <a href="/admin">Sign in</a>{" "}
-          <button onClick={() => void load()}>Retry loading entries</button>
+          <button onClick={() => void load().catch(() => {})}>
+            Retry loading entries
+          </button>
         </p>
       ) : !workspace.divisions.length ? (
         <p className="empty">
-          No divisions are assigned to your organizer account.
+          No entry divisions are available under your current authority. A World
+          Curling team-season grant and matching configured division season are
+          required for self-entry.
         </p>
       ) : (
         <div className="application-layout">
           <aside className="application-queue">
             <h2>Edition entries</h2>
-            <button onClick={startNew} disabled={busy || !!retry}>
+            <button
+              onClick={startNew}
+              disabled={
+                busy ||
+                recovery.locked ||
+                (!manual &&
+                  !permitted.some((g) => g.actions.includes("submit")))
+              }
+            >
               New entry
             </button>
             <label className="field-label" htmlFor="entry-division">
@@ -329,7 +419,7 @@ export function EntriesWorkbench() {
             <select
               id="entry-division"
               value={divisionId}
-              disabled={busy || editing || !!retry}
+              disabled={busy || editing || recovery.locked}
               onChange={(e) => {
                 setDivisionId(e.target.value);
                 setTeamId(undefined);
@@ -358,7 +448,7 @@ export function EntriesWorkbench() {
                     </p>
                     <button
                       className="secondary"
-                      disabled={busy || !!retry}
+                      disabled={busy || recovery.locked}
                       onClick={() => void openEntry(e.id)}
                     >
                       Edit {e.name}
@@ -381,7 +471,7 @@ export function EntriesWorkbench() {
                 save();
               }}
             >
-              <fieldset disabled={busy || !!retry}>
+              <fieldset disabled={busy || recovery.locked}>
                 <label htmlFor="entry-name">Entry name</label>
                 <input
                   id="entry-name"
@@ -405,6 +495,9 @@ export function EntriesWorkbench() {
                 <ul className="search-results">
                   {teams
                     .filter(
+                      (t) => manual || permitted.some((g) => g.teamId === t.id),
+                    )
+                    .filter(
                       (t) =>
                         t.discipline === discipline &&
                         `${t.name} ${t.core.map((p) => p.name).join(" ")}`
@@ -421,7 +514,18 @@ export function EntriesWorkbench() {
                         <button
                           type="button"
                           className="secondary"
-                          onClick={() => selectTeam(t, t.registrations[0])}
+                          onClick={() =>
+                            selectTeam(
+                              t,
+                              manual
+                                ? t.registrations[0]
+                                : t.registrations.find((r) =>
+                                    permitted.some(
+                                      (g) => g.registrationId === r.id,
+                                    ),
+                                  ),
+                            )
+                          }
                         >
                           Select {t.name}
                         </button>
@@ -455,24 +559,34 @@ export function EntriesWorkbench() {
                         )
                       }
                     >
-                      <option value="">Core only · defaulted</option>
-                      {selectedTeam.registrations.map((r) => (
-                        <option key={r.id} value={r.id}>
-                          {r.season} · version {r.version}
-                        </option>
-                      ))}
+                      {manual && (
+                        <option value="">Core only · defaulted</option>
+                      )}
+                      {selectedTeam.registrations
+                        .filter(
+                          (r) =>
+                            manual ||
+                            permitted.some((g) => g.registrationId === r.id),
+                        )
+                        .map((r) => (
+                          <option key={r.id} value={r.id}>
+                            {r.season} · version {r.version}
+                          </option>
+                        ))}
                     </select>
-                    <button
-                      type="button"
-                      className="secondary"
-                      onClick={() => {
-                        setTeamId(undefined);
-                        setRegistrationId(undefined);
-                        changed();
-                      }}
-                    >
-                      Assemble different permanent core
-                    </button>
+                    {manual && (
+                      <button
+                        type="button"
+                        className="secondary"
+                        onClick={() => {
+                          setTeamId(undefined);
+                          setRegistrationId(undefined);
+                          changed();
+                        }}
+                      >
+                        Assemble different permanent core
+                      </button>
+                    )}
                   </div>
                 )}
                 <h3>Regular core and event lineup</h3>
@@ -743,7 +857,7 @@ export function EntriesWorkbench() {
                   <input
                     type="checkbox"
                     checked={registerSeason}
-                    disabled={!coreKnown}
+                    disabled={!coreKnown || !manual}
                     onChange={(e) => {
                       setRegisterSeason(e.target.checked);
                       changed();
@@ -772,15 +886,18 @@ export function EntriesWorkbench() {
                   </>
                 )}
                 <div className="application-actions">
-                  <button disabled={busy || !dirty || stale} type="submit">
-                    {busy ? "Saving…" : "Save entry"}
+                  <button
+                    disabled={busy || !dirty || stale || !canSave}
+                    type="submit"
+                  >
+                    {busy || recovery.busy ? "Saving…" : "Save entry"}
                   </button>
                   {editing && <a href={`/entries/${id}`}>View public entry</a>}
                 </div>
               </fieldset>
             </form>
             <p role="status">
-              {busy
+              {busy || recovery.busy
                 ? "Saving entry…"
                 : saved
                   ? "Saved to the database."
@@ -788,15 +905,6 @@ export function EntriesWorkbench() {
                     ? "Unsaved changes."
                     : "Loaded recorded entry."}
             </p>
-            {retry && (
-              <button
-                className="secondary"
-                disabled={busy}
-                onClick={() => void send(retry.path, retry.body)}
-              >
-                Retry last save
-              </button>
-            )}
             {stale && editing && (
               <button className="secondary" onClick={() => void openEntry(id)}>
                 Reload current version
