@@ -4,7 +4,7 @@ number: 33
 title: "Calculate four-player event assessments and point awards"
 parent: WCP-SPEC-001
 type: implementation
-status: ready-for-agent
+status: in-progress
 labels: [ready-for-agent]
 blocked_by: [WCP-027, WCP-032]
 source_spec_sha256: 045B46988225B6C8C0020B23C8C5D4EAA8E2E1916256148A0FDA26B5DA8673FD
@@ -18,7 +18,7 @@ published: 2026-11-07
 
 **Blocked by:** [27: Finalize division results and preserve revised snapshots](27-finalize-division-results-and-preserve-revised-snapshots.md); [32: Review official rosters, WCTRS sources and starting entitlements](32-review-official-rosters-wctrs-sources-and-starting-entitlements.md).
 
-**Status:** ready-for-agent
+**Status:** in-progress
 
 ## Parent and scope
 
