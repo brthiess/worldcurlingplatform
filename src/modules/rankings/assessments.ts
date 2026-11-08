@@ -66,7 +66,7 @@ async function association(c: PoolClient, id: string, lock = false) {
       [id],
     );
     await c.query(
-      "SELECT g.id FROM game g JOIN draw_session ds ON ds.id=g.draw_id WHERE ds.division_id=$1 ORDER BY g.id FOR SHARE OF g",
+      "SELECT g.id FROM game g WHERE g.division_id=$1 ORDER BY g.id FOR SHARE OF g",
       [id],
     );
   }
@@ -306,6 +306,10 @@ export async function queueEventAssessment(userId: string, raw: unknown) {
       auditId = randomUUID();
     if (action === "retry") {
       id = identifier(cmd.assessmentId);
+      await c.query(
+        "SELECT assessment_id FROM event_calculation_job WHERE assessment_id=$1 FOR UPDATE",
+        [id],
+      );
       const old = await detail(c, id);
       if (old.divisionId !== divisionId || old.version !== cmd.version)
         throw new EntryError("Retry target changed.", 409);

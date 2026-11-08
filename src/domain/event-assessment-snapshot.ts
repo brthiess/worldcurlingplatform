@@ -22,7 +22,7 @@ export type SportingSnapshot = {
     draws: { id: string; startsAt: string }[];
     games: {
       id: string;
-      drawId: string;
+      drawId: string | null;
       entryA: string;
       entryB: string;
       result: {
@@ -124,10 +124,10 @@ export function prepareEventCalculation(
     issues.push(
       "Classify every frozen game once as qualification or playoff; game phase labels alone do not establish ranking stages.",
     );
+  const singleFormat = /single[ _-]*(knockout|elimination)/i.test(d.format);
   if (
-    event.singleKnockout &&
-    (event.qualificationGameIds.length > 0 ||
-      !/single|knockout/i.test(d.format))
+    event.singleKnockout !== singleFormat ||
+    (event.singleKnockout && event.qualificationGameIds.length > 0)
   )
     issues.push(
       "Single knockout designation disagrees with the frozen format/stages.",

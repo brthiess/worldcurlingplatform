@@ -17,7 +17,14 @@ async function accepted(send: Send, path: string, body: unknown, status = 200) {
   return r.json();
 }
 /** Complete fictional event; real public commands create entries, inputs, results and finalization. Pool lifetime belongs to caller. */
-export async function assessmentFixture(db: Pool, send: Send) {
+export async function assessmentFixture(
+  db: Pool,
+  send: Send,
+  options: {
+    discipline?: "men_four" | "women_four";
+    unscheduled?: boolean;
+  } = {},
+) {
   const eventId = randomUUID(),
     divisionId = randomUUID(),
     rulesId = randomUUID();
@@ -29,8 +36,8 @@ export async function assessmentFixture(db: Pool, send: Send) {
     [eventId],
   );
   await db.query(
-    "INSERT INTO division(id,event_id,name,discipline,format,ranking_status) VALUES($1,$2,'Eight-team review','men_four','Round robin and playoffs','eligible')",
-    [divisionId, eventId],
+    "INSERT INTO division(id,event_id,name,discipline,format,ranking_status) VALUES($1,$2,'Eight-team review',$3,'Round robin and playoffs','eligible')",
+    [divisionId, eventId, options.discipline ?? "men_four"],
   );
   const rules = wctrs2026();
   rules.reviewNote =
@@ -140,23 +147,25 @@ export async function assessmentFixture(db: Pool, send: Send) {
   );
   for (const [i, g] of games.entries()) {
     const drawId = randomUUID();
+    if (!options.unscheduled)
+      await db.query(
+        "INSERT INTO draw_session(id,division_id,number,starts_at,state) VALUES($1,$2,$3,$4,'completed')",
+        [
+          drawId,
+          divisionId,
+          i + 1,
+          `2026-11-${i < 8 ? "20" : "21"}T${String(1 + i).padStart(2, "0")}:00:00Z`,
+        ],
+      );
     await db.query(
-      "INSERT INTO draw_session(id,division_id,number,starts_at,state) VALUES($1,$2,$3,$4,'completed')",
-      [
-        drawId,
-        divisionId,
-        i + 1,
-        `2026-11-${i < 8 ? "20" : "21"}T${String(1 + i).padStart(2, "0")}:00:00Z`,
-      ],
-    );
-    await db.query(
-      "INSERT INTO game(id,draw_id,sheet,phase,state,entry_a,entry_b,slot_a,slot_b) VALUES($1,$2,'A',$3,'scheduled',$4,$5,'A','B')",
+      "INSERT INTO game(id,draw_id,sheet,phase,state,entry_a,entry_b,slot_a,slot_b,division_id) VALUES($1,$2,'A',$3,'scheduled',$4,$5,'A','B',$6)",
       [
         g.id,
-        drawId,
+        options.unscheduled ? null : drawId,
         g.playoff ? "Playoff" : "Qualification",
         entries[g.a],
         entries[g.b],
+        divisionId,
       ],
     );
     await accepted(send, `/api/v1/games/${g.id}/scoring`, {
@@ -201,7 +210,7 @@ export async function assessmentFixture(db: Pool, send: Send) {
       effectiveDate: "2026-11-17",
       cutoffInstant: "2026-11-17T12:00:00Z",
       sourceId: "official",
-      family: "men_four",
+      family: options.discipline ?? "men_four",
       rows: entries.map((entryId, i) => ({
         entryId,
         rank: 31 + i,

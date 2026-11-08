@@ -114,17 +114,17 @@ export function AssessmentEvidenceEditor({
           }
         >
           {[
-            "tour",
-            "nationals",
-            "world_qualifier",
-            "slam",
-            "europeans",
-            "trials",
-            "olympics",
-            "worlds",
-          ].map((x) => (
-            <option key={x} value={x}>
-              {x}
+            ["tour", "Tour event"],
+            ["nationals", "National championship"],
+            ["world_qualifier", "World qualification event"],
+            ["slam", "Grand Slam event"],
+            ["europeans", "European championship"],
+            ["trials", "National Olympic trials"],
+            ["olympics", "Olympic Winter Games"],
+            ["worlds", "World championships"],
+          ].map(([value, label]) => (
+            <option key={value} value={value}>
+              {label}
             </option>
           ))}
         </select>

@@ -228,6 +228,12 @@ test("staff complete ordinary sourced controls, queue real awards and review res
     await page.screenshot({
       path: info.outputPath(`${name}-event-awards.png`),
     });
+    await page
+      .getByRole("heading", { name: "Reviewed inputs", exact: true })
+      .scrollIntoViewIfNeeded();
+    await page.screenshot({
+      path: info.outputPath(`${name}-sourced-inputs.png`),
+    });
   }
   await page.getByLabel("Assessment revision", { exact: true }).focus();
   await expect(

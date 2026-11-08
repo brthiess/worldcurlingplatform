@@ -200,6 +200,8 @@ export function EventAssessmentsWorkbench() {
       setWorkspace(next);
       setError("");
       setStale(false);
+      if (next.selected)
+        setEvidence(JSON.parse(next.selected.contents).evidence);
     },
     async (pending) => {
       const original = JSON.parse(pending.body),
@@ -217,7 +219,9 @@ export function EventAssessmentsWorkbench() {
       }
       return !!found;
     },
-    () => setStale(true),
+    (status) => {
+      if (status === 409 || status === 403) setStale(true);
+    },
   );
   const locked = command.locked || loading || stale,
     review = workspace?.review,
@@ -575,6 +579,14 @@ export function EventAssessmentsWorkbench() {
                           Engine: {selected.engine}. Event awards are private
                           staff review evidence. This screen does not publish a
                           world ranking list.
+                        </p>
+                        <p>
+                          Code revision:{" "}
+                          <code>
+                            {JSON.parse(selected.contents).engineIdentity
+                              ?.codeRevision ??
+                              "Legacy input without an implementation fingerprint"}
+                          </code>
                         </p>
                       </>
                     )}

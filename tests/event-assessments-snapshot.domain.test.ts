@@ -257,3 +257,28 @@ test("forfeit, unclassified game, incomplete field, malformed provenance and uns
   );
   assert.equal(assessmentEvidence(f.evidence).entries.length, 8);
 });
+test("single knockout reduction cannot be selected for a triple format or omitted for an explicit single format", () => {
+  const f = fixture();
+  f.snapshot.source.division.format = "Triple knockout";
+  f.evidence.event.singleKnockout = true;
+  f.evidence.event.playoffGameIds = f.evidence.event.qualificationGameIds;
+  f.evidence.event.qualificationGameIds = [];
+  assert.equal(
+    assessFourPlayer(prepareEventCalculation(f.evidence, f.snapshot, f.roster))
+      .state,
+    "blocked",
+  );
+  const x = fixture();
+  x.snapshot.source.division.format = "single_knockout";
+  assert.equal(
+    assessFourPlayer(prepareEventCalculation(x.evidence, x.snapshot, x.roster))
+      .state,
+    "blocked",
+  );
+  x.snapshot.source.division.format = "Triple knockout";
+  assert.equal(
+    assessFourPlayer(prepareEventCalculation(x.evidence, x.snapshot, x.roster))
+      .state,
+    "completed",
+  );
+});

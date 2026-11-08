@@ -55,6 +55,20 @@ async function waitForJob(
     `Job did not reach ${state}: ${JSON.stringify(view?.selected)}`,
   );
 }
+async function waitingCalculation(exceptPid?: number) {
+  const end = Date.now() + 15000;
+  while (Date.now() < end) {
+    const r = await db.query(
+      "SELECT pid FROM pg_stat_activity WHERE datname=current_database() AND wait_event_type='Lock' AND query LIKE '%event_calculation_job%' AND pid<>coalesce($1,0) ORDER BY query_start",
+      [exceptPid ?? null],
+    );
+    if (r.rowCount) return Number(r.rows[0].pid);
+    await new Promise((r) => setTimeout(r, 25));
+  }
+  throw new Error(
+    "Real calculation command did not reach the job-row lock barrier",
+  );
+}
 test("complete real event queues immutable duplicate-safe assessment and worker returns independent F2 awards", async () => {
   const cookie = await login(),
     send = (path: string, body?: unknown) => request(cookie, path, body),
@@ -480,4 +494,114 @@ test("same-label different engine implementation fails durably; retry never sile
   const again = (await waitForJob(send, f, "failed")).selected;
   assert.equal(again.resultContents, null);
   assert.equal(again.digest, changed.digest);
+});
+test("manual retry queued behind an automatic completion rechecks terminal job state under its row lock", async () => {
+  const cookie = await login(),
+    send = (path: string, body?: unknown) => request(cookie, path, body),
+    f = await assessmentFixture(db, send),
+    view = await (
+      await send(
+        `/api/v1/event-assessments?division=${f.divisionId}&rules=${f.rulesId}`,
+      )
+    ).json();
+  await db.query(
+    `CREATE FUNCTION fail_wcp033_race_result() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF EXISTS(SELECT 1 FROM event_assessment WHERE id=NEW.assessment_id AND division_id='${f.divisionId}') THEN RAISE EXCEPTION 'Controlled retry barrier failure'; END IF;RETURN NEW;END $$;CREATE TRIGGER fail_wcp033_race_result BEFORE INSERT ON event_assessment_result FOR EACH ROW EXECUTE FUNCTION fail_wcp033_race_result()`,
+  );
+  let failed: any;
+  const blocker = await db.connect();
+  let active = false;
+  try {
+    assert.equal(
+      (
+        await send("/api/v1/event-assessments", {
+          action: "calculate",
+          divisionId: f.divisionId,
+          version: 0,
+          requestId: randomUUID(),
+          sourceDigest: view.review.sourceDigest,
+          evidence: f.evidence,
+        })
+      ).status,
+      200,
+    );
+    failed = (await waitForJob(send, f, "failed")).selected;
+    await blocker.query("BEGIN");
+    active = true;
+    await blocker.query(
+      "SELECT assessment_id FROM event_calculation_job WHERE assessment_id=$1 FOR UPDATE",
+      [failed.id],
+    );
+    await db.query(
+      "DROP TRIGGER fail_wcp033_race_result ON event_assessment_result;DROP FUNCTION fail_wcp033_race_result()",
+    );
+    const workerPid = await waitingCalculation();
+    const retry = send("/api/v1/event-assessments", {
+      action: "retry",
+      divisionId: f.divisionId,
+      assessmentId: failed.id,
+      version: 1,
+      requestId: randomUUID(),
+    });
+    await waitingCalculation(workerPid);
+    await blocker.query("COMMIT");
+    active = false;
+    const response = await retry;
+    assert.equal(
+      response.status,
+      409,
+      (await response.clone().text()).slice(0, 500),
+    );
+    const completed = (await waitForJob(send, f)).selected;
+    assert.equal(completed.state, "completed");
+    assert.ok(completed.resultContents);
+    assert.equal(
+      (
+        await db.query(
+          "SELECT count(*) FROM event_assessment_result WHERE assessment_id=$1",
+          [failed.id],
+        )
+      ).rows[0].count,
+      "1",
+    );
+  } finally {
+    if (active) await blocker.query("ROLLBACK");
+    blocker.release();
+    await db.query(
+      "DROP TRIGGER IF EXISTS fail_wcp033_race_result ON event_assessment_result;DROP FUNCTION IF EXISTS fail_wcp033_race_result()",
+    );
+  }
+});
+test("women's special event consumes every completed unscheduled game from accepted019, without inventing session order", async () => {
+  const cookie = await login(),
+    send = (path: string, body?: unknown) => request(cookie, path, body),
+    f = await assessmentFixture(db, send, {
+      discipline: "women_four",
+      unscheduled: true,
+    });
+  f.evidence.event.kind = "world_qualifier";
+  const view = await (
+    await send(
+      `/api/v1/event-assessments?division=${f.divisionId}&rules=${f.rulesId}`,
+    )
+  ).json();
+  assert.equal(view.review.current.games.length, 11);
+  assert.ok(view.review.current.games.every((g: any) => g.drawId === null));
+  assert.equal(view.review.current.draws.length, 0);
+  const r = await send("/api/v1/event-assessments", {
+    action: "calculate",
+    divisionId: f.divisionId,
+    version: 0,
+    requestId: randomUUID(),
+    sourceDigest: view.review.sourceDigest,
+    evidence: f.evidence,
+  });
+  assert.equal(r.status, 200, await r.clone().text());
+  const completed = (await waitForJob(send, f)).selected,
+    result = JSON.parse(completed.resultContents).result;
+  assert.equal(result.sfm, "63/10");
+  assert.equal(result.series, "Champion");
+  assert.equal(
+    result.awards.find((a: any) => a.entryId === f.entries[0]).points,
+    "189/4",
+  );
 });

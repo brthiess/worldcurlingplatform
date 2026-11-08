@@ -1247,6 +1247,13 @@ footer {
 .assessment-workbench fieldset {min-width:0;border:1px solid var(--line,#c5cdd4);padding:1rem;}
 .assessment-workbench select,.assessment-workbench input,.assessment-workbench textarea {max-width:100%;}
 .assessment-workbench dd {overflow-wrap:anywhere;}
+.assessment-workbench {max-width:1100px;}
+.assessment-workbench .form-card {max-width:none;}
+.assessment-workbench h3 {margin:24px 0 12px;}
+.assessment-workbench fieldset > fieldset {margin:18px 0;}
+.assessment-workbench input[type="checkbox"] {display:inline-block;width:20px;height:20px;padding:0;vertical-align:middle;margin:0 10px 0 0;}
+.assessment-workbench dl > div {display:grid;grid-template-columns:minmax(0,2fr) minmax(80px,1fr);gap:16px;padding:10px 0;border-bottom:1px solid #d1dce0;}
+.assessment-workbench dd {margin:0;font-variant-numeric:tabular-nums;}
 /* Competition routes use actual game records; the mobile list avoids a wide bracket. */
 .draw-controls { display:flex; align-items:end; gap:1rem; flex-wrap:wrap; margin:1rem 0; }
 .draw-workspace fieldset { min-width:0; }
