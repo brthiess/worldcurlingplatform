@@ -1,0 +1,4 @@
+import {actor} from "@/modules/identity/access";
+import {EntryError} from "@/domain/entries";
+export async function entryHttp(request:Request,write:boolean,run:(userId:string)=>Promise<unknown>,status=200) {try{if(write&&request.headers.get("origin")!==new URL(process.env.BETTER_AUTH_URL!).origin)return Response.json({error:"Untrusted request origin"},{status:403});const current=await actor(request.headers);if(!current)return Response.json({error:"Sign in required"},{status:401});return Response.json(await run(current.id),{status,headers:{"Cache-Control":"no-store"}});}catch(e){if(e instanceof EntryError)return Response.json({error:e.message},{status:e.status});if(e instanceof SyntaxError)return Response.json({error:"Invalid JSON"},{status:400});console.error("Entry request failed",e);return Response.json({error:"Your save could not be confirmed. Retry the same request."},{status:503});}}
+
