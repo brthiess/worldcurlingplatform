@@ -47,6 +47,8 @@ type Revision = {
   finalizedBy: string;
   actorId: string;
   requestId?: string;
+  visibility?: "public-sporting-projection";
+  snapshotDigest?: string;
 };
 type Frozen = {
   source: Source;
@@ -129,10 +131,25 @@ function Snapshot({ revision }: { revision: Revision }) {
       <p>{f.note}</p>
       <ResultRows source={f.source} />
       <p className="muted">
-        SHA-256 <code className="digest">{revision.digest}</code>
+        {revision.visibility
+          ? "Public sporting projection SHA-256"
+          : "Exact snapshot SHA-256"}{" "}
+        <code className="digest">{revision.digest}</code>
       </p>
+      {revision.visibility && (
+        <p className="muted">
+          Original private snapshot SHA-256{" "}
+          <code className="digest">{revision.snapshotDigest}</code>. The public
+          sporting projection excludes internal audit, receipt and account
+          identifiers; its bytes and digest are separate.
+        </p>
+      )}
       <details>
-        <summary>Exact frozen contents and entry lineup references</summary>
+        <summary>
+          {revision.visibility
+            ? "Public sporting contents and lineup references"
+            : "Exact frozen contents and entry lineup references"}
+        </summary>
         <pre className="frozen-contents">{revision.contents}</pre>
       </details>
     </section>

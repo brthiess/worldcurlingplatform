@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import { randomUUID, createHash } from "node:crypto";
 import pg from "pg";
 import { authRequest } from "./auth-request";
+import { finalizationFixtureEvent } from "./finalization-fixture";
 import {
   rulesFixture,
   source as rankingSource,
@@ -40,12 +41,13 @@ const request = (path: string, cookie = "", body?: unknown) =>
     body: body ? JSON.stringify(body) : undefined,
   });
 async function fixture(cookie: string, registered = false) {
+  const eventId = await finalizationFixtureEvent(pool);
   const divisionId = `final-${randomUUID()}`,
     drawId = randomUUID(),
     gameId = randomUUID();
   await pool.query(
-    "INSERT INTO division(id,event_id,name,discipline,format) VALUES($1,'prairie-2026','Finalization review','men_four','Organizer recorded final')",
-    [divisionId],
+    "INSERT INTO division(id,event_id,name,discipline,format) VALUES($1,$2,'Finalization review','men_four','Organizer recorded final')",
+    [divisionId, eventId],
   );
   const entries = [],
     registrations = [];
@@ -90,8 +92,8 @@ async function fixture(cookie: string, registered = false) {
     [gameId, drawId, ...entries],
   );
   await pool.query(
-    "INSERT INTO role_grant VALUES($1,'demo-scorekeeper','scorekeeper','prairie-2026',$1)",
-    [gameId],
+    "INSERT INTO role_grant VALUES($1,'demo-scorekeeper','scorekeeper',$2,$1)",
+    [gameId, eventId],
   );
   const confirm = await request(
     `/api/v1/games/${gameId}/scoring`,
@@ -381,7 +383,55 @@ test("two divisions finalize independently; ordinary correction marks and replac
     `/api/v1/public/divisions/${a.divisionId}/results?version=1`,
   );
   assert.equal(publicR.status, 200);
-  assert.equal((await publicR.json()).selected.contents, old.selected.contents);
+  const publicData = await publicR.json();
+  const inspect = (value: unknown) => {
+    if (Array.isArray(value)) {
+      for (const child of value) inspect(child);
+      return;
+    }
+    if (value && typeof value === "object")
+      for (const [key, child] of Object.entries(value)) {
+        assert.equal(
+          [
+            "actorId",
+            "auditId",
+            "resultAuditId",
+            "requestId",
+            "commandDigest",
+            "scoringSource",
+            "sourceDigest",
+            "registrationId",
+            "registrationVersion",
+          ].includes(key),
+          false,
+          `Private field ${key} must not be public`,
+        );
+        inspect(child);
+      }
+  };
+  inspect(publicData);
+  inspect(JSON.parse(publicData.selected.contents));
+  assert.equal(publicData.selected.visibility, "public-sporting-projection");
+  assert.equal(publicData.selected.snapshotDigest, old.selected.digest);
+  assert.equal(
+    publicData.selected.digest,
+    createHash("sha256").update(publicData.selected.contents).digest("hex"),
+  );
+  assert.notEqual(publicData.selected.contents, old.selected.contents);
+  assert.equal(
+    JSON.parse(publicData.selected.contents).source.games[0].result
+      .winnerEntryId,
+    a.entries[0],
+  );
+  assert.equal(
+    JSON.parse(publicData.selected.contents).source.games[0].result.reason,
+    "Fictional fixture forfeit",
+  );
+  assert.equal(
+    (await read(a.divisionId, 1)).selected.contents,
+    old.selected.contents,
+  );
+  assert.equal(typeof old.selected.auditId, "string");
   const audits = await pool.query(
     "SELECT action,resource_version FROM audit_record WHERE resource_id=$1 AND action='division_finalized' ORDER BY resource_version",
     [a.divisionId],
@@ -544,13 +594,14 @@ test("prerequisites, placements, current sources, duplicates and audit failure p
   assert.equal((await read()).history.length, 2);
 });
 test("scheduled games and legacy totals cannot be passed off as completed explicit sporting outcomes", async () => {
+  const eventId = await finalizationFixtureEvent(pool);
   const cookie = await login("organizer"),
     divisionId = `final-incomplete-${randomUUID()}`,
     drawId = randomUUID(),
     gameId = randomUUID();
   await pool.query(
-    "INSERT INTO division(id,event_id,name,discipline,format) VALUES($1,'prairie-2026','Incomplete final review','men_four','Manual review')",
-    [divisionId],
+    "INSERT INTO division(id,event_id,name,discipline,format) VALUES($1,$2,'Incomplete final review','men_four','Manual review')",
+    [divisionId, eventId],
   );
   await pool.query(
     "INSERT INTO draw_session VALUES($1,$2,1,'2042-01-01T12:00:00Z','scheduled')",

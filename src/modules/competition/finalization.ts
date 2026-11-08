@@ -10,6 +10,7 @@ import {
 } from "@/domain/finalization";
 import { readEventLineup } from "@/modules/entries/entries";
 import { competitionRankingStatus } from "@/modules/rankings/inputs";
+import { publicFinalizationResponse } from "./public-finalization";
 async function authorize(c: PoolClient, userId: string, eventId?: string) {
   const r = await c.query(
     "SELECT id FROM role_grant WHERE user_id=$1 AND ((role='administrator' AND event_id IS NULL AND game_id IS NULL) OR (role='organizer' AND ($2::text IS NULL OR event_id=$2) AND game_id IS NULL)) FOR SHARE",
@@ -412,12 +413,8 @@ export async function publicFinalization(id: string, version?: number) {
     if (!visible.rowCount)
       throw new FinalizationError("Division not found.", 404);
     const result = await detail(c, id, version, false);
-    // Public readers see sporting records and a general separate-ranking notice;
-    // the organizer-only scoped evidence review is deliberately omitted.
-    if (result.selected) delete result.selected.requestId;
-    for (const row of result.history) delete row.requestId;
     await c.query("COMMIT");
-    return result;
+    return publicFinalizationResponse(result);
   } catch (e) {
     await c.query("ROLLBACK");
     throw e;

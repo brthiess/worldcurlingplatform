@@ -4,6 +4,7 @@ import pg from "pg";
 import { randomUUID } from "node:crypto";
 import "dotenv/config";
 import { signInApiWithRateWindow } from "./auth-fixture";
+import { finalizationFixtureEvent } from "../finalization-fixture";
 const pool = new pg.Pool({
   connectionString: process.env.DATABASE_URL,
   max: 3,
@@ -33,13 +34,14 @@ test.afterAll(async () => {
   await pool.end();
 });
 async function fixture() {
+  const eventId = await finalizationFixtureEvent(pool);
   const divisionId = `final-browser-${randomUUID()}`,
     drawId = randomUUID(),
     gameId = randomUUID(),
     entries = [randomUUID(), randomUUID()];
   await pool.query(
-    "INSERT INTO division(id,event_id,name,discipline,format) VALUES($1,'prairie-2026','Review final division','men_four','Organizer-recorded final')",
-    [divisionId],
+    "INSERT INTO division(id,event_id,name,discipline,format) VALUES($1,$2,'Review final division','men_four','Organizer-recorded final')",
+    [divisionId, eventId],
   );
   for (const [i, id] of entries.entries()) {
     const players = Array.from({ length: 4 }, () => randomUUID());
@@ -79,8 +81,8 @@ async function fixture() {
     [gameId, drawId, ...entries],
   );
   await pool.query(
-    "INSERT INTO role_grant VALUES($1,'demo-scorekeeper','scorekeeper','prairie-2026',$1)",
-    [gameId],
+    "INSERT INTO role_grant VALUES($1,'demo-scorekeeper','scorekeeper',$2,$1)",
+    [gameId, eventId],
   );
   expect(
     (
@@ -338,8 +340,8 @@ test("loading, failed read, stale review and lost acknowledgement recover withou
   });
   const empty = `final-empty-${randomUUID()}`;
   await pool.query(
-    "INSERT INTO division(id,event_id,name,discipline,format) VALUES($1,'prairie-2026','Empty review','men_four','Manual review')",
-    [empty],
+    "INSERT INTO division(id,event_id,name,discipline,format) VALUES($1,$2,'Empty review','men_four','Manual review')",
+    [empty, await finalizationFixtureEvent(pool)],
   );
   await page.goto(`/admin/finalizations?division=${empty}`);
   await expect(
