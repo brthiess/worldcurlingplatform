@@ -216,6 +216,24 @@ test("linked player submits private immutable bytes and administrator publishes 
     (await (await call("/api/v1/public/players/" + id)).json()).photoUrl,
     "/api/v1/public/photos/" + third.assetId,
   );
+  const approvedPath = path.join(
+    process.env.MEDIA_STORAGE_ROOT!,
+    third.assetId + ".png",
+  );
+  const approvedOriginal = await readFile(approvedPath);
+  try {
+    await writeFile(approvedPath, alternate);
+    assert.equal(
+      (await call("/api/v1/public/photos/" + third.assetId)).status,
+      503,
+    );
+  } finally {
+    await writeFile(approvedPath, approvedOriginal);
+  }
+  assert.equal(
+    (await call("/api/v1/public/photos/" + third.assetId)).status,
+    200,
+  );
   const fourth = await (await upload(owner)).json();
   const diskPath = path.join(
     process.env.MEDIA_STORAGE_ROOT!,
