@@ -82,6 +82,222 @@ nav {
   gap: 24px;
   font-size: 14px;
 }
+.application-actions {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin: 20px 0;
+}
+.application-layout {
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr);
+  gap: 28px;
+  align-items: start;
+}
+.application-queue {
+  position: sticky;
+  top: 20px;
+}
+.application-queue .workspace-list {
+  max-height: 650px;
+  overflow: auto;
+}
+.application-queue h3 {
+  margin-top: 12px;
+  overflow-wrap: anywhere;
+}
+.application-queue select {
+  width: 100%;
+  margin-top: 8px;
+}
+.application-detail {
+  background: white;
+  padding: 24px;
+  border: 1px solid #d1dce0;
+  border-radius: 8px;
+  min-width: 0;
+}
+.application-detail h2 {
+  overflow-wrap: anywhere;
+}
+.application-form {
+  padding: 0;
+  border: 0;
+  max-width: none;
+  margin-top: 24px;
+}
+.application-form fieldset {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+.application-form legend {
+  font-size: 18px;
+  font-weight: bold;
+}
+.application-form h3 {
+  margin-top: 28px;
+}
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 18px;
+}
+.field-error {
+  color: #873b27;
+  font-size: 14px;
+  margin: 8px 0;
+}
+.division-form {
+  border-left: 3px solid #b6cbd1;
+  padding-left: 16px;
+  margin: 20px 0;
+}
+.application-states {
+  padding: 4px 16px;
+  border-left: 3px solid #005b67;
+  background: #f2f7f8;
+}
+.review-actions {
+  margin-top: 30px;
+  padding-top: 24px;
+  border-top: 1px solid #d1dce0;
+}
+.review-actions label {
+  display: block;
+  margin: 16px 0 8px;
+  font-weight: bold;
+}
+.review-actions textarea {
+  width: 100%;
+  min-height: 90px;
+  border: 1px solid #8c9ea8;
+  font: inherit;
+  padding: 12px;
+}
+.review-actions h3 {
+  margin-top: 28px;
+}
+.history-list {
+  padding-left: 22px;
+}
+.history-list > li {
+  padding: 16px 0;
+  border-bottom: 1px solid #d1dce0;
+}
+.history-list p {
+  margin: 8px 0;
+}
+summary {
+  cursor: pointer;
+  min-height: 32px;
+  color: #005b67;
+}
+.calendar-filters {
+  padding: 22px;
+  background: white;
+  border: 1px solid #d1dce0;
+  border-radius: 6px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: end;
+}
+.calendar-filters label {
+  display: block;
+  font-size: 14px;
+  font-weight: bold;
+  margin-bottom: 8px;
+}
+.calendar-filters input,
+.calendar-filters select {
+  min-height: 44px;
+  padding: 10px;
+  border: 1px solid #8c9ea8;
+  border-radius: 4px;
+  max-width: 100%;
+}
+.calendar-list {
+  list-style: none;
+  padding: 0;
+}
+.calendar-list > li {
+  display: grid;
+  grid-template-columns: 145px minmax(0, 1fr);
+  gap: 24px;
+  padding: 28px;
+  background: white;
+  margin-bottom: 16px;
+  border: 1px solid #d1dce0;
+  border-radius: 8px;
+}
+.calendar-date {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+.calendar-list h2 {
+  font-size: 23px;
+  overflow-wrap: anywhere;
+}
+.division-links {
+  padding-left: 20px;
+  line-height: 1.8;
+  font-size: 14px;
+}
+.edition-divisions {
+  padding: 20px 24px;
+  border-top: 1px solid #d1dce0;
+}
+textarea:focus-visible,
+summary:focus-visible {
+  outline: 3px solid #da7200;
+  outline-offset: 4px;
+}
+@media (max-width: 900px) {
+  .application-layout {
+    grid-template-columns: 1fr;
+  }
+  .application-queue {
+    position: static;
+  }
+  .application-queue .workspace-list {
+    max-height: 300px;
+    overflow: auto;
+  }
+}
+@media (max-width: 600px) {
+  .form-grid {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+  .application-detail {
+    padding: 18px;
+  }
+  .calendar-list > li {
+    grid-template-columns: 1fr;
+    gap: 12px;
+    padding: 20px;
+  }
+  .calendar-date {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+  .calendar-filters > div {
+    width: 100%;
+  }
+  .calendar-filters input,
+  .calendar-filters select {
+    width: 100%;
+  }
+  .site-header {
+    flex-wrap: wrap;
+  }
+}
 main {
   max-width: 1160px;
   margin: 0 auto;

@@ -115,6 +115,9 @@ export default function Admin() {
           <p>
             Signed in as <strong>{workspace.name}</strong>.
           </p>
+          <p>
+            <a href="/admin/applications">Event applications</a>
+          </p>
           <button
             className="secondary"
             disabled={busy}

@@ -19,6 +19,14 @@ export type PublicGame = {
   endsB: Score[];
 };
 export type PublicEvent = {
+  divisions: {
+    id: string;
+    name: string;
+    discipline: string;
+    format: string;
+    rankingStatus: string;
+  }[];
+  selectedDivisionId: string | null;
   event: {
     id: string;
     name: string;
@@ -30,28 +38,48 @@ export type PublicEvent = {
     origin: string;
     division: string;
     format: string;
+    registrationStatus: string;
   };
   draws: { id: string; number: number; startsAt: string; state: string }[];
   games: PublicGame[];
   selection: ReturnType<typeof selectDraws>;
 };
-export async function publicEvent(id: string): Promise<PublicEvent | null> {
+export async function publicEvent(
+  id: string,
+  divisionId?: string,
+): Promise<PublicEvent | null> {
   return db.transaction(async (transaction) => {
     await transaction.execute(
       sql`SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY`,
     );
-    return projectEvent(transaction, id);
+    return projectEvent(transaction, id, divisionId);
   });
 }
 async function projectEvent(
   connection: Pick<typeof db, "execute">,
   id: string,
+  divisionId?: string,
 ): Promise<PublicEvent | null> {
   const result = await connection.execute(
-    sql`SELECT e.id,e.name,e.venue,e.location,e.timezone,e.starts_on::text AS "startsOn",e.ends_on::text AS "endsOn",e.origin,d.name AS division,d.format,d.id AS "divisionId" FROM event_edition e JOIN division d ON d.event_id=e.id WHERE e.id=${id} AND e.published=true ORDER BY d.id LIMIT 1`,
+    sql`SELECT e.id,e.name,e.venue,e.location,e.timezone,e.starts_on::text AS "startsOn",e.ends_on::text AS "endsOn",e.origin,e.registration_status AS "registrationStatus" FROM event_edition e WHERE e.id=${id} AND e.published=true AND e.admission_status='approved'`,
   );
   if (!result.rows.length) return null;
-  const row = result.rows[0] as PublicEvent["event"] & { divisionId: string };
+  const divisionResult = await connection.execute(
+    sql`SELECT id,name,discipline,format,ranking_status AS "rankingStatus" FROM division WHERE event_id=${id} ORDER BY name,id`,
+  );
+  const divisions = divisionResult.rows as PublicEvent["divisions"];
+  if (divisionId && !divisions.some((d) => d.id === divisionId)) return null;
+  const selected = divisionId
+    ? divisions.find((d) => d.id === divisionId)
+    : divisions.length === 1
+      ? divisions[0]
+      : undefined;
+  const row = {
+    ...result.rows[0],
+    divisionId: selected?.id ?? null,
+    division: selected?.name ?? "All divisions",
+    format: selected?.format ?? "Select a division for competition details",
+  } as PublicEvent["event"] & { divisionId: string | null };
   const drawsResult = await connection.execute(
     sql`SELECT id,number,starts_at AS "startsAt",state FROM draw_session WHERE division_id=${row.divisionId} ORDER BY starts_at,number`,
   );
@@ -119,5 +147,12 @@ async function projectEvent(
       },
     );
   const { divisionId: _, ...event } = row;
-  return { event, draws, games, selection: selectDraws(draws) };
+  return {
+    event,
+    divisions,
+    selectedDivisionId: row.divisionId,
+    draws,
+    games,
+    selection: selectDraws(draws),
+  };
 }

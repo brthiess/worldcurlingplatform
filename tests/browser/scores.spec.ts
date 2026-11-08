@@ -120,10 +120,24 @@ test("loading, lost connection, recovery and missing event remain honest", async
 test("scorekeeper signs in, sees only assigned game, signs out", async ({
   page,
 }, testInfo) => {
+  test.setTimeout(95000);
   await page.setViewportSize({ width: 360, height: 800 });
   await page.goto("/admin");
   await page.getByLabel("Demo password").fill(process.env.DEMO_PASSWORD!);
+  const signIn = page.waitForResponse((response) =>
+    response.url().endsWith("/api/auth/sign-in/email"),
+  );
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  const response = await signIn;
+  if (response.status() === 429) {
+    const wait = Math.min(
+      60000,
+      Math.max(1000, Number(response.headers()["x-retry-after"] ?? 60) * 1000),
+    );
+    await page.waitForTimeout(wait);
+    await page.waitForTimeout(250);
+    await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  }
   await expect(
     page.getByRole("heading", { name: "Your workspace" }),
   ).toBeVisible();

@@ -1,11 +1,14 @@
 import { publicEvent } from "@/modules/public/scores";
 export const dynamic = "force-dynamic";
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const data = await publicEvent((await params).id);
+    const data = await publicEvent(
+      (await params).id,
+      new URL(request.url).searchParams.get("division") ?? undefined,
+    );
     return Response.json(data ?? { error: "Event not found" }, {
       status: data ? 200 : 404,
       headers: { "Cache-Control": "no-store" },
