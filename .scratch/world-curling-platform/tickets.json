@@ -265,13 +265,17 @@
       "file": "05-delegate-event-approval-and-assign-scoped-event-staff.md",
       "id": "WCP-005",
       "path": "issues/05-delegate-event-approval-and-assign-scoped-event-staff.md",
-      "status": "in-progress",
+      "status": "completed",
       "labels": [
         "ready-for-agent"
       ],
       "blocked_by": [
         "WCP-004"
-      ]
+      ],
+      "completion": {
+        "commit": "5a0fcd9a7ac7d698ae04beeeba6120771f76baf0",
+        "evidence": "docs/verification/WCP-005.md"
+      }
     },
     {
       "n": 6,

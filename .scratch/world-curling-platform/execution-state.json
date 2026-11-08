@@ -29,6 +29,7 @@
     "WCP-002",
     "WCP-003",
     "WCP-004",
+    "WCP-005",
     "WCP-006",
     "WCP-012",
     "WCP-013",
@@ -81,6 +82,10 @@
         "commit": "fe6812a",
         "evidence": "docs/verification/WCP-004.md"
       },
+      "WCP-005": {
+        "commit": "5a0fcd9a7ac7d698ae04beeeba6120771f76baf0",
+        "evidence": "docs/verification/WCP-005.md"
+      },
       "WCP-006": {
         "commit": "4f50650c849021c5d764c71fe73409a56971997e",
         "evidence": "docs/verification/WCP-006.md"
@@ -117,9 +122,8 @@
     "Close only reviewed integrated tickets with meaningful unit/PostgreSQL/API/frontend/browser evidence.",
     "Continue unblocked work and report provider/deployment limitations honestly."
   ],
-  "updated_at": "2026-11-08T19:20:56.585739+00:00",
+  "updated_at": "2026-11-08T19:48:50.982447+00:00",
   "active_tickets": [
-    "WCP-005",
     "WCP-018",
     "WCP-032"
   ],
@@ -291,6 +295,14 @@
       "reason": null,
       "commit": null,
       "evidence": null
+    },
+    {
+      "time": "2026-11-08T19:48:50.982447+00:00",
+      "ticket": "WCP-005",
+      "status": "completed",
+      "reason": null,
+      "commit": "5a0fcd9a7ac7d698ae04beeeba6120771f76baf0",
+      "evidence": "docs/verification/WCP-005.md"
     }
   ],
   "research": {
