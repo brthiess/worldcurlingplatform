@@ -156,6 +156,8 @@ test("starting evidence cannot be marked reviewed from aggregates, client readin
     effectiveFrom: "2026-08-01",
     effectiveTo: "2027-08-01",
     rankingPlayerIds: players,
+    rankingAlternateIds: [],
+    rosterSourceId: "official",
     allocationOption: "four-equal",
     allocations: players.map((playerId) => ({ playerId, share: "1/4" })),
     sources: [source],
@@ -258,4 +260,201 @@ test("starting evidence cannot be marked reviewed from aggregates, client readin
     ).status,
     422,
   );
+});
+
+test("a separately sourced official roster can differ from the platform core while ownership, entry and season snapshots retain their exact meanings", async () => {
+  const cookie = await login(),
+    ids = Array.from({ length: 5 }, () => randomUUID()),
+    rulesId = randomUUID();
+  assert.equal(
+    (
+      await request(cookie, undefined, {
+        id: rulesId,
+        kind: "rules",
+        version: 0,
+        requestId: randomUUID(),
+        state: "reviewed",
+        data: rulesFixture(),
+      })
+    ).status,
+    200,
+  );
+  const entryId = randomUUID();
+  const r = await request(cookie, "/api/v1/entries", {
+    id: entryId,
+    version: 0,
+    requestId: randomUUID(),
+    entry: {
+      divisionId: "prairie-men",
+      name: "WCP032 independently registered roster",
+      coreKnown: true,
+      corePlayerIds: ids.slice(0, 4),
+      members: ids.map((playerId, i) => ({
+        playerId,
+        role: i === 4 ? "alternate" : "core",
+        position: "",
+        participation: "declared",
+      })),
+      newPlayers: ids.map((id, i) => ({
+        id,
+        name: `Separate roster player ${i}`,
+        provisional: false,
+      })),
+      registerSeason: { season: "2026-27", version: 0 },
+    },
+  });
+  assert.equal(r.status, 201);
+  const created = await r.json(),
+    official = [ids[0], ids[1], ids[2], ids[4]],
+    id = randomUUID();
+  const data = {
+    registrationId: created.registration.id,
+    rosterVersion: 1,
+    rulesId,
+    rulesVersion: 1,
+    effectiveFrom: "2026-08-01",
+    effectiveTo: "2027-08-01",
+    rankingPlayerIds: official,
+    rankingAlternateIds: [ids[3]],
+    rosterSourceId: "official",
+    allocationOption: "four-equal",
+    allocations: official.map((playerId) => ({ playerId, share: "1/4" })),
+    sources: rulesFixture().sources,
+    contributions: official.map((playerId, i) => ({
+      playerId,
+      amount: i === 3 ? "1000.123456789013" : "50",
+      basis: "documented-individual",
+      sourceId: "official",
+      ownershipSourceId: "official",
+      eligibilitySourceId: "official",
+      note: "Explicit synthetic official roster declaration and individually evidenced rights, separately recorded from platform roles.",
+    })),
+    reviewNote:
+      "Sourced official roles deliberately differ; platform identity and old season/entry remain intact.",
+    biographyMissing: false,
+  };
+  const command = {
+    id,
+    kind: "season",
+    version: 0,
+    requestId: randomUUID(),
+    state: "reviewed",
+    data,
+  };
+  const saved = await request(cookie, undefined, command);
+  assert.equal(saved.status, 200);
+  const evidence = await saved.json();
+  assert.equal(evidence.currentReadiness.complete, true);
+  assert.equal(
+    evidence.currentReadiness.startingInput,
+    "1150123456789013/1000000000000",
+  );
+  assert.equal(
+    evidence.data.contributions[3].amount,
+    "1000123456789013/1000000000000",
+  );
+  // GET reparses canonical values and produces the same exact sum after persistence.
+  const loaded = await (
+    await request(cookie, `/api/v1/ranking-inputs?id=${id}`)
+  ).json();
+  assert.equal(
+    loaded.currentReadiness.startingInput,
+    "1150123456789013/1000000000000",
+  );
+  assert.deepEqual(loaded.data.rankingAlternateIds, [ids[3]]);
+  assert.equal(
+    (
+      await request(cookie, undefined, {
+        ...command,
+        version: 1,
+        requestId: randomUUID(),
+        data: {
+          ...data,
+          allocations: ids
+            .slice(0, 4)
+            .map((playerId) => ({ playerId, share: "1/4" })),
+        },
+      })
+    ).status,
+    400,
+  );
+  const team = await (
+    await request("", `/api/v1/public/teams/${created.teamId}`)
+  ).json();
+  assert.deepEqual(
+    team.core.map((m: { playerId: string }) => m.playerId).sort(),
+    ids.slice(0, 4).sort(),
+  );
+  assert.equal(team.registrations[0].version, 1);
+  assert.equal(
+    team.registrations[0].members.find(
+      (m: { playerId: string }) => m.playerId === ids[4],
+    ).role,
+    "alternate",
+  );
+  const original = await (
+    await request(cookie, `/api/v1/entries/${entryId}?version=1`)
+  ).json();
+  assert.equal(original.registration.version, 1);
+  assert.equal(
+    original.lineup.members.find(
+      (m: { playerId: string }) => m.playerId === ids[4],
+    ).role,
+    "alternate",
+  );
+  assert.equal(
+    original.core.some((m: { playerId: string }) => m.playerId === ids[3]),
+    true,
+  );
+});
+
+test("an audit failure rolls back the whole evidence revision and an exact retry subsequently commits once", async () => {
+  const cookie = await login(),
+    id = randomUUID(),
+    name = "wcp032_" + randomUUID().replaceAll("-", ""),
+    db = new pg.Pool({ connectionString: process.env.DATABASE_URL }),
+    command = {
+      id,
+      kind: "rules",
+      version: 0,
+      requestId: randomUUID(),
+      state: "reviewed",
+      data: rulesFixture(),
+    };
+  try {
+    await db.query(
+      `CREATE FUNCTION ${name}() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.resource_id='${id}' THEN RAISE EXCEPTION 'WCP032 injected audit failure'; END IF; RETURN NEW; END $$`,
+    );
+    await db.query(
+      `CREATE TRIGGER ${name} BEFORE INSERT ON audit_record FOR EACH ROW EXECUTE FUNCTION ${name}()`,
+    );
+    assert.equal((await request(cookie, undefined, command)).status, 503);
+    assert.equal(
+      (await request(cookie, `/api/v1/ranking-inputs?id=${id}`)).status,
+      404,
+    );
+  } finally {
+    await db.query(`DROP TRIGGER IF EXISTS ${name} ON audit_record`);
+    await db.query(`DROP FUNCTION IF EXISTS ${name}()`);
+    await db.end();
+  }
+  const [a, b] = await Promise.all([
+    request(cookie, undefined, command),
+    request(cookie, undefined, command),
+  ]);
+  assert.equal(a.status, 200);
+  assert.equal(b.status, 200);
+  assert.equal((await a.json()).version, 1);
+  assert.equal((await b.json()).version, 1);
+  const competing = await Promise.all(
+    ["A", "B"].map((title) =>
+      request(cookie, undefined, {
+        ...command,
+        version: 1,
+        requestId: randomUUID(),
+        data: { ...command.data, title },
+      }),
+    ),
+  );
+  assert.deepEqual(competing.map((r) => r.status).sort(), [200, 409]);
 });

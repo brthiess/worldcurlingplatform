@@ -16,7 +16,7 @@ export function wctrs2026(): RulesInput {
       url: "https://worldcurling.org/teamrankings/ranking-calculations-four-player/",
       edition: "2026-27 dated table, mutable HTML",
       sha256:
-        "7fc8ab23fbe7613107c2552cc591f4fc1b19b7c73cb9bd53ea54b545518f1deb",
+        "3bdc981ab5c7b098e7faff0b8d815d4cf2b4aa33243ef2d411d0c55b30ac8118",
     },
     {
       id: "mixed",
@@ -24,7 +24,7 @@ export function wctrs2026(): RulesInput {
       url: "https://worldcurling.org/teamrankings/ranking-calculations-mixed-doubles/",
       edition: "2026-27 dated table, mutable HTML",
       sha256:
-        "fc2de0ccd704688d0ccf89149b82e82a1b375f16fc32112d85e24bd741e8d080",
+        "1bb58dccd7da5969279e9d790effbf59a03bb1167db463ccb774c4f61c9c2000",
     },
     {
       id: "md2024",
@@ -34,7 +34,7 @@ export function wctrs2026(): RulesInput {
       sha256:
         "cac15e5c9f0233ab928c17546b2ce4eacd8c34394fb34048309341653bfdf15f",
     },
-  ].map((s) => ({ ...s, retrievedAt: "2026-11-08T12:50:00Z" }));
+  ].map((s) => ({ ...s, retrievedAt: "2026-11-08T19:02:37Z" }));
   const checkpoints: Checkpoint[] = [];
   for (const [i, from] of [
     "2026-08-01",

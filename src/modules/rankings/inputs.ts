@@ -60,10 +60,19 @@ async function context(c: Reader, input: SeasonInput): Promise<ReviewContext> {
     throw new RankingInputError(
       "The exact rule/source version does not exist.",
     );
+  const rankingPlayers = await c.query(
+    'SELECT id AS "playerId",name,identity_status AS "identityStatus",\'ranking\' AS role FROM player WHERE id=ANY($1::text[]) ORDER BY name,id FOR SHARE',
+    [[...input.rankingPlayerIds, ...input.rankingAlternateIds]],
+  );
+  if (
+    rankingPlayers.rowCount !==
+    new Set([...input.rankingPlayerIds, ...input.rankingAlternateIds]).size
+  )
+    throw new RankingInputError("A referenced ranking player does not exist.");
   return {
     ...r.rows[0],
     rosterVersion: r.rows[0].version,
-    members: members.rows,
+    members: rankingPlayers.rows,
     rules: rulesInput(rule.rows[0].data),
     rulesReviewed: rule.rows[0].state === "reviewed",
   };
@@ -93,6 +102,20 @@ async function detail(c: Reader, id: string, version?: number) {
   return {
     ...row,
     rosterSnapshot: rosterSnapshot?.rows ?? null,
+    rankingPlayers:
+      row.kind === "season"
+        ? (
+            await c.query(
+              "SELECT id AS \"playerId\",name,identity_status AS \"identityStatus\",'ranking' AS role,'' AS position FROM player WHERE id=ANY($1::text[]) ORDER BY name,id",
+              [
+                [
+                  ...row.data.rankingPlayerIds,
+                  ...(row.data.rankingAlternateIds ?? []),
+                ],
+              ],
+            )
+          ).rows
+        : [],
     history: history.rows,
     currentReadiness:
       row.kind === "season"

@@ -9,13 +9,8 @@ function reduce([n, d]: Q): Q {
   return [n / g, d / g];
 }
 function q(v: unknown): Q {
-  if (
-    typeof v !== "string" ||
-    !/^(0|[1-9]\d{0,14})(\/(?:[1-9]\d{0,14})|\.\d{1,12})?$/.test(v)
-  )
-    throw new EntryError(
-      "Use a nonnegative exact fraction or decimal (up to 15 digits).",
-    );
+  if (typeof v !== "string" || !/^(0|[1-9]\d*)(\/(?:[1-9]\d*)|\.\d+)?$/.test(v))
+    throw new EntryError("Use a nonnegative exact fraction or decimal.");
   if (v.includes("/")) {
     const [n, d] = v.split("/");
     return reduce([BigInt(n), BigInt(d)]);
@@ -27,7 +22,21 @@ function str([n, d]: Q) {
   return d === 1n ? String(n) : `${n}/${d}`;
 }
 export const exact = {
-  value: (v: unknown) => str(q(v)),
+  value: (v: unknown) => {
+    if (
+      typeof v !== "string" ||
+      !/^(0|[1-9]\d{0,127})(\/(?:[1-9]\d{0,127})|\.\d{1,12})?$/.test(v)
+    )
+      throw new EntryError(
+        "Use a nonnegative exact fraction (up to 128 digits per integer) or decimal (up to 12 fractional digits).",
+      );
+    const parsed = q(v);
+    if (parsed.some((n) => String(n).length > 128))
+      throw new EntryError(
+        "The exact canonical numerator and denominator must each fit 128 digits.",
+      );
+    return str(parsed);
+  },
   add: (a: string, b: string) => {
     const [n, d] = q(a),
       [m, e] = q(b);
@@ -306,6 +315,8 @@ export type SeasonInput = {
   effectiveFrom: string;
   effectiveTo: string;
   rankingPlayerIds: string[];
+  rankingAlternateIds: string[];
+  rosterSourceId: string;
   allocationOption: AllocationOption;
   allocations: Allocation[];
   sources: Source[];
@@ -322,9 +333,11 @@ export function seasonInput(raw: unknown): SeasonInput {
   const r = object(raw),
     sources = sourcesInput(r.sources),
     rankingPlayerIds = list(r.rankingPlayerIds, 5).map(identifier),
+    rankingAlternateIds = list(r.rankingAlternateIds ?? [], 10).map(identifier),
     allocationOption = r.allocationOption as AllocationOption;
   if (
-    new Set(rankingPlayerIds).size !== rankingPlayerIds.length ||
+    new Set([...rankingPlayerIds, ...rankingAlternateIds]).size !==
+      rankingPlayerIds.length + rankingAlternateIds.length ||
     !allocationOptions.includes(allocationOption)
   )
     throw new EntryError(
@@ -398,6 +411,8 @@ export function seasonInput(raw: unknown): SeasonInput {
     effectiveFrom,
     effectiveTo,
     rankingPlayerIds,
+    rankingAlternateIds,
+    rosterSourceId: reference(r.rosterSourceId ?? ""),
     allocationOption,
     allocations,
     sources,
@@ -462,7 +477,6 @@ export function readiness(input: SeasonInput, c: ReviewContext) {
       "The season roster has changed since this input was reviewed.",
       "Reload the current season roster and save a new input revision.",
     );
-  const regulars = c.members.filter((m) => m.role === "core");
   if (
     input.rankingPlayerIds.length !==
       (c.discipline === "mixed_doubles" ? 2 : 4) &&
@@ -473,16 +487,21 @@ export function readiness(input: SeasonInput, c: ReviewContext) {
       "The registered ranking roster is incomplete.",
       "Record four/five regulars or both mixed doubles partners.",
     );
+  if (!input.rosterSourceId)
+    issue(
+      "ranking-roster-source",
+      "The separately registered ranking roster has no source evidence.",
+      "Cite the official roster declaration/decision for these regular and alternate assignments; platform core membership alone does not establish registration.",
+    );
   if (
-    regulars.length !== input.rankingPlayerIds.length ||
     input.rankingPlayerIds.some(
-      (id) => !regulars.some((m) => m.playerId === id),
+      (id) => !c.members.some((m) => m.playerId === id),
     )
   )
     issue(
-      "core-ranking-membership",
-      "Registered ranking regulars differ from the recorded season core.",
-      "Resolve the distinction with staff; alternates/coaches cannot silently become regulars. Use season-roster maintenance for factual changes.",
+      "ranking-player-missing",
+      "A registered ranking player cannot be resolved.",
+      "Select an existing identified player record without altering the platform core.",
     );
   if (
     c.members.some(
@@ -576,6 +595,7 @@ export function readiness(input: SeasonInput, c: ReviewContext) {
     );
   const complete = !issues.some((i) => i.severity === "blocker");
   return {
+    scope: "starting-input-evidence" as const,
     complete,
     startingInput: complete
       ? input.contributions.reduce((s, v) => exact.add(s, v.amount!), "0")

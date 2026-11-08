@@ -35,6 +35,7 @@ type RuleSummary = {
 };
 type Workspace = { rules: RuleSummary[]; registrations: Registration[] };
 type RecordView = {
+  rankingPlayers: Member[];
   rosterSnapshot: Member[] | null;
   id: string;
   kind: "rules" | "season";
@@ -191,6 +192,7 @@ export function RankingInputsWorkbench() {
     [message, setMessage] = useState(""),
     [retry, setRetry] = useState<Command | null>(null),
     [dirty, setDirty] = useState(false);
+  const [extraPlayers, setExtraPlayers] = useState<Member[]>([]);
   const frozen = busy || !!retry;
   async function load() {
     setLoading(true);
@@ -216,6 +218,7 @@ export function RankingInputsWorkbench() {
     void load();
   }, []);
   function clear() {
+    setExtraPlayers([]);
     setRecord(null);
     setRule(null);
     setInput(null);
@@ -295,6 +298,10 @@ export function RankingInputsWorkbench() {
       rankingPlayerIds: reg.members
         .filter((m) => m.role === "core")
         .map((m) => m.playerId),
+      rankingAlternateIds: reg.members
+        .filter((m) => m.role === "alternate")
+        .map((m) => m.playerId),
+      rosterSourceId: "",
       allocationOption: "unresolved",
       allocations: [],
       sources: [],
@@ -403,6 +410,47 @@ export function RankingInputsWorkbench() {
     record?.rosterSnapshot && input?.rosterVersion !== registration?.version
       ? record.rosterSnapshot
       : (registration?.members ?? []);
+  const rankingCandidates = [
+    ...new Map(
+      [
+        ...rosterMembers,
+        ...(record?.rankingPlayers ?? []),
+        ...extraPlayers,
+      ].map((m) => [m.playerId, m]),
+    ).values(),
+  ];
+  function assignRankingRole(playerId: string, role: string) {
+    if (!input) return;
+    editInput({
+      ...input,
+      rankingPlayerIds: [
+        ...input.rankingPlayerIds.filter((id) => id !== playerId),
+        ...(role === "regular" ? [playerId] : []),
+      ],
+      rankingAlternateIds: [
+        ...input.rankingAlternateIds.filter((id) => id !== playerId),
+        ...(role === "alternate" ? [playerId] : []),
+      ],
+      allocations: [],
+      contributions:
+        role === "regular"
+          ? [
+              ...input.contributions.filter((c) => c.playerId !== playerId),
+              input.contributions.find((c) => c.playerId === playerId) ?? {
+                playerId,
+                amount: null,
+                basis: "unknown",
+                sourceId: "",
+                ownershipSourceId: "",
+                eligibilitySourceId: "",
+                note: "",
+                priorTotal: null,
+                priorShare: null,
+              },
+            ]
+          : input.contributions.filter((c) => c.playerId !== playerId),
+    });
+  }
   const updateContribution = (
     playerId: string,
     key: keyof Contribution,
@@ -897,33 +945,11 @@ export function RankingInputsWorkbench() {
                           editInput({
                             ...input,
                             rosterVersion: registration.version,
-                            rankingPlayerIds: registration.members
-                              .filter((m) => m.role === "core")
-                              .map((m) => m.playerId),
-                            allocations: [],
-                            contributions: registration.members
-                              .filter((m) => m.role === "core")
-                              .map(
-                                (m) =>
-                                  input.contributions.find(
-                                    (c) => c.playerId === m.playerId,
-                                  ) ?? {
-                                    playerId: m.playerId,
-                                    amount: null,
-                                    basis: "unknown",
-                                    sourceId: "",
-                                    ownershipSourceId: "",
-                                    eligibilitySourceId: "",
-                                    note: "",
-                                    priorTotal: null,
-                                    priorShare: null,
-                                  },
-                              ),
                           })
                         }
                       >
-                        Use current season roster v{registration.version} and
-                        recheck ownership
+                        Use current platform season snapshot v
+                        {registration.version} and recheck evidence
                       </button>
                     )}
                     <div className="ranking-grid">
@@ -988,54 +1014,96 @@ export function RankingInputsWorkbench() {
                         />
                       </label>
                     </div>
-                    <h3>Registered ranking regulars</h3>
+                    <h3>Separately registered ranking roster</h3>
                     <p>
-                      Review this explicit roster separately. A designated
-                      alternate cannot acquire regular membership or point
-                      rights through an allocation edit.
+                      Official ranking roles are recorded independently of
+                      platform core/alternate roles. A roster declaration source
+                      is required. Ownership belongs only to the explicitly
+                      registered ranking regulars.
                     </p>
-                    {rosterMembers
-                      .filter((m) => m.role === "core")
-                      .map((m) => (
-                        <label className="check-label" key={m.playerId}>
-                          <input
-                            type="checkbox"
-                            checked={input.rankingPlayerIds.includes(
-                              m.playerId,
-                            )}
-                            onChange={(e) =>
-                              editInput({
-                                ...input,
-                                rankingPlayerIds: e.target.checked
-                                  ? [...input.rankingPlayerIds, m.playerId]
-                                  : input.rankingPlayerIds.filter(
-                                      (id) => id !== m.playerId,
-                                    ),
-                                allocations: [],
-                                contributions: e.target.checked
-                                  ? [
-                                      ...input.contributions,
-                                      {
-                                        playerId: m.playerId,
-                                        amount: null,
-                                        basis: "unknown",
-                                        sourceId: "",
-                                        ownershipSourceId: "",
-                                        eligibilitySourceId: "",
-                                        note: "",
-                                        priorTotal: null,
-                                        priorShare: null,
-                                      },
-                                    ]
-                                  : input.contributions.filter(
-                                      (c) => c.playerId !== m.playerId,
-                                    ),
-                              })
+                    <Reference
+                      label="Ranking roster declaration source"
+                      value={input.rosterSourceId}
+                      sources={input.sources}
+                      onChange={(rosterSourceId) =>
+                        editInput({ ...input, rosterSourceId })
+                      }
+                    />
+                    <div className="ranking-grid">
+                      {rankingCandidates.map((m) => (
+                        <label key={m.playerId}>
+                          {m.name} official ranking role
+                          <select
+                            value={
+                              input.rankingPlayerIds.includes(m.playerId)
+                                ? "regular"
+                                : input.rankingAlternateIds.includes(m.playerId)
+                                  ? "alternate"
+                                  : "none"
                             }
-                          />
-                          {m.name} · ranking regular
+                            onChange={(e) =>
+                              assignRankingRole(m.playerId, e.target.value)
+                            }
+                          >
+                            <option value="regular">Registered regular</option>
+                            <option value="alternate">
+                              Designated ranking alternate
+                            </option>
+                            <option value="none">Not on ranking roster</option>
+                          </select>
                         </label>
                       ))}
+                    </div>
+                    <p>
+                      To include a separately registered player outside this
+                      platform season roster, enter their existing player ID.
+                      This leaves platform core and season history unchanged.
+                    </p>
+                    <label>
+                      Existing ranking player ID
+                      <input name="ranking-player-id" id="ranking-player-id" />
+                    </label>
+                    <button
+                      type="button"
+                      className="secondary"
+                      onClick={async () => {
+                        const field = document.getElementById(
+                          "ranking-player-id",
+                        ) as HTMLInputElement;
+                        const playerId = field.value.trim();
+                        setBusy(true);
+                        setError("");
+                        try {
+                          const r = await fetch(
+                            "/api/v1/public/players/" +
+                              encodeURIComponent(playerId),
+                          );
+                          if (!r.ok)
+                            throw new Error(
+                              "Existing player not found. Select a recorded player ID.",
+                            );
+                          const p = await r.json();
+                          setExtraPlayers((old) => [
+                            ...old.filter((m) => m.playerId !== p.id),
+                            {
+                              playerId: p.id,
+                              name: p.name,
+                              identityStatus: p.identityStatus,
+                              role: "ranking",
+                              position: "",
+                            },
+                          ]);
+                          assignRankingRole(p.id, "regular");
+                          field.value = "";
+                        } catch (e) {
+                          setError((e as Error).message);
+                        } finally {
+                          setBusy(false);
+                        }
+                      }}
+                    >
+                      Add existing ranking regular
+                    </button>
                     <label>
                       Declared allocation option
                       <select
@@ -1064,7 +1132,7 @@ export function RankingInputsWorkbench() {
                       {input.rankingPlayerIds.map((playerId) => (
                         <label key={playerId}>
                           {
-                            registration.members.find(
+                            rankingCandidates.find(
                               (m) => m.playerId === playerId,
                             )?.name
                           }{" "}
@@ -1109,7 +1177,7 @@ export function RankingInputsWorkbench() {
                       <details key={c.playerId}>
                         <summary>
                           {
-                            registration.members.find(
+                            rankingCandidates.find(
                               (m) => m.playerId === c.playerId,
                             )?.name
                           }{" "}
