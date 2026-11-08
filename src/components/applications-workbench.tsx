@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { ResponsibilityControls } from "./authority-workbench";
 import {
   disciplines,
   nextEdition,
@@ -18,6 +19,10 @@ type Detail = Omit<ApplicationInput, "divisions"> &
     origin: string;
     registrationStatus: string;
     canReview: boolean;
+    canEdit: boolean;
+    canReassign: boolean;
+    authorityName: string;
+    responsibilityActive: boolean;
     organizationName: string;
     seriesName: string;
     divisions: (ApplicationInput["divisions"][number] & {
@@ -29,7 +34,10 @@ type Detail = Omit<ApplicationInput, "divisions"> &
       reason: string;
       actorName: string;
       createdAt: string;
-      snapshot: ApplicationInput;
+      snapshot: ApplicationInput & {
+        authorityName?: string;
+        reviewerName?: string;
+      };
     }[];
   };
 type Workspace = {
@@ -59,13 +67,15 @@ export function ApplicationsWorkbench() {
     [form, setForm] = useState<ApplicationInput | null>(null),
     [newId, setNewId] = useState(""),
     [loading, setLoading] = useState(true),
-    [busy, setBusy] = useState(false),
+    [working, setBusy] = useState(false),
+    [responsibilityPending, setResponsibilityPending] = useState(false),
     [error, setError] = useState(""),
     [fields, setFields] = useState<Record<string, string>>({}),
     [notice, setNotice] = useState(""),
     [reason, setReason] = useState(""),
     [pending, setPending] = useState<Pending | null>(null),
     [queue, setQueue] = useState("all");
+  const busy = working || responsibilityPending;
   async function load() {
     setLoading(true);
     try {
@@ -102,8 +112,10 @@ export function ApplicationsWorkbench() {
       setDetail(result);
       setForm(result);
       setReason("");
+      return true;
     } catch (e) {
       setError((e as Error).message);
+      return false;
     } finally {
       setBusy(false);
     }
@@ -285,6 +297,7 @@ export function ApplicationsWorkbench() {
                 <label htmlFor="queue-status">Application status</label>
                 <select
                   id="queue-status"
+                  disabled={busy}
                   value={queue}
                   onChange={(e) => setQueue(e.target.value)}
                 >
@@ -337,8 +350,20 @@ export function ApplicationsWorkbench() {
                           Version {detail.version}
                         </p>
                         <p>
-                          <strong>Responsible authority:</strong> World Curling
-                          · {detail.reviewerName}
+                          <strong>Responsible authority:</strong>{" "}
+                          {detail.authorityName}
+                          {" · "}
+                          {detail.reviewerName}
+                        </p>
+                        {!detail.responsibilityActive && (
+                          <p className="notice">
+                            This responsibility is inactive or outside its
+                            grant. World Curling must explicitly reassign the
+                            application.
+                          </p>
+                        )}
+                        <p className="muted">
+                          Application identifier: {detail.id}
                         </p>
                         <div className="application-states">
                           <p>Registration: {detail.registrationStatus}</p>
@@ -363,32 +388,36 @@ export function ApplicationsWorkbench() {
                             </a>
                           </p>
                         )}
-                        <button
-                          className="secondary"
-                          disabled={busy}
-                          onClick={() => {
-                            const year = (date: string) =>
-                              `${Number(date.slice(0, 4)) + 1}${date.slice(4)}`;
-                            setForm(
-                              nextEdition(
-                                detail,
-                                year(detail.startsOn),
-                                year(detail.endsOn),
-                                detail.divisions.map(() => crypto.randomUUID()),
-                              ),
-                            );
-                            setDetail(null);
-                            setNewId(crypto.randomUUID());
-                            setFields({});
-                            setNotice(
-                              "New edition copied. Review its dates and details before saving.",
-                            );
-                            setError("");
-                            setPending(null);
-                          }}
-                        >
-                          Create next year's edition
-                        </button>
+                        {workspace.organizations.length > 0 && (
+                          <button
+                            className="secondary"
+                            disabled={busy}
+                            onClick={() => {
+                              const year = (date: string) =>
+                                `${Number(date.slice(0, 4)) + 1}${date.slice(4)}`;
+                              setForm(
+                                nextEdition(
+                                  detail,
+                                  year(detail.startsOn),
+                                  year(detail.endsOn),
+                                  detail.divisions.map(() =>
+                                    crypto.randomUUID(),
+                                  ),
+                                ),
+                              );
+                              setDetail(null);
+                              setNewId(crypto.randomUUID());
+                              setFields({});
+                              setNotice(
+                                "New edition copied. Review its dates and details before saving.",
+                              );
+                              setError("");
+                              setPending(null);
+                            }}
+                          >
+                            Create next year's edition
+                          </button>
+                        )}
                       </>
                     )}
                     <form
@@ -403,7 +432,11 @@ export function ApplicationsWorkbench() {
                         Save essential dates, location and divisions as a draft.
                         The venue and competition setup may follow later.
                       </p>
-                      <fieldset disabled={busy || !!pending}>
+                      <fieldset
+                        disabled={
+                          busy || !!pending || (!!detail && !detail.canEdit)
+                        }
+                      >
                         <legend>Edition details</legend>
                         <label htmlFor="app-organization">
                           Organizing organization
@@ -501,6 +534,16 @@ export function ApplicationsWorkbench() {
                         </div>
                         {field("venue", "Venue", "text", true)}
                         {field("timezone", "Venue time zone")}
+                        <label htmlFor="app-category">Event category</label>
+                        <input
+                          id="app-category"
+                          value={form.category ?? "open"}
+                          onChange={(e) => update("category", e.target.value)}
+                          maxLength={80}
+                        />
+                        {fields.category && (
+                          <p className="field-error">{fields.category}</p>
+                        )}
                         <h3>Proposed divisions</h3>
                         {fields.divisions && (
                           <p className="field-error">{fields.divisions}</p>
@@ -602,13 +645,15 @@ export function ApplicationsWorkbench() {
                           </button>
                         )}
                         <div>
-                          <button type="submit">
-                            {busy
-                              ? "Saving…"
-                              : detail
-                                ? "Save changes"
-                                : "Save draft"}
-                          </button>
+                          {(!detail || detail.canEdit) && (
+                            <button type="submit">
+                              {working
+                                ? "Saving…"
+                                : detail
+                                  ? "Save changes"
+                                  : "Save draft"}
+                            </button>
+                          )}
                         </div>
                       </fieldset>
                     </form>
@@ -618,14 +663,15 @@ export function ApplicationsWorkbench() {
                           Submit or review the saved version above. Save any
                           field changes first.
                         </p>
-                        {["draft", "rejected"].includes(detail.status) && (
-                          <button
-                            disabled={busy || !!pending || dirty}
-                            onClick={() => command("submit")}
-                          >
-                            Submit for review
-                          </button>
-                        )}
+                        {detail.canEdit &&
+                          ["draft", "rejected"].includes(detail.status) && (
+                            <button
+                              disabled={busy || !!pending || dirty}
+                              onClick={() => command("submit")}
+                            >
+                              Submit for review
+                            </button>
+                          )}
                         {detail.status === "submitted" && detail.canReview && (
                           <>
                             <label htmlFor="review-reason">
@@ -658,10 +704,31 @@ export function ApplicationsWorkbench() {
                           </>
                         )}
                         {detail.status === "submitted" && !detail.canReview && (
-                          <p>
-                            Awaiting the responsible World Curling
-                            administrator's review.
-                          </p>
+                          <p>Awaiting the responsible reviewer's decision.</p>
+                        )}
+                        {detail.canReassign && (
+                          <ResponsibilityControls
+                            id={detail.id}
+                            version={detail.version}
+                            onPendingChange={setResponsibilityPending}
+                            onSaved={async () => {
+                              if (!(await open(detail.id)))
+                                throw new Error("Application refresh failed");
+                              try {
+                                const response = await fetch(
+                                  "/api/v1/applications",
+                                  { cache: "no-store" },
+                                );
+                                if (!response.ok) throw new Error();
+                                setWorkspace(await response.json());
+                              } catch {
+                                setError(
+                                  "Responsibility changed, but the queue could not be refreshed. Reload the current version.",
+                                );
+                                throw new Error("Queue refresh failed");
+                              }
+                            }}
+                          />
                         )}
                         <h3>Application history</h3>
                         {detail.history.length === 0 ? (
@@ -674,7 +741,21 @@ export function ApplicationsWorkbench() {
                             {detail.history.map((h) => (
                               <li key={h.version}>
                                 <strong>
-                                  Version {h.version} · {h.action}
+                                  Version {h.version} ·{" "}
+                                  {(
+                                    {
+                                      create: "Draft created",
+                                      edit: "Edition details saved",
+                                      submit: "Submitted for review",
+                                      approve: "Admitted",
+                                      reject: "Returned to organizer",
+                                      reassign: "Responsibility reassigned",
+                                      override_approve:
+                                        "World Curling override: admitted",
+                                      override_reject:
+                                        "World Curling override: returned",
+                                    } as Record<string, string>
+                                  )[h.action] ?? h.action}
                                 </strong>
                                 <p>
                                   {h.actorName} ·{" "}
@@ -697,6 +778,13 @@ export function ApplicationsWorkbench() {
                                     {h.snapshot.city}, {h.snapshot.country} ·{" "}
                                     {h.snapshot.venue || "Venue not confirmed"}
                                   </p>
+                                  {h.snapshot.authorityName && (
+                                    <p>
+                                      Responsible authority:{" "}
+                                      {h.snapshot.authorityName} ·{" "}
+                                      {h.snapshot.reviewerName}
+                                    </p>
+                                  )}
                                   <ul>
                                     {h.snapshot.divisions.map((d) => (
                                       <li key={d.id}>
