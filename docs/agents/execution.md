@@ -2,7 +2,7 @@
 
 Started 2026-11-08 under the user's explicit implementation authorization.
 
-Paused at the user's explicit request on2026-11-09 UTC. See [the durable resume checkpoint](paused-2026-11-09.md). In-progress ticket statuses describe unfinished work; no agents continue running.
+Resumed at the user's explicit request on2026-11-09 (America/Edmonton), from [the preserved pause checkpoint](paused-2026-11-09.md). Continue autonomous unblocked work, required verification and authorized commits/pushes; hosting/domain remain pending. The primary includes provisional007 source that is not accepted merely because it is merged. The execution-state resume event records exact source boundaries.
 
 - Workflow: `C:/Users/brthi/.codex/skills/implement-spec/SKILL.md`.
 - Authoritative requirements: `.scratch/world-curling-platform/spec.md`.

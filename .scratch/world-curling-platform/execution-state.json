@@ -1,7 +1,7 @@
 {
   "recorded_date": "2026-11-08",
   "phase": "implementation",
-  "status": "paused",
+  "status": "active",
   "authoritative_spec": ".scratch/world-curling-platform/spec.md",
   "task_graph": ".scratch/world-curling-platform/tickets.json",
   "execution_issues": ".scratch/world-curling-platform/issues/",
@@ -65,7 +65,7 @@
   "git": {
     "remote": "https://github.com/brthiess/worldcurlingplatform.git",
     "push_as_work_progresses": true,
-    "last_verified_remote_integration_commit": "44f48dfacada33d96f8ed0aeaeb71e7fa7856b65",
+    "last_verified_remote_integration_commit": "d667c4f717d7a5045ed1313e41e5502169135e60",
     "integration_branch": "integration/world-curling-platform",
     "worktrees_created": [
       ".worktrees/WCP-001",
@@ -188,13 +188,17 @@
       "required": "Domain/DNS, hosting access and reviewed quote; provider credentials when exercised"
     }
   ],
-  "resume": [
-    "Review active ticket worktrees and evidence before integration.",
-    "Run python scripts/tickets.py status to compute the published frontier.",
-    "Close only reviewed integrated tickets with meaningful unit/PostgreSQL/API/frontend/browser evidence.",
-    "Continue unblocked work and report provider/deployment limitations honestly."
-  ],
-  "updated_at": "2026-11-09T03:42:44.744801+00:00",
+  "resume": {
+    "requested_by": "user",
+    "requested_at": "2026-11-09T22:08:38.860381+00:00",
+    "reason": "Resume implement-spec autonomously through unblocked tickets; preserve required checks, commit/push, leave hosting pending.",
+    "from_checkpoint": "d667c4f717d7a5045ed1313e41e5502169135e60",
+    "from_note": "docs/agents/paused-2026-11-09.md",
+    "formally_accepted_integration": "11d9e6ce0c4b3bdf9188dc75f74987e4b628b886",
+    "pending_source_on_primary": "WCP-007; acceptance remains unfinished",
+    "max_parallel_children": 3
+  },
+  "updated_at": "2026-11-09T22:08:38.860381+00:00",
   "active_tickets": [
     "WCP-007",
     "WCP-017",
@@ -553,6 +557,14 @@
       "reason": "User explicitly requested pause until tomorrow; partial checks preserved and no unfinished ticket closed.",
       "commit": "44f48dfacada33d96f8ed0aeaeb71e7fa7856b65",
       "evidence": "docs/agents/paused-2026-11-09.md"
+    },
+    {
+      "time": "2026-11-09T22:08:38.860381+00:00",
+      "ticket": null,
+      "status": "active",
+      "reason": "User explicitly resumed implementation. Hosting/domain remain pending; no unfinished ticket accepted.",
+      "commit": "d667c4f717d7a5045ed1313e41e5502169135e60",
+      "evidence": "docs/agents/execution.md"
     }
   ],
   "research": {
@@ -711,6 +723,7 @@
       "WCP-007": "cc9676903a26e0072b8d46349e23a1cb3102ebb9",
       "WCP-017": "ac7e6bcd7812c0bb8901a7c1b709e09544bd8631",
       "WCP-034": "164616aacf3c866a5504be1902a1d3c2b079c9fa"
-    }
+    },
+    "resumed_at": "2026-11-09T22:08:38.860381+00:00"
   }
 }
