@@ -469,6 +469,11 @@ test("ordinary sourced award exclusion, retained roster and historical ownership
     .getByLabel("Prior player 4", { exact: true })
     .fill(f.playerLists[1][0]);
   await page
+    .getByLabel("Continuity rationale", { exact: true })
+    .fill(
+      "Fictional source confirms three retained regulars with50 each from a200 total at four equal shares; incoming independently owns50, so the200 minimum remains exact.",
+    );
+  await page
     .getByRole("button", { name: "Add award ownership decision", exact: true })
     .click();
   await page
@@ -512,6 +517,11 @@ test("ordinary sourced award exclusion, retained roster and historical ownership
     .getByLabel("Historical transfer applicability rationale", { exact: true })
     .fill(
       "Synthetic applicable prior-season decision200×1/4=50. This is documentary starting ownership only, not a current event award or retroactive official rule claim.",
+    );
+  await page
+    .getByLabel("Adjustment applicability rationale", { exact: true })
+    .fill(
+      "Fictional reviewed27-point ordinary exclusion and independently applicable historical entitlement check; no outstanding penalty or exemption arithmetic.",
     );
   await page
     .getByRole("button", { name: "Calculate overall draft", exact: true })
