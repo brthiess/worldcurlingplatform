@@ -35,6 +35,7 @@ type Entry = {
   admissionState: string;
   deadline: string | null;
   rosterStatus: string;
+  attention: "funds_without_place" | "cleared_without_place" | null;
   staff: boolean;
   version: number;
   charge: Charge | null;
@@ -106,12 +107,16 @@ export function ChargeWorkbench() {
             : "Entry charges could not be loaded.",
         );
       const next: Workspace = await r.json();
+      const query = new URLSearchParams(window.location.search);
       setW(next);
       setSelected((old) =>
         next.divisions.some((d) => d.id === old)
           ? old
-          : (next.divisions[0]?.id ?? ""),
+          : (next.divisions.find((d) => d.id === query.get("division"))?.id ??
+            next.divisions[0]?.id ??
+            ""),
       );
+      setEntryId((old) => old || query.get("entry") || "");
       setError("");
       setStale(false);
       return next;
@@ -154,7 +159,6 @@ export function ChargeWorkbench() {
     entries = w?.entries.filter((e) => e.divisionId === selected) ?? [],
     en = entries.find((e) => e.id === entryId) ?? entries[0];
   useEffect(() => {
-    setEntryId("");
     setFormError("");
     setAmount("");
     setReason("");
@@ -293,7 +297,10 @@ export function ChargeWorkbench() {
               id="charge-division"
               value={selected}
               disabled={recovery.locked}
-              onChange={(e) => setSelected(e.target.value)}
+              onChange={(e) => {
+                setSelected(e.target.value);
+                setEntryId("");
+              }}
             >
               {w.divisions.map((d) => (
                 <option key={d.id} value={d.id}>
@@ -516,17 +523,17 @@ export function ChargeWorkbench() {
                                   : "An amount remains due."}{" "}
                               No online payment is claimed.
                             </p>
-                            {en.balance.dueMinor === 0 &&
-                              en.admissionState !== "accepted" && (
-                                <p className="notice">
-                                  <strong>Staff attention required.</strong> The
-                                  balance does not reserve or restore a place.
-                                  Expired, pending and waitlisted entries
-                                  require a separate admission decision;
-                                  released capacity is never reclaimed by this
-                                  ledger.
-                                </p>
-                              )}
+                            {en.attention && (
+                              <p className="notice">
+                                <strong>Staff attention required.</strong>{" "}
+                                {en.attention === "funds_without_place"
+                                  ? "External funds are recorded without an effective place. The financial balance does not reserve or restore capacity. "
+                                  : "The cleared balance does not reserve or restore a place. "}
+                                Expired, pending and waitlisted entries require
+                                a separate admission decision; released capacity
+                                is never reclaimed by this ledger.
+                              </p>
+                            )}
                             <h3>Charge history</h3>
                             <p>
                               Normal fee frozen from version{" "}

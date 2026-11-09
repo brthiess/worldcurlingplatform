@@ -110,3 +110,12 @@ export function reconcileCharge(terms: FeeTerms, history: readonly Credit[]) {
           : "amount_due",
   };
 }
+/** A financial record never reserves capacity. Re-evaluate with effective database-time admission. */
+export function admissionAttention(
+  state: string,
+  balance: { dueMinor: number; externalMinor: number },
+): "funds_without_place" | "cleared_without_place" | null {
+  if (state === "accepted" || state === "held") return null;
+  if (balance.externalMinor > 0) return "funds_without_place";
+  return balance.dueMinor === 0 ? "cleared_without_place" : null;
+}

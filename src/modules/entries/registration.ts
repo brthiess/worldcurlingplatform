@@ -44,7 +44,7 @@ export async function registrationWorkspace(userId: string) {
     ).rows;
     const entries = (
       await c.query(
-        `SELECT en.id,en.division_id AS "divisionId",en.display_name AS name,en.admission_state AS state,en.admission_version AS version,en.reservation_deadline AS deadline,coalesce(v.status,'provisional') AS "rosterStatus" FROM event_entry en JOIN division d ON d.id=en.division_id LEFT JOIN event_lineup_version v ON v.entry_id=en.id AND v.version=en.version WHERE en.division_id=ANY($1::text[]) AND (en.division_id=ANY($2::text[]) OR EXISTS(SELECT 1 FROM team_representation g JOIN season_registration sr ON sr.id=g.registration_id WHERE g.user_id=$3 AND g.revoked_at IS NULL AND sr.id=en.season_registration_id AND sr.team_id=en.team_id AND sr.season=d.entry_season)) ORDER BY en.display_name,en.id`,
+        `SELECT en.id,en.division_id AS "divisionId",en.display_name AS name,en.admission_state AS state,en.admission_version AS version,en.reservation_deadline AS deadline,coalesce(v.status,'provisional') AS "rosterStatus",(en.division_id=ANY($2::text[]) OR EXISTS(SELECT 1 FROM team_representation pg JOIN season_registration ps ON ps.id=pg.registration_id WHERE pg.user_id=$3 AND pg.revoked_at IS NULL AND 'payment'=ANY(pg.actions) AND ps.id=en.season_registration_id AND ps.team_id=en.team_id AND ps.season=d.entry_season)) AS "canReadPayment" FROM event_entry en JOIN division d ON d.id=en.division_id LEFT JOIN event_lineup_version v ON v.entry_id=en.id AND v.version=en.version WHERE en.division_id=ANY($1::text[]) AND (en.division_id=ANY($2::text[]) OR EXISTS(SELECT 1 FROM team_representation g JOIN season_registration sr ON sr.id=g.registration_id WHERE g.user_id=$3 AND g.revoked_at IS NULL AND sr.id=en.season_registration_id AND sr.team_id=en.team_id AND sr.season=d.entry_season)) ORDER BY en.display_name,en.id`,
         [
           divisions.map((d) => d.id),
           divisions.filter((d) => d.manual).map((d) => d.id),
@@ -55,6 +55,23 @@ export async function registrationWorkspace(userId: string) {
       ...e,
       state: effectiveAdmission(e.state, e.deadline, clock),
     }));
+    for (const en of entries) {
+      en.payment = null;
+      if (en.canReadPayment) {
+        const charge = (
+          await c.query(
+            'SELECT fee_version AS "feeVersion",fee_minor AS "feeMinor",currency,payment_terms AS "paymentTerms" FROM entry_charge WHERE entry_id=$1',
+            [en.id],
+          )
+        ).rows[0];
+        if (charge)
+          en.payment = {
+            feeVersion: charge.feeVersion,
+            currency: charge.currency,
+            ...(await chargeBalance(c, en.id, charge)).balance,
+          };
+      }
+    }
     const occupied = (
       await c.query(
         "SELECT division_id,count(*)::int AS count FROM event_entry WHERE division_id=ANY($1::text[]) AND (admission_state='accepted' OR (admission_state='held' AND reservation_deadline>$2)) GROUP BY division_id",

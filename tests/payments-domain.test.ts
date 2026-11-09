@@ -127,3 +127,30 @@ test("several independent reductions preserve a one-minor-unit remainder without
     },
   );
 });
+test("funds without an effective place need attention even when a positive balance remains", async () => {
+  const { admissionAttention } = await import("../src/domain/payments");
+  assert.equal(
+    admissionAttention("expired", { dueMinor: 11500, externalMinor: 1000 }),
+    "funds_without_place",
+  );
+  assert.equal(
+    admissionAttention("waitlisted", { dueMinor: 11500, externalMinor: 1000 }),
+    "funds_without_place",
+  );
+  assert.equal(
+    admissionAttention("held", { dueMinor: 11500, externalMinor: 1000 }),
+    null,
+  );
+  assert.equal(
+    admissionAttention("accepted", { dueMinor: 0, externalMinor: 1000 }),
+    null,
+  );
+  assert.equal(
+    admissionAttention("pending", { dueMinor: 0, externalMinor: 0 }),
+    "cleared_without_place",
+  );
+  assert.equal(
+    admissionAttention("pending", { dueMinor: 12500, externalMinor: 0 }),
+    null,
+  );
+});

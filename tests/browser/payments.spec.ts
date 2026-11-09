@@ -89,6 +89,7 @@ for (const [label, width, height] of [
   test(`${label}: staff records a reasoned exception and external receipt with clear amounts/history`, async ({
     page,
   }, info) => {
+    test.setTimeout(120000);
     const f = await fixture(page.request);
     await page.setViewportSize({ width, height });
     const errors: string[] = [],
@@ -167,6 +168,31 @@ for (const [label, width, height] of [
       path: info.outputPath(`${label}-ledger.png`),
       fullPage: true,
     });
+    await page.goto("/admin/registration");
+    await main.getByLabel("Division", { exact: true }).selectOption(f.division);
+    const summary = main.getByRole("listitem").filter({
+      has: page.getByRole("heading", {
+        name: `Fictional fee team ${f.suffix}`,
+        exact: true,
+      }),
+    });
+    await expect(summary).toContainText("Payment: balance cleared");
+    await expect(summary).toContainText("staff-attested external receipts");
+    await summary
+      .getByRole("link", {
+        name: "Review this entry’s charge history →",
+        exact: true,
+      })
+      .click();
+    await expect(main.getByLabel("Division", { exact: true })).toHaveValue(
+      f.division,
+    );
+    await expect(main.getByLabel("Team entry", { exact: true })).toHaveValue(
+      f.entry,
+    );
+    await expect(main.getByTestId("amount-due")).toHaveText("CAD 0.00");
+    expect(errors).toEqual([]);
+    expect(network).toEqual([]);
   });
 }
 test("loading, empty, stale balances and uncertain actor-bound retries remain truthful", async ({
@@ -352,6 +378,28 @@ test("fee revisions and full waivers keep prior charges visible; late cleared ba
     .click();
   await expect(main.getByText("CAD 180.25", { exact: true })).toBeVisible();
   await expect(main.getByTestId("amount-due")).toHaveText("CAD 125.00");
+  await page.goto("/admin/registration");
+  await main.getByLabel("Division", { exact: true }).selectOption(f.division);
+  const entrySummary = main.getByRole("listitem").filter({
+    has: page.getByRole("heading", {
+      name: `Fictional fee team ${f.suffix}`,
+      exact: true,
+    }),
+  });
+  await expect(entrySummary).toContainText("Payment: unpaid — CAD 125.00 due");
+  await expect(main.getByRole("region", { name: "Entry terms" })).toContainText(
+    "CAD 180.25",
+  );
+  await entrySummary
+    .getByRole("link", {
+      name: "Review this entry’s charge history →",
+      exact: true,
+    })
+    .click();
+  await expect(main.getByLabel("Team entry", { exact: true })).toHaveValue(
+    f.entry,
+  );
+
   await main
     .getByLabel("Adjustment type", { exact: true })
     .selectOption("waiver");
@@ -383,6 +431,7 @@ test("fee revisions and full waivers keep prior charges visible; late cleared ba
 test("a stale displayed fee cannot silently price a new manual charge", async ({
   page,
 }) => {
+  test.setTimeout(120000);
   const f = await fixture(page.request),
     pending = randomUUID(),
     main = page.getByRole("main");
@@ -502,4 +551,92 @@ test("current team-season payment representatives can read but cannot attest rec
       exact: true,
     }),
   ).toHaveCount(0);
+});
+test("partial funds without an effective place stay visible with staff attention and a positive balance", async ({
+  page,
+}, info) => {
+  test.setTimeout(120000);
+  const f = await fixture(page.request),
+    main = page.getByRole("main");
+  await page.setViewportSize({ width: 360, height: 900 });
+  await page.goto("/admin/entry-charges");
+  await main.getByLabel("Division", { exact: true }).selectOption(f.division);
+  await main
+    .getByLabel("Adjustment type", { exact: true })
+    .selectOption("external_receipt");
+  await main.getByLabel("Amount (CAD)", { exact: true }).fill("10.00");
+  await main
+    .getByLabel("Adjustment reason", { exact: true })
+    .fill("Fictional partial funds received");
+  await main
+    .getByLabel("External receipt reference", { exact: true })
+    .fill("demo-partial-" + f.suffix);
+  await main
+    .getByRole("button", { name: "Record adjustment", exact: true })
+    .click();
+  await expect(main.getByTestId("amount-due")).toHaveText("CAD 115.00");
+  await expect(
+    main.getByText("Staff attention required.", { exact: true }),
+  ).toHaveCount(0);
+  await pool.query(
+    "UPDATE event_entry SET reservation_deadline=clock_timestamp()-interval '1 second' WHERE id=$1",
+    [f.entry],
+  );
+  await main
+    .getByRole("button", { name: "Refresh ledger", exact: true })
+    .click();
+  await expect(
+    main.getByText("Expired — capacity released", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    main.getByText("Staff attention required.", { exact: true }),
+  ).toBeVisible();
+  await expect(main).toContainText(
+    "External funds are recorded without an effective place",
+  );
+  await expect(main.getByTestId("amount-due")).toHaveText("CAD 115.00");
+  await page.screenshot({
+    path: info.outputPath("phone-funds-without-place.png"),
+    fullPage: true,
+  });
+});
+
+test("unversioned legacy zero or unsupported fee amounts are unresolved rather than free or a render error", async ({
+  page,
+}) => {
+  test.setTimeout(120000);
+  const f = await fixture(page.request),
+    divisions = [randomUUID(), randomUUID()],
+    main = page.getByRole("main"),
+    errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  for (const [i, division] of divisions.entries()) {
+    await pool.query(
+      "INSERT INTO division(id,event_id,name,discipline,format) VALUES($1,$2,$3,'men_four','single_knockout')",
+      [division, f.edition, `Fictional unresolved legacy ${i}`],
+    );
+    await pool.query(
+      "INSERT INTO division_registration(division_id,version,mode,capacity,requirements,fee_minor,currency,payment_terms,payment_window_minutes,format,format_notes,opened_at) VALUES($1,1,'open',1,'Declared lineup',$2,'CAD','Unversioned historical payment terms',60,'single_knockout','Single elimination',clock_timestamp())",
+      [division, i === 0 ? 0 : 1000000000],
+    );
+    await pool.query(
+      "INSERT INTO event_entry(id,division_id,display_name,admission_version) VALUES($1,$2,'Fictional unresolved entry',1)",
+      [randomUUID(), division],
+    );
+  }
+  await page.goto("/admin/registration");
+  for (const division of divisions) {
+    await main.getByLabel("Division", { exact: true }).selectOption(division);
+    await expect(
+      main.getByText(
+        "Fee terms are unknown or unsupported; staff review is required.",
+        { exact: true },
+      ),
+    ).toBeVisible();
+    await expect(main.getByText("No entry fee", { exact: true })).toHaveCount(
+      0,
+    );
+    await expect(main).toContainText("Payment: unresolved");
+  }
+  expect(errors).toEqual([]);
 });

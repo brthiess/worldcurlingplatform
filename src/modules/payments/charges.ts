@@ -7,7 +7,12 @@ import {
   plainText,
   canonicalEntryCommand,
 } from "@/domain/entries";
-import { feeTerms, reconcileCharge, creditAmount } from "@/domain/payments";
+import {
+  feeTerms,
+  reconcileCharge,
+  creditAmount,
+  admissionAttention,
+} from "@/domain/payments";
 import { effectiveAdmission } from "@/domain/registration";
 import { assertAdmissionTeamAvailable } from "@/modules/entries/admission-identity";
 
@@ -154,13 +159,18 @@ export async function chargeWorkspace(userId: string) {
             [en.id],
           )
         ).rows[0] ?? null;
+      const accounting = charge
+        ? await chargeBalance(c, en.id, charge)
+        : { version: 0, balance: null, history: [] };
+      const admissionState = effectiveAdmission(en.state, en.deadline, now);
       result.push({
         ...en,
-        admissionState: effectiveAdmission(en.state, en.deadline, now),
+        admissionState,
         charge,
-        ...(charge
-          ? await chargeBalance(c, en.id, charge)
-          : { version: 0, balance: null, history: [] }),
+        ...accounting,
+        attention: accounting.balance
+          ? admissionAttention(admissionState, accounting.balance)
+          : null,
       });
     }
     const scopedDivisions = [];
@@ -422,10 +432,7 @@ export async function chargeCommand(userId: string, raw: unknown) {
         );
         admissionState = "accepted";
         disposition = "accepted_within_reservation";
-      } else if (
-        next.balance.dueMinor === 0 &&
-        !["accepted"].includes(effective)
-      )
+      } else if (admissionAttention(effective, next.balance))
         disposition = "staff_attention";
       result = {
         entryId,
@@ -434,6 +441,7 @@ export async function chargeCommand(userId: string, raw: unknown) {
         balance: next.balance,
         admissionState,
         disposition,
+        attention: admissionAttention(admissionState, next.balance),
       };
     }
     await c.query(

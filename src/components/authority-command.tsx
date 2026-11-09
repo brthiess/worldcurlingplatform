@@ -329,12 +329,13 @@ export function AuthorityRecovery({
                   <dd>{body.entryId}</dd>
                 </>
               )}
-              {body.expectedFeeVersion !== undefined && (
-                <>
-                  <dt>Reviewed fee version</dt>
-                  <dd>{body.expectedFeeVersion}</dd>
-                </>
-              )}
+              {body.expectedFeeVersion !== undefined &&
+                body.expectedFeeVersion !== null && (
+                  <>
+                    <dt>Reviewed fee version</dt>
+                    <dd>{body.expectedFeeVersion}</dd>
+                  </>
+                )}
               {body.externalReference && (
                 <>
                   <dt>External receipt reference</dt>

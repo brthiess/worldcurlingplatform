@@ -658,6 +658,14 @@ test("exact team-season payment grants control ledger reads; profile ownership a
     ).status,
     403,
   );
+  const registrationView = async () =>
+    (
+      await (
+        await fetch(base + "/api/v1/registration", {
+          headers: { cookie: reviewer },
+        })
+      ).json()
+    ).entries.find((x: any) => x.id === f.entries[0]);
   const submitGrant = randomUUID();
   await pool.query(
     "INSERT INTO team_representation(id,user_id,registration_id,actions,created_by) VALUES($1,'demo-reviewer',$2,ARRAY['submit'],'demo-administrator')",
@@ -667,10 +675,16 @@ test("exact team-season payment grants control ledger reads; profile ownership a
     (await workspace(reviewer)).entries.some((e: any) => e.id === f.entries[0]),
     false,
   );
+  const submitView = await registrationView();
+  assert.equal(submitView.canReadPayment, false);
+  assert.equal(submitView.payment, null);
   await pool.query(
     "INSERT INTO team_representation(id,user_id,registration_id,actions,created_by) VALUES($1,'demo-reviewer',$2,ARRAY['payment'],'demo-administrator')",
     [grant, registration],
   );
+  const paymentView = await registrationView();
+  assert.equal(paymentView.canReadPayment, true);
+  assert.equal(paymentView.payment.dueMinor, 12500);
   let w = await workspace(reviewer);
   const e = w.entries.find((e: any) => e.id === f.entries[0]);
   assert.equal(e.balance.dueMinor, 12500);
@@ -716,6 +730,9 @@ test("exact team-season payment grants control ledger reads; profile ownership a
     (await workspace(reviewer)).entries.some((e: any) => e.id === f.entries[0]),
     false,
   );
+  const revokedView = await registrationView();
+  assert.equal(revokedView.canReadPayment, false);
+  assert.equal(revokedView.payment, null);
   const invalidActor = {
     action: "freeze",
     divisionId: f.division,
@@ -980,4 +997,132 @@ test("global administrators can record scoped external receipts and public proje
     "amountMinor",
   ])
     assert.equal(body.includes(privateValue), false);
+});
+test("late partial external funds require attention without reclaiming released capacity", async () => {
+  const f = await fixture(),
+    entryId = f.entries[0];
+  assert.equal(
+    (
+      await post(f.cookie, "/api/v1/registration", {
+        action: "request",
+        divisionId: f.division,
+        entryId,
+        version: 0,
+      })
+    ).status,
+    200,
+  );
+  await pool.query(
+    "UPDATE event_entry SET reservation_deadline=clock_timestamp()-interval '1 second' WHERE id=$1",
+    [entryId],
+  );
+  const command = {
+    action: "external_receipt",
+    divisionId: f.division,
+    entryId,
+    version: 1,
+    amountMinor: 1000,
+    currency: "CAD",
+    reason: "Late partial bank transfer verified",
+    externalReference: "late-partial-" + randomUUID(),
+    requestId: randomUUID(),
+  };
+  const r = await post(f.cookie, "/api/v1/entry-charges", command);
+  assert.equal(r.status, 200);
+  const result = await r.json();
+  assert.equal(result.disposition, "staff_attention");
+  assert.equal(result.attention, "funds_without_place");
+  const e = (await workspace(f.cookie)).entries.find(
+    (e: any) => e.id === entryId,
+  );
+  assert.equal(e.balance.dueMinor, 11500);
+  assert.equal(e.admissionState, "expired");
+  assert.equal(e.attention, "funds_without_place");
+  assert.equal(
+    (await post(f.cookie, "/api/v1/entry-charges", command)).status,
+    200,
+  );
+  assert.equal(
+    (await workspace(f.cookie)).entries.find((e: any) => e.id === entryId)
+      .history.length,
+    1,
+  );
+});
+
+test("registration summaries use frozen terms and balances rather than revised division prices", async () => {
+  const f = await fixture();
+  assert.equal(
+    (
+      await post(f.cookie, "/api/v1/entry-charges", {
+        action: "freeze",
+        divisionId: f.division,
+        entryId: f.entries[0],
+        version: 0,
+        expectedFeeVersion: 1,
+        reason: "Normal original manual fee",
+      })
+    ).status,
+    200,
+  );
+  assert.equal(
+    (
+      await post(f.cookie, "/api/v1/entry-charges", {
+        action: "revise_fee",
+        divisionId: f.division,
+        version: 1,
+        terms: {
+          feeMinor: 0,
+          currency: "CAD",
+          paymentTerms: "New zero-fee future charges",
+        },
+        reason: "Sponsor new entrants",
+      })
+    ).status,
+    200,
+  );
+  assert.equal(
+    (
+      await post(f.cookie, "/api/v1/entry-charges", {
+        action: "freeze",
+        divisionId: f.division,
+        entryId: f.entries[1],
+        version: 0,
+        expectedFeeVersion: 2,
+        reason: "New normal zero-fee manual entry",
+      })
+    ).status,
+    200,
+  );
+  assert.equal(
+    (
+      await post(f.cookie, "/api/v1/entry-charges", {
+        action: "revise_fee",
+        divisionId: f.division,
+        version: 2,
+        terms: {
+          feeMinor: 20000,
+          currency: "CAD",
+          paymentTerms: "New future normal fee",
+        },
+        reason: "Next pricing version",
+      })
+    ).status,
+    200,
+  );
+  const r = await fetch(base + "/api/v1/registration", {
+    headers: { cookie: f.cookie },
+  });
+  assert.equal(r.status, 200);
+  const w = await r.json(),
+    old = w.entries.find((e: any) => e.id === f.entries[0]),
+    zero = w.entries.find((e: any) => e.id === f.entries[1]);
+  assert.equal(old.canReadPayment, true);
+  assert.equal(old.payment.feeMinor, 12500);
+  assert.equal(old.payment.dueMinor, 12500);
+  assert.equal(zero.payment.feeMinor, 0);
+  assert.equal(zero.payment.status, "no_fee");
+  assert.equal(
+    w.divisions.find((d: any) => d.id === f.division).feeMinor,
+    20000,
+  );
 });

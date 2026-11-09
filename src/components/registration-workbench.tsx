@@ -22,7 +22,35 @@ type Entry = {
   version: number;
   deadline: string | null;
   rosterStatus: string;
+  canReadPayment: boolean;
+  payment: {
+    feeVersion: number;
+    feeMinor: number;
+    currency: string;
+    dueMinor: number;
+    discountMinor: number;
+    waivedMinor: number;
+    externalMinor: number;
+    status: string;
+  } | null;
 };
+function paymentLabel(entry: Entry) {
+  if (!entry.canReadPayment)
+    return "financial details require current team-season payment authority";
+  const p = entry.payment;
+  if (!p) return "unresolved — frozen fee terms have not been established";
+  if (p.feeMinor === 0) return "not required under the frozen zero-fee terms";
+  if (p.dueMinor > 0)
+    return `unpaid — ${formatMoney(p.dueMinor, p.currency)} due under frozen fee version ${p.feeVersion}`;
+  const records = [
+    p.discountMinor > 0 ? "discounts" : null,
+    p.waivedMinor > 0 ? "waivers" : null,
+    p.externalMinor > 0 ? "staff-attested external receipts" : null,
+  ]
+    .filter(Boolean)
+    .join(", ");
+  return `balance cleared by recorded ${records} (${formatMoney(0, p.currency)} due)`;
+}
 type Workspace = {
   actorId: string;
   now: string;
@@ -214,12 +242,13 @@ export function RegistrationWorkbench() {
                             <dd>{d.requirements}</dd>
                             <dt>Entry fee</dt>
                             <dd>
-                              {d.feeMinor === 0
-                                ? "No entry fee"
-                                : d.currency &&
-                                    Object.hasOwn(currencyDigits, d.currency)
-                                  ? formatMoney(d.feeMinor!, d.currency)
-                                  : `${d.feeMinor} ${d.currency} minor units (unsupported currency; staff review required)`}
+                              {!d.feeVersion ||
+                              !d.currency ||
+                              !Object.hasOwn(currencyDigits, d.currency)
+                                ? "Fee terms are unknown or unsupported; staff review is required."
+                                : d.feeMinor === 0
+                                  ? "No entry fee"
+                                  : formatMoney(d.feeMinor!, d.currency)}
                             </dd>
                             <dt>Payment terms</dt>
                             <dd>{d.paymentTerms}</dd>
@@ -457,11 +486,18 @@ export function RegistrationWorkbench() {
                               )}
                               <p>
                                 Lineup: {e.rosterStatus}. Payment:{" "}
-                                {e.state === "held"
-                                  ? "unpaid balance; review the entry charge ledger"
-                                  : "review the entry charge ledger for frozen fees, exceptions and external receipts"}
-                                . Ranking eligibility: separate assessment.
+                                {paymentLabel(e)}. Ranking eligibility: separate
+                                assessment.
                               </p>
+                              {e.canReadPayment && (
+                                <p>
+                                  <a
+                                    href={`/admin/entry-charges?division=${encodeURIComponent(e.divisionId)}&entry=${encodeURIComponent(e.id)}`}
+                                  >
+                                    Review this entry’s charge history →
+                                  </a>
+                                </p>
+                              )}
                               {d.mode &&
                                 ["pending", "invited"].includes(e.state) && (
                                   <div className="ranking-actions">
