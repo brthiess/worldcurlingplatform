@@ -1030,7 +1030,11 @@ export function OverallRankingsWorkbench() {
                     </td>
                     <td>{amount(r.carryover)}</td>
                     <td>
-                      <button type="button" onClick={() => setDetailId(r.id)}>
+                      <button
+                        type="button"
+                        disabled={locked}
+                        onClick={() => setDetailId(r.id)}
+                      >
                         Inspect {r.name}
                       </button>
                     </td>
@@ -1095,6 +1099,7 @@ export function OverallRankingsWorkbench() {
               <select
                 value={selected.id}
                 onChange={async (e) => {
+                  setLoading(true);
                   try {
                     setSelected(
                       await read<Saved>(`${path}?id=${e.target.value}`),
@@ -1102,6 +1107,8 @@ export function OverallRankingsWorkbench() {
                     setDetailId("");
                   } catch (e) {
                     setError((e as Error).message);
+                  } finally {
+                    setLoading(false);
                   }
                 }}
               >

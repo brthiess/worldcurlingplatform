@@ -9,6 +9,7 @@ import {
 import { source } from "../ranking-inputs-fixtures";
 const db = new pg.Pool({ connectionString: process.env.DATABASE_URL, max: 3 });
 test.afterAll(() => db.end());
+test.use({ actionTimeout: 10000 });
 test("overall review loads and shows honest empty/input state", async ({
   page,
 }) => {
@@ -359,7 +360,12 @@ test("loading, failed reads, stale review, denied access and committed lost ackn
   await page.screenshot({
     path: "docs/verification/assets/WCP-034/retained-command-reload.png",
   });
-  await page.getByRole("button", { name: /Retry retained/ }).click();
+  await page
+    .getByRole("button", {
+      name: "Retry exact overall ranking command",
+      exact: true,
+    })
+    .click();
   await expect(
     page.getByText("Overall draft and immutable contributions saved.", {
       exact: true,
@@ -368,10 +374,8 @@ test("loading, failed reads, stale review, denied access and committed lost ackn
   await expect(
     page.getByRole("heading", { name: /Ready overall draft/ }),
   ).toBeVisible();
-  await page.request.post("/api/auth/sign-out", {
-    headers: { Origin: process.env.BETTER_AUTH_URL! },
-  });
   await page.goto("/admin");
+  await page.getByRole("button", { name: "Sign out", exact: true }).click();
   await page.getByLabel("Demo persona").selectOption("organizer");
   await page.getByLabel("Demo password").fill(process.env.DEMO_PASSWORD!);
   await signInWithRateWindow(
@@ -382,4 +386,152 @@ test("loading, failed reads, stale review, denied access and committed lost ackn
   await expect(page.getByRole("main").getByRole("alert")).toContainText(
     "administrator authority",
   );
+});
+
+test("ordinary sourced award exclusion, retained roster and historical ownership check persist without rewriting original draft", async ({
+  page,
+}) => {
+  test.setTimeout(120000);
+  await page.goto("/admin");
+  await page.getByLabel("Demo persona").selectOption("administrator");
+  await page.getByLabel("Demo password").fill(process.env.DEMO_PASSWORD!);
+  await signInWithRateWindow(
+    page,
+    page.getByRole("button", { name: "Sign in", exact: true }),
+  );
+  const send = async (path: string, body?: unknown) => {
+    const r = body
+      ? await page.request.post(path, {
+          headers: { Origin: process.env.BETTER_AUTH_URL! },
+          data: body,
+        })
+      : await page.request.get(path);
+    return { status: r.status(), json: () => r.json(), text: () => r.text() };
+  };
+  const f = await overallFixture(db, send),
+    url = `/api/v1/overall-rankings?discipline=${f.discipline}&date=2026-11-23&rules=${f.rulesId}`,
+    w = await (await page.request.get(url)).json(),
+    evidence = overallReviewEvidence(w.review, f);
+  const old = await page.request.post("/api/v1/overall-rankings", {
+    headers: { Origin: process.env.BETTER_AUTH_URL! },
+    data: {
+      action: "calculate",
+      discipline: f.discipline,
+      effectiveDate: "2026-11-23",
+      rulesId: f.rulesId,
+      version: w.version,
+      sourceDigest: w.review.sourceDigest,
+      requestId: crypto.randomUUID(),
+      evidence,
+    },
+  });
+  expect(old.status()).toBe(200);
+  const original = await old.json();
+  await page.goto("/admin/overall-rankings");
+  await page
+    .getByRole("combobox", { name: "Discipline", exact: true })
+    .selectOption(f.discipline);
+  await page
+    .getByRole("combobox", { name: "Rule-source edition", exact: true })
+    .selectOption(f.rulesId);
+  await page
+    .getByRole("button", { name: "Load current review", exact: true })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: /Ready overall draft/ }),
+  ).toBeVisible();
+  await page
+    .getByLabel("Season subject", { exact: true })
+    .selectOption(f.seasonIds[0]);
+  await page
+    .getByLabel("Continuity decision", { exact: true })
+    .selectOption("retained");
+  await page.getByLabel("Prior final team total", { exact: true }).fill("200");
+  await page
+    .getByLabel("Prior player 4", { exact: true })
+    .fill(f.playerLists[1][0]);
+  await page
+    .getByRole("button", { name: "Add award ownership decision", exact: true })
+    .click();
+  await page
+    .getByLabel("Frozen award", { exact: true })
+    .selectOption(
+      `${w.review.events.find((e: any) => e.divisionId === f.divisionId).assessment.id}:${f.entries[0]}`,
+    );
+  await page
+    .getByLabel("Award decision", { exact: true })
+    .selectOption("exclude");
+  await page
+    .getByLabel("Award decision source", { exact: true })
+    .selectOption("official");
+  await page
+    .getByLabel("Award decision rationale", { exact: true })
+    .fill(
+      "Fictional ordinary sourced event exclusion preserves the original frozen27-point award.",
+    );
+  await page
+    .getByRole("button", {
+      name: "Add historical ownership check",
+      exact: true,
+    })
+    .click();
+  await page
+    .getByLabel("Transfer owner", { exact: true })
+    .selectOption(f.playerLists[0][0]);
+  await page
+    .getByLabel("Prior-season departure date", { exact: true })
+    .fill("2025-10-01");
+  await page
+    .getByLabel("Historical old played subtotal", { exact: true })
+    .fill("200");
+  await page
+    .getByLabel("Historical amount source", { exact: true })
+    .selectOption("official");
+  await page
+    .getByLabel("Prior-season applicability source", { exact: true })
+    .selectOption("official");
+  await page
+    .getByLabel("Historical transfer applicability rationale", { exact: true })
+    .fill(
+      "Synthetic applicable prior-season decision200×1/4=50. This is documentary starting ownership only, not a current event award or retroactive official rule claim.",
+    );
+  await page
+    .getByRole("button", { name: "Calculate overall draft", exact: true })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: /Ready overall draft/ }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Inspect Fictional team 1", exact: true })
+    .click();
+  const contribution = page.getByRole("region", {
+    name: "Subject contributions",
+  });
+  await expect(contribution).toContainText("continuity floor 200");
+  await expect(contribution).toContainText("2026-11-22 · 27");
+  await expect(contribution).toContainText(
+    "Fictional ordinary sourced event exclusion",
+  );
+  await page
+    .getByLabel("Draft revision", { exact: true })
+    .selectOption(original.id);
+  await expect(
+    page.getByRole("heading", {
+      name: `Ready overall draft · revision ${original.version}`,
+      exact: true,
+    }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Inspect Fictional team 1", exact: true })
+    .click();
+  await expect(
+    page.getByRole("region", { name: "Subject contributions" }),
+  ).toContainText("No excluded awards.");
+  const unchanged = await (
+    await page.request.get(`/api/v1/overall-rankings?id=${original.id}`)
+  ).json();
+  expect(unchanged.resultDigest).toBe(original.resultDigest);
+  expect(
+    unchanged.result.rows.find((r: any) => r.id === f.seasonIds[0]).total,
+  ).toBe("102");
 });
