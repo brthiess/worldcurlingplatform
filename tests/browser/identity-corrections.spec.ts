@@ -206,6 +206,54 @@ test("lost applied response locks correction controls across reload and replays 
   await page.screenshot({ path: info.outputPath("phone-uncertain.png") });
   await page.reload();
   await expect(page.getByLabel("Affected entry")).toBeDisabled();
+  const retained = page
+    .locator("details")
+    .filter({
+      has: page.getByText("Review retained command", { exact: true }),
+    });
+  await retained.locator("summary").click();
+  await expect(
+    retained.getByText("Correct factual player selection", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    retained.getByRole("link", {
+      name: `Open mistaken player record ${f.ids[0]}`,
+      exact: true,
+    }),
+  ).toHaveAttribute("href", `/players/${f.ids[0]}`);
+  await expect(
+    retained.getByRole("link", {
+      name: `Open proposed player record ${candidate}`,
+      exact: true,
+    }),
+  ).toHaveAttribute("href", `/players/${candidate}`);
+  await expect(retained.getByText("1", { exact: true })).toBeVisible();
+  await expect(
+    retained.getByText("demo-administrator", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    retained.getByText("Original organizer lineup and staff review", {
+      exact: true,
+    }),
+  ).toBeVisible();
+  await retained.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: info.outputPath("phone-retained-review.png") });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+  await retained
+    .getByRole("link", {
+      name: `Open mistaken player record ${f.ids[0]}`,
+      exact: true,
+    })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "Wrong browser record", exact: true }),
+  ).toBeVisible();
+  await page.goBack();
+  await expect(page.getByLabel("Affected entry")).toBeDisabled();
   await page
     .getByRole("button", {
       name: "Retry exact identity correction command",
