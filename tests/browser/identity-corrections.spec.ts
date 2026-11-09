@@ -111,6 +111,7 @@ for (const width of [360, 768, 1440])
     await expect(
       outcome.getByText(/No canonical changes applied/),
     ).toBeVisible();
+    await expect(page.getByLabel("Affected entry")).toBeEnabled();
     expect(
       (await (await page.request.get(`/api/v1/entries/${f.id}`)).json())
         .version,

@@ -64,7 +64,22 @@ export async function correctionWorkspace(userId: string, requestId?: string) {
   }
 }
 /** Entry-local selection repair. No player consolidation, registered-core rewrite or historical reassessment. */
-export async function correctIdentity(userId: string, bodyText: string) {
+export async function correctIdentity(userId: string, bodyBytes: Uint8Array) {
+  if (bodyBytes.byteLength > 48000)
+    throw new EntryError("Correction evidence is too large.");
+  let bodyText: string;
+  try {
+    // Request.text() strips a leading BOM and replaces malformed UTF-8. Neither
+    // transformation is acceptable for an exact-byte retained command.
+    bodyText = new TextDecoder("utf-8", {
+      fatal: true,
+      ignoreBOM: true,
+    }).decode(bodyBytes);
+  } catch {
+    throw new EntryError("Send valid UTF-8 JSON for the correction.");
+  }
+  if (bodyText.charCodeAt(0) === 0xfeff)
+    throw new EntryError("Send JSON without a UTF-8 byte-order mark.");
   if (bodyText.length > 12000)
     throw new EntryError("Correction evidence is too large.");
   const raw = JSON.parse(bodyText),
@@ -77,7 +92,7 @@ export async function correctIdentity(userId: string, bodyText: string) {
   if (from === to) throw new EntryError("Choose a different player record.");
   const reason = plainText(raw.reason, 1000),
     source = plainText(raw.source, 1000),
-    digest = createHash("sha256").update(bodyText).digest("hex");
+    digest = createHash("sha256").update(bodyBytes).digest("hex");
   const c = await pool.connect();
   try {
     await c.query("BEGIN");
@@ -125,7 +140,7 @@ export async function correctIdentity(userId: string, bodyText: string) {
     );
     if (previous.rowCount) {
       const { body_text, ...r } = previous.rows[0];
-      if (body_text !== bodyText)
+      if (body_text !== bodyText || r.commandDigest !== digest)
         throw new EntryError(
           "This request belongs to different exact command bytes.",
           409,

@@ -13,6 +13,6 @@ export async function GET(r: Request) {
 }
 export async function POST(r: Request) {
   return entryHttp(r, true, async (userId) =>
-    correctIdentity(userId, await r.text()),
+    correctIdentity(userId, new Uint8Array(await r.arrayBuffer())),
   );
 }

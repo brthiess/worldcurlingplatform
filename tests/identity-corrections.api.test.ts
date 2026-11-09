@@ -747,3 +747,81 @@ test("factual correction preserves frozen results, season inputs and assessment 
     await db.end();
   }
 });
+
+test("raw HTTP correction bytes reject BOM and malformed UTF-8, while earlier ordinary UTF-8 receipts replay", async () => {
+  const f = await fixture(),
+    body = {
+      requestId: randomUUID(),
+      entryId: f.id,
+      version: 1,
+      fromPlayerId: f.ids[0],
+      toPlayerId: f.ids[4],
+      reason: "Raw transport receipt fixture",
+      source: "Original valid UTF-8 source",
+    };
+  const accepted = await req("/api/v1/identity-corrections", body);
+  assert.equal(accepted.status, 200);
+  const headers = {
+    cookie: await login(),
+    Origin: base,
+    "Content-Type": "application/json",
+  };
+  const bom = await fetch(base + "/api/v1/identity-corrections", {
+    method: "POST",
+    headers,
+    body: new Uint8Array([
+      239,
+      187,
+      191,
+      ...new TextEncoder().encode(JSON.stringify(body)),
+    ]),
+  });
+  assert.equal(
+    bom.status,
+    400,
+    "BOM must not normalize into a successful exact-byte replay",
+  );
+  const f2 = await fixture(),
+    text = JSON.stringify({
+      ...body,
+      requestId: randomUUID(),
+      entryId: f2.id,
+      fromPlayerId: f2.ids[0],
+      toPlayerId: f2.ids[4],
+      source: "Malformed @ marker",
+    }),
+    bytes = new TextEncoder().encode(text);
+  bytes[text.indexOf("@")] = 255;
+  const malformed = await fetch(base + "/api/v1/identity-corrections", {
+    method: "POST",
+    headers,
+    body: bytes,
+  });
+  assert.equal(malformed.status, 400);
+  assert.equal(
+    (await (await req(`/api/v1/entries/${f2.id}`)).json()).version,
+    1,
+  );
+  const db = new pg.Pool({ connectionString: process.env.DATABASE_URL });
+  try {
+    // Use retained earlier UTF-8 command bytes as fixture input; behavior is observed through private HTTP receipts.
+    const old = (
+      await db.query(
+        "SELECT body_text,request_id FROM identity_correction WHERE actor_id='demo-administrator' AND outcome='applied' ORDER BY created_at,id LIMIT 1",
+      )
+    ).rows[0];
+    assert.ok(old);
+    const original = await (
+      await req(`/api/v1/identity-corrections?requestId=${old.request_id}`)
+    ).json();
+    const replay = await fetch(base + "/api/v1/identity-corrections", {
+      method: "POST",
+      headers,
+      body: new TextEncoder().encode(old.body_text),
+    });
+    assert.equal(replay.status, 200);
+    assert.deepEqual(await replay.json(), original);
+  } finally {
+    await db.end();
+  }
+});
