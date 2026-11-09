@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { canonicalEntryCommand } from "@/domain/entries";
 import type { RegistrationTerms, AdmissionState } from "@/domain/registration";
 import { AuthorityRecovery, useAuthorityCommand } from "./authority-command";
+import { currencyDigits, formatMoney } from "@/domain/payments";
 type Division = Partial<RegistrationTerms> & {
   id: string;
   name: string;
@@ -11,6 +12,7 @@ type Division = Partial<RegistrationTerms> & {
   manual: boolean;
   remaining: number | null;
   openedAt: string | null;
+  feeVersion: number | null;
 };
 type Entry = {
   id: string;
@@ -20,13 +22,41 @@ type Entry = {
   version: number;
   deadline: string | null;
   rosterStatus: string;
+  canReadPayment: boolean;
+  payment: {
+    feeVersion: number;
+    feeMinor: number;
+    currency: string;
+    dueMinor: number;
+    discountMinor: number;
+    waivedMinor: number;
+    externalMinor: number;
+    status: string;
+  } | null;
 };
+function paymentLabel(entry: Entry) {
+  if (!entry.canReadPayment)
+    return "financial details require current team-season payment authority";
+  const p = entry.payment;
+  if (!p) return "unresolved — frozen fee terms have not been established";
+  if (p.feeMinor === 0) return "not required under the frozen zero-fee terms";
+  if (p.dueMinor > 0)
+    return `unpaid — ${formatMoney(p.dueMinor, p.currency)} due under frozen fee version ${p.feeVersion}`;
+  const records = [
+    p.discountMinor > 0 ? "discounts" : null,
+    p.waivedMinor > 0 ? "waivers" : null,
+    p.externalMinor > 0 ? "staff-attested external receipts" : null,
+  ]
+    .filter(Boolean)
+    .join(", ");
+  return `balance cleared by recorded ${records} (${formatMoney(0, p.currency)} due)`;
+}
 type Workspace = {
   actorId: string;
   now: string;
   divisions: Division[];
   entries: Entry[];
-  receipts: { requestId: string; command: unknown }[];
+  receipts: { requestId: string; commandDigest: string }[];
 };
 const initial: RegistrationTerms = {
   mode: "open",
@@ -87,10 +117,15 @@ export function RegistrationWorkbench() {
     async (saved) => {
       const w = await load(),
         v = JSON.parse(saved.body);
+      const bytes = await crypto.subtle.digest(
+        "SHA-256",
+        new TextEncoder().encode(canonicalEntryCommand(v)),
+      );
+      const commandDigest = Array.from(new Uint8Array(bytes), (byte) =>
+        byte.toString(16).padStart(2, "0"),
+      ).join("");
       const found = w.receipts.some(
-        (r) =>
-          r.requestId === v.requestId &&
-          canonicalEntryCommand(r.command) === canonicalEntryCommand(v),
+        (r) => r.requestId === v.requestId && r.commandDigest === commandDigest,
       );
       if (found) setSelected(v.divisionId);
       return found;
@@ -113,6 +148,7 @@ export function RegistrationWorkbench() {
         divisionId: selected,
         requestId: crypto.randomUUID(),
         version: entry?.version ?? d?.version ?? 0,
+        expectedFeeVersion: d?.feeVersion,
         ...(entry ? { entryId: entry.id } : {}),
         ...(action === "open" ? { terms } : {}),
       },
@@ -129,6 +165,7 @@ export function RegistrationWorkbench() {
       </p>
       <p>
         <a href="/admin/entries">Create or amend a team entry →</a> ·{" "}
+        <a href="/admin/entry-charges">Entry charge ledger →</a> ·{" "}
         <a href="/admin">Your workspace</a>
       </p>
       {error && (
@@ -210,9 +247,13 @@ export function RegistrationWorkbench() {
                             <dd>{d.requirements}</dd>
                             <dt>Entry fee</dt>
                             <dd>
-                              {d.feeMinor === 0
-                                ? "No entry fee"
-                                : `${d.feeMinor} ${d.currency} minor units`}
+                              {!d.feeVersion ||
+                              !d.currency ||
+                              !Object.hasOwn(currencyDigits, d.currency)
+                                ? "Fee terms are unknown or unsupported; staff review is required."
+                                : d.feeMinor === 0
+                                  ? "No entry fee"
+                                  : formatMoney(d.feeMinor!, d.currency)}
                             </dd>
                             <dt>Payment terms</dt>
                             <dd>{d.paymentTerms}</dd>
@@ -227,9 +268,12 @@ export function RegistrationWorkbench() {
                             </dd>
                           </dl>
                           <p>
-                            Terms are retained as opened. A held place is
-                            unpaid. Late payment after expiry requires staff
-                            attention and cannot restore a released place.
+                            Capacity, requirements and format are retained as
+                            opened. The fee shown applies to new charges; each
+                            entry retains its frozen fee in the charge ledger. A
+                            held place has an unpaid balance. Late settlement
+                            after expiry requires staff attention and cannot
+                            restore a released place.
                           </p>
                           {d.manual && (
                             <button
@@ -447,13 +491,18 @@ export function RegistrationWorkbench() {
                               )}
                               <p>
                                 Lineup: {e.rosterStatus}. Payment:{" "}
-                                {d.feeMinor === 0
-                                  ? "not required under these terms"
-                                  : d.mode
-                                    ? "unpaid; checkout handled separately"
-                                    : "terms not open"}
-                                . Ranking eligibility: separate assessment.
+                                {paymentLabel(e)}. Ranking eligibility: separate
+                                assessment.
                               </p>
+                              {e.canReadPayment && (
+                                <p>
+                                  <a
+                                    href={`/admin/entry-charges?division=${encodeURIComponent(e.divisionId)}&entry=${encodeURIComponent(e.id)}`}
+                                  >
+                                    Review this entry’s charge history →
+                                  </a>
+                                </p>
+                              )}
                               {d.mode &&
                                 ["pending", "invited"].includes(e.state) && (
                                   <div className="ranking-actions">
