@@ -5,6 +5,7 @@ import { randomUUID } from "node:crypto";
 import { authRequest } from "./auth-request";
 import pg from "pg";
 import { assessmentFixture } from "./event-assessments-fixture";
+import { rulesFixture } from "./ranking-inputs-fixtures";
 const base = process.env.BETTER_AUTH_URL!;
 const sessions = new Map<string, string>();
 async function login(role = "administrator") {
@@ -278,11 +279,77 @@ test("person, team, entry and ranking-subject collisions retain durable issues w
   const target = await response.json();
   const db = new pg.Pool({ connectionString: process.env.DATABASE_URL });
   try {
-    // Fixture-only ranking subject; evidence is exercised via the staff correction interface.
-    await db.query(
-      "INSERT INTO ranking_record(id,kind,registration_id,version) VALUES($1,'season',$2,1)",
-      [randomUUID(), target.registration.id],
+    const rankingId = randomUUID(),
+      rulesId = randomUUID(),
+      rankingRequestId = randomUUID();
+    // A collision needs an actual readable subject, but no reviewed point rights.
+    const rulesResponse = await req("/api/v1/ranking-inputs", {
+      id: rulesId,
+      kind: "rules",
+      version: 0,
+      requestId: randomUUID(),
+      state: "draft",
+      data: rulesFixture(),
+    });
+    assert.equal(rulesResponse.status, 200);
+    const draftResponse = await req("/api/v1/ranking-inputs", {
+      id: rankingId,
+      kind: "season",
+      version: 0,
+      requestId: rankingRequestId,
+      state: "draft",
+      data: {
+        registrationId: target.registration.id,
+        rosterVersion: target.registration.version,
+        rulesId,
+        rulesVersion: 1,
+        effectiveFrom: "2026-08-01",
+        effectiveTo: "2027-08-01",
+        rankingPlayerIds: correctedIds,
+        rankingAlternateIds: [],
+        rosterSourceId: "",
+        allocationOption: "unresolved",
+        allocations: [],
+        sources: [],
+        contributions: [],
+        reviewNote:
+          "Collision fixture only; starting entitlements and eligibility remain unresolved.",
+      },
+    });
+    assert.equal(draftResponse.status, 200);
+    const draft = await draftResponse.json();
+    const rankingResponse = await req(`/api/v1/ranking-inputs?id=${rankingId}`);
+    assert.equal(
+      rankingResponse.status,
+      200,
+      "Collision ranking subject must be readable through the staff API",
     );
+    assert.deepEqual(await rankingResponse.json(), draft);
+    assert.equal(draft.version, 1);
+    assert.equal(draft.state, "draft");
+    assert.equal(draft.data.registrationId, target.registration.id);
+    assert.equal(draft.savedReadiness.complete, false);
+    assert.equal(draft.currentReadiness.complete, false);
+    assert.equal(draft.currentReadiness.startingInput, null);
+    assert.equal(draft.history.length, 1);
+    assert.equal(draft.history[0].state, "draft");
+    assert.equal(draft.history[0].actorId, "demo-administrator");
+    const receipts = await db.query(
+      "SELECT v.version,v.state,v.actor_id,v.request_id,v.command_digest,a.action,a.resource_id,a.actor_id AS audit_actor FROM ranking_revision v JOIN audit_record a ON a.id=v.audit_id WHERE v.record_id=$1",
+      [rankingId],
+    );
+    assert.equal(receipts.rowCount, 1);
+    const { command_digest: digest, ...receipt } = receipts.rows[0];
+    assert.deepEqual(receipt, {
+      version: 1,
+      state: "draft",
+      actor_id: "demo-administrator",
+      request_id: rankingRequestId,
+      action: "ranking_season_draft",
+      resource_id: rankingId,
+      audit_actor: "demo-administrator",
+    });
+    assert.match(digest, /^[a-f0-9]{64}$/);
     const stateBefore = await db.query(
       "SELECT (SELECT count(*)::int FROM team) AS teams,(SELECT count(*)::int FROM event_lineup_version WHERE entry_id=$1) AS versions",
       [f.id],
@@ -300,6 +367,16 @@ test("person, team, entry and ranking-subject collisions retain durable issues w
     assert.deepEqual(
       issue.collisions.map((c: { kind: string }) => c.kind),
       ["team", "entry", "ranking_subject"],
+    );
+    assert.deepEqual(
+      issue.collisions.find(
+        (c: { kind: string }) => c.kind === "ranking_subject",
+      ).ids,
+      [rankingId],
+    );
+    assert.deepEqual(
+      await (await req(`/api/v1/ranking-inputs?id=${rankingId}`)).json(),
+      draft,
     );
     assert.deepEqual(
       (await (await req(`/api/v1/entries/${f.id}`)).json()).lineup,
@@ -496,12 +573,14 @@ test("a factual core correction never transfers an old representative grant or p
         name: "Represented mistaken identity",
         coreKnown: true,
         corePlayerIds: f.ids.slice(0, 4),
-        members: f.ids.slice(0, 4).map((playerId) => ({
-          playerId,
-          role: "core",
-          position: "",
-          participation: "declared",
-        })),
+        members: f.ids
+          .slice(0, 4)
+          .map((playerId) => ({
+            playerId,
+            role: "core",
+            position: "",
+            participation: "declared",
+          })),
         registerSeason: { season: "2026-27", version: 0 },
       },
     });
@@ -872,14 +951,12 @@ test("factual correction preserves frozen charges and old credits, serializes an
         name: "Factual financial identity",
         coreKnown: true,
         corePlayerIds: f.ids.slice(0, 4),
-        members: f.ids
-          .slice(0, 4)
-          .map((playerId) => ({
-            playerId,
-            role: "core",
-            position: "",
-            participation: "declared",
-          })),
+        members: f.ids.slice(0, 4).map((playerId) => ({
+          playerId,
+          role: "core",
+          position: "",
+          participation: "declared",
+        })),
         registerSeason: { season: "2026-27", version: 0 },
       },
     });
