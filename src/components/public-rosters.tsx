@@ -1,4 +1,7 @@
 "use client";
+import { PublicLink, usePublicFilters } from "./public-context";
+import { FavoriteButton } from "./favorites";
+import { PublicActivity } from "./public-activity";
 import { useEffect, useState } from "react";
 type Player = {
   playerId: string;
@@ -65,7 +68,7 @@ function Players({ players }: { players: Player[] }) {
     <ul className="public-roster">
       {players.map((p) => (
         <li key={p.playerId}>
-          <a href={`/players/${p.playerId}`}>{p.name}</a>
+          <PublicLink href={`/players/${p.playerId}`}>{p.name}</PublicLink>
           <div className="roster-labels">
             {p.role && <span className="badge">{p.role}</span>}
             {p.position && <span>{p.position}</span>}
@@ -97,6 +100,7 @@ export function PublicRoster({
   kind: "entries" | "teams";
   id?: string;
 }) {
+  const { filters, change } = usePublicFilters();
   const [data, setData] = useState<Entry | Team | Team[] | null>(null),
     [error, setError] = useState(""),
     [loading, setLoading] = useState(true),
@@ -138,7 +142,7 @@ export function PublicRoster({
         </p>
         <button onClick={() => void load()}>Retry roster</button>
         <p>
-          <a href="/events">Browse events</a>
+          <PublicLink href="/events">Browse events</PublicLink>
         </p>
       </main>
     );
@@ -156,8 +160,8 @@ export function PublicRoster({
             <label htmlFor="team-filter">Search teams or core players</label>
             <input
               id="team-filter"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              value={filters.q ?? ""}
+              onChange={(e) => change({ q: e.target.value })}
             />
           </div>
         </div>
@@ -166,12 +170,12 @@ export function PublicRoster({
             .filter((t) =>
               `${t.name} ${t.core.map((p) => p.name).join(" ")}`
                 .toLowerCase()
-                .includes(search.toLowerCase()),
+                .includes((filters.q ?? "").toLowerCase()),
             )
             .map((t) => (
               <li key={t.id}>
                 <h2>
-                  <a href={`/teams/${t.id}`}>{t.name}</a>
+                  <PublicLink href={`/teams/${t.id}`}>{t.name}</PublicLink>
                 </h2>
                 <p>
                   {disciplineName(t.discipline)} · {t.core.length} regular core
@@ -183,7 +187,7 @@ export function PublicRoster({
         {!data.some((t) =>
           `${t.name} ${t.core.map((p) => p.name).join(" ")}`
             .toLowerCase()
-            .includes(search.toLowerCase()),
+            .includes((filters.q ?? "").toLowerCase()),
         ) && <p className="empty">No teams match this search.</p>}
       </main>
     );
@@ -208,12 +212,12 @@ export function PublicRoster({
             </p>
           )
         )}
-        <a
+        <PublicLink
           className="back"
           href={`/events/${e.eventId}?division=${e.divisionId}`}
         >
           ← {e.eventName}
-        </a>
+        </PublicLink>
         <p className="eyebrow">Event entry · {disciplineName(e.discipline)}</p>
         <h1>{e.name}</h1>
         <span className="badge">{e.status}</span>
@@ -228,7 +232,9 @@ export function PublicRoster({
         </p>
         {e.teamId && (
           <p>
-            <a href={`/teams/${e.teamId}`}>View core-composition team</a>
+            <PublicLink href={`/teams/${e.teamId}`}>
+              View core-composition team
+            </PublicLink>
           </p>
         )}
         <section className="roster-section">
@@ -259,13 +265,14 @@ export function PublicRoster({
   const t = data as Team;
   return (
     <main id="main">
-      <a className="back" href="/teams">
+      <PublicLink className="back" href="/teams">
         ← Teams
-      </a>
+      </PublicLink>
       <p className="eyebrow">
         {disciplineName(t.discipline)} · core composition
       </p>
       <h1>{t.name}</h1>
+      <FavoriteButton kind="team" id={t.id} />
       {t.core.every((p) => p.origin === "fictional_demo") && (
         <p className="notice">Fictional demonstration team.</p>
       )}
@@ -283,6 +290,7 @@ export function PublicRoster({
       {!t.registrations.length && (
         <p className="empty">No season roster registered.</p>
       )}
+      <PublicActivity kind="team" id={t.id} />
       <section className="roster-section">
         <h2>Public event entries</h2>
         <ul className="workspace-list">
@@ -296,12 +304,14 @@ export function PublicRoster({
                 )
               )}
               <h3>
-                <a href={`/entries/${e.id}`}>{e.name}</a>
+                <PublicLink href={`/entries/${e.id}`}>{e.name}</PublicLink>
               </h3>
               <p>
-                <a href={`/events/${e.eventId}?division=${e.divisionId}`}>
+                <PublicLink
+                  href={`/events/${e.eventId}?division=${e.divisionId}`}
+                >
                   {e.eventName}
-                </a>
+                </PublicLink>
               </p>
             </li>
           ))}
@@ -366,7 +376,7 @@ export function EventEntryLinks({
             .filter((e) => !divisionId || e.divisionId === divisionId)
             .map((e) => (
               <li key={e.id}>
-                <a href={`/entries/${e.id}`}>{e.name}</a>
+                <PublicLink href={`/entries/${e.id}`}>{e.name}</PublicLink>
                 <span className="muted">
                   {e.divisionName} ·{" "}
                   {e.registrationConfigured

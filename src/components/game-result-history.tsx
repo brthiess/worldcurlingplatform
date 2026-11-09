@@ -1,3 +1,4 @@
+import { PublicLink } from "./public-context";
 import type { PublicGame } from "@/modules/public/scores";
 import type { GameLineup } from "@/modules/scoring/lineups";
 export function LineupEvidence({
@@ -27,7 +28,7 @@ export function LineupEvidence({
         <ul>
           {lineup.members.map((m) => (
             <li key={m.playerId}>
-              <a href={`/players/${m.playerId}`}>{m.name}</a>
+              <PublicLink href={`/players/${m.playerId}`}>{m.name}</PublicLink>
               {m.position ? ` · ${m.position}` : ""}
               {m.role ? ` · ${m.role}` : ""} · {m.participation}
               {m.identityStatus === "provisional"
