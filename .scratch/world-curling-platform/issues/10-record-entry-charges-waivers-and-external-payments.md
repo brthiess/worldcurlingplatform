@@ -4,7 +4,7 @@ number: 10
 title: "Record entry charges, waivers and external payments"
 parent: WCP-SPEC-001
 type: implementation
-status: in-progress
+status: completed
 labels: [ready-for-agent]
 blocked_by: [WCP-009]
 source_spec_sha256: 045B46988225B6C8C0020B23C8C5D4EAA8E2E1916256148A0FDA26B5DA8673FD
@@ -18,7 +18,7 @@ published: 2026-11-07
 
 **Blocked by:** [09: Open division entries with capacity and expiring holds](09-open-division-entries-with-capacity-and-expiring-holds.md).
 
-**Status:** in-progress
+**Status:** completed
 
 ## Parent and scope
 
@@ -31,13 +31,13 @@ published: 2026-11-07
 
 ## Acceptance criteria
 
-- [ ] Freeze charge currency and fee terms for an entry; later event fee edits do not rewrite prior charge history.
-- [ ] Apply normal fees to manual/invited entries unless an authorized reasoned adjustment exists.
-- [ ] Keep external receipts distinguishable from provider transactions and show payment status separately from withdrawal/readiness.
-- [ ] **Unit testing:** Test minor-unit currency arithmetic, allowable adjustments, balance reconciliation and immutable charge-term behavior.
-- [ ] **Database/API verification:** Create and adjust charges through guarded commands, retaining an audit trail and rejecting unauthorized/invalid balance changes.
-- [ ] **Frontend quality:** Render an understandable entry charge/history view with labelled fee exceptions and external references, avoiding a misleading online-payment success state.
-- [ ] Record actual verification commands/results and relevant browser/screenshots or API evidence. Report meaningful uncovered branches or limitations; do not claim checks that were not run.
+- [x] Freeze charge currency and fee terms for an entry; later event fee edits do not rewrite prior charge history.
+- [x] Apply normal fees to manual/invited entries unless an authorized reasoned adjustment exists.
+- [x] Keep external receipts distinguishable from provider transactions and show payment status separately from withdrawal/readiness.
+- [x] **Unit testing:** Test minor-unit currency arithmetic, allowable adjustments, balance reconciliation and immutable charge-term behavior.
+- [x] **Database/API verification:** Create and adjust charges through guarded commands, retaining an audit trail and rejecting unauthorized/invalid balance changes.
+- [x] **Frontend quality:** Render an understandable entry charge/history view with labelled fee exceptions and external references, avoiding a misleading online-payment success state.
+- [x] Record actual verification commands/results and relevant browser/screenshots or API evidence. Report meaningful uncovered branches or limitations; do not claim checks that were not run.
 
 ## Slice boundary
 
