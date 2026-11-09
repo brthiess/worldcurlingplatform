@@ -2,6 +2,8 @@
 
 Started 2026-11-08 under the user's explicit implementation authorization.
 
+Resumed at the user's explicit request on2026-11-09 (America/Edmonton), from [the preserved pause checkpoint](paused-2026-11-09.md). Continue autonomous unblocked work, required verification and authorized commits/pushes; hosting/domain remain pending. The provisional007 source present at resume has now passed [independent acceptance](../verification/WCP-007-merge.md); published tracker state and coordinator notifications govern later acceptance boundaries. The execution-state resume event records exact source boundaries.
+
 - Workflow: `C:/Users/brthi/.codex/skills/implement-spec/SKILL.md`.
 - Authoritative requirements: `.scratch/world-curling-platform/spec.md`.
 - Task graph: `.scratch/world-curling-platform/tickets.json`; execute published `issues/`, never archived drafts.
@@ -9,7 +11,7 @@ Started 2026-11-08 under the user's explicit implementation authorization.
 - Remote (supplied by user during implementation): `https://github.com/brthiess/worldcurlingplatform.git`. Commit and push work as it progresses; verify remote ref SHAs. The initially empty remote now has the planning baseline on `main` and the integration branch. Local published issues remain the execution tracker.
 - Concurrency: at most three implementers, each a fresh-context agent on a separate branch/worktree based on the current integration tip. A separate merger verifies and integrates each completed slice.
 - Closure: mark a published issue and graph entry completed only after acceptance evidence is reviewed and its commit integrated. Unverified implementations remain in progress. External-input blockers affect only dependent work.
-- Evidence: `docs/verification/WCP-NNN.md`, plus machine-readable execution state. Preserve commands, outcomes, failures, limitations and browser artifact paths. Never commit credentials.
+- Evidence: `docs/verification/WCP-NNN.md`, plus machine-readable execution state. Preserve commands, outcomes, failures, limitations and browser artifact paths. Never commit credentials. Whole-integration frontend review must also inspect [retained review follow-ups](review-followups.md).
 - Curling Crawler: read-only initial import source; no source changes or crawler runtime dependency.
 - Hosting direction (2026-11-08): user answered “Leave hosting pending” and domain “pending.” Keep WCP-045 blocked on those external inputs, make no Render workspace selection/provisioning, and continue local/unblocked work. Do not ask routine hosting questions again.
 - Disk management: after independent acceptance, reproducible `node_modules` and `.next` directories may be reclaimed from inactive ticket worktrees. Source branches, verification records/screenshots, retained reports and runtime configuration remain available. Reinstall/build before attempting another runtime check there; a historical pass does not mean a server is still running. These generated artifacts were reclaimed from WCP-001, WCP-002, WCP-004, WCP-012 and WCP-013 on 2026-11-08.
@@ -22,6 +24,12 @@ The parent specification's Testing Decisions already authorizes domain public in
 ## Environment observations
 
 The starting folder contained planning/tracker documents and no application or Git repository. Git was initialized after read-only review. Sandboxed Git/npm fail on parent-directory access; reviewed escalated shell commands work. Node is 20.19.0; PostgreSQL 13 binaries/service are installed; Docker's daemon was unavailable at preflight. Prefer a dedicated project-local PostgreSQL cluster/database rather than modifying unrelated databases. No hosted domain, provider credentials or reviewed hosting quote has been supplied.
+
+### Resumed-session toolchain check (2026-11-09)
+
+The original preflight observation above is historical. After resume, the system executable `C:/Program Files/nodejs/node.exe` was actually Node 20.15.0, below this project's required 20.19.0. Check actual Node/npm versions and executable paths at every new session before starting builds, web, worker or tests. Use the verified local `C:/Users/brthi/Projects/world-curling-platform-2/.runtime/toolchains/node-v20.19.0-win-x64/node.exe` (Node 20.19.0, bundled npm 10.8.2), prepend only its directory to the command's process `$env:Path`, and invoke that exact executable; for npm use its bundled `node_modules/npm/bin/npm-cli.js`. Do not change global PATH.
+
+The official Node archive SHA256 is `be72284c7bc62de07d5a9fd0ae196879842c085f11f7f2b60bf8864c0c9d6a4f`, checked against `https://nodejs.org/dist/v20.19.0/SHASUMS256.txt`. Private proof/startup records are `.runtime/toolchains/node-v20.19.0-verification.json` and `.runtime/resume-20261109/coordinator-startup.txt`. Inspect actual web/worker/test child executable paths and the engine manifest's `node` value as well as source/build fingerprints. A matching source fingerprint alone does not establish a matching supported runtime. Preserve any wrong-toolchain/interrupted evidence separately and rerun its required scope under the pinned runtime.
 
 - Generated-only reclamation on2026-11-09 UTC covered inactive accepted WCP-009 and WCP-019 (`node_modules` and `.next`). All four resolved targets were checked inside the workspace, reparse points rejected, and old runtime listener ports confirmed inactive. Source, configuration, immutable data and verification reports remain. Reinstall/build before rerunning there.
 
