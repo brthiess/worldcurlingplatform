@@ -39,6 +39,7 @@ export async function freezeEntryCharge(
   c: Reader,
   entryId: string,
   divisionId: string,
+  expectedFeeVersion?: unknown,
 ) {
   let charge = (
     await c.query(
@@ -54,10 +55,35 @@ export async function freezeEntryCharge(
       );
     return charge;
   }
+  const prior = (
+    await c.query(
+      "SELECT admission_version FROM event_entry WHERE id=$1 AND division_id=$2",
+      [entryId, divisionId],
+    )
+  ).rows[0];
+  if (prior?.admission_version > 0)
+    throw new EntryError(
+      "Historical fee terms have not been established for this earlier admission. Staff must review the original terms; a newer fee cannot reprice this entry.",
+      409,
+    );
   const fee = await currentFee(c, divisionId);
   if (!fee)
     throw new EntryError(
       "Fee terms are unknown or unsupported. Staff must establish a supported fee version before pricing this entry; this is not proof of zero fee or payment.",
+      409,
+    );
+  const originalV1 =
+    expectedFeeVersion === undefined &&
+    fee.version === 1 &&
+    !!(
+      await c.query(
+        "SELECT division_id FROM division_registration WHERE division_id=$1 AND fee_minor=$2 AND currency=$3 AND payment_terms=$4",
+        [divisionId, fee.feeMinor, fee.currency, fee.paymentTerms],
+      )
+    ).rowCount;
+  if (expectedFeeVersion !== fee.version && !originalV1)
+    throw new EntryError(
+      "The quoted fee version changed. Refresh and review the new charge amount before submitting again.",
       409,
     );
   await c.query(
@@ -330,7 +356,12 @@ export async function chargeCommand(userId: string, raw: unknown) {
           ],
         );
       }
-      const charge = await freezeEntryCharge(c, entryId!, divisionId),
+      const charge = await freezeEntryCharge(
+          c,
+          entryId!,
+          divisionId,
+          v.expectedFeeVersion,
+        ),
         current = await chargeBalance(c, entryId!, charge);
       if (action !== "freeze") {
         if (v.version !== current.version)

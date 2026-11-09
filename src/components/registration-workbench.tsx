@@ -12,6 +12,7 @@ type Division = Partial<RegistrationTerms> & {
   manual: boolean;
   remaining: number | null;
   openedAt: string | null;
+  feeVersion: number | null;
 };
 type Entry = {
   id: string;
@@ -114,6 +115,7 @@ export function RegistrationWorkbench() {
         divisionId: selected,
         requestId: crypto.randomUUID(),
         version: entry?.version ?? d?.version ?? 0,
+        expectedFeeVersion: d?.feeVersion,
         ...(entry ? { entryId: entry.id } : {}),
         ...(action === "open" ? { terms } : {}),
       },

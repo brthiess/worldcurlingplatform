@@ -119,6 +119,10 @@ for (const [label, width, height] of [
     await main
       .getByLabel("Adjustment reason", { exact: true })
       .fill("Fictional junior team award");
+    await page.screenshot({
+      path: info.outputPath(`${label}-adjustment.png`),
+      fullPage: true,
+    });
     await main
       .getByRole("button", { name: "Record adjustment", exact: true })
       .click();
@@ -246,6 +250,12 @@ test("loading, empty, stale balances and uncertain actor-bound retries remain tr
   await expect(main.getByText(/command result is not confirmed/)).toBeVisible();
   await page.reload();
   await expect(main.getByText(/Unconfirmed command retained/)).toBeVisible();
+  await expect(
+    main.getByRole("heading", {
+      name: `Fictional fee team ${f.suffix}`,
+      exact: true,
+    }),
+  ).toBeVisible();
   await expect(main.getByLabel("Division", { exact: true })).toBeDisabled();
   expect(
     (
@@ -369,4 +379,127 @@ test("fee revisions and full waivers keep prior charges visible; late cleared ba
   ).toBeVisible();
   await expect(main.getByTestId("amount-due")).toHaveText("CAD 0.00");
   await expect(main.getByText("Accepted", { exact: true })).toHaveCount(0);
+});
+test("a stale displayed fee cannot silently price a new manual charge", async ({
+  page,
+}) => {
+  const f = await fixture(page.request),
+    pending = randomUUID(),
+    main = page.getByRole("main");
+  await pool.query(
+    "INSERT INTO event_entry(id,division_id,display_name) VALUES($1,$2,$3)",
+    [pending, f.division, `Fictional unpriced team ${f.suffix}`],
+  );
+  await page.goto("/admin/entry-charges");
+  await main.getByLabel("Division", { exact: true }).selectOption(f.division);
+  await main.getByLabel("Team entry", { exact: true }).selectOption(pending);
+  await main
+    .getByLabel("Adjustment reason", { exact: true })
+    .fill("Fictional normal manual fee");
+  expect(
+    (
+      await page.request.post("/api/v1/entry-charges", {
+        headers: { Origin: base },
+        data: {
+          action: "revise_fee",
+          requestId: randomUUID(),
+          divisionId: f.division,
+          version: 1,
+          terms: {
+            feeMinor: 20000,
+            currency: "CAD",
+            paymentTerms: "New reviewed fee",
+          },
+          reason: "Fictional fee revision in another tab",
+        },
+      })
+    ).status(),
+  ).toBe(200);
+  await main
+    .getByRole("button", { name: "Freeze normal charge", exact: true })
+    .click();
+  await expect(
+    main.getByRole("alert").filter({ hasText: /quoted fee version changed/ }),
+  ).toBeVisible();
+  await expect(main.getByTestId("amount-due")).toHaveCount(0);
+  await main
+    .getByRole("button", { name: "Refresh ledger", exact: true })
+    .click();
+  await expect(main.getByText("CAD 200.00", { exact: true })).toBeVisible();
+  await main
+    .getByRole("button", { name: "Freeze normal charge", exact: true })
+    .click();
+  await expect(main.getByTestId("amount-due")).toHaveText("CAD 200.00");
+  await main.getByLabel("Team entry", { exact: true }).selectOption(f.entry);
+  await expect(main.getByTestId("amount-due")).toHaveText("CAD 125.00");
+});
+
+test("current team-season payment representatives can read but cannot attest receipts", async ({
+  page,
+}, info) => {
+  test.setTimeout(120000);
+  const f = await fixture(page.request),
+    team = randomUUID(),
+    registration = randomUUID(),
+    grant = randomUUID();
+  await pool.query(
+    "INSERT INTO team(id,discipline,core_key) VALUES($1,'men_four',$2)",
+    [team, `wcp010-browser:${team}`],
+  );
+  await pool.query(
+    "INSERT INTO season_registration(id,team_id,season,version) VALUES($1,$2,'2026-27',1)",
+    [registration, team],
+  );
+  await pool.query(
+    "UPDATE event_entry SET team_id=$2,season_registration_id=$3 WHERE id=$1",
+    [f.entry, team, registration],
+  );
+  await pool.query(
+    "INSERT INTO team_representation(id,user_id,registration_id,actions,created_by) VALUES($1,'demo-reviewer',$2,ARRAY['payment'],'demo-administrator')",
+    [grant, registration],
+  );
+  expect(
+    (
+      await signInApiWithRateWindow(
+        page.request,
+        "reviewer@demo.invalid",
+        process.env.DEMO_PASSWORD,
+      )
+    ).status(),
+  ).toBe(200);
+  await page.setViewportSize({ width: 360, height: 900 });
+  await page.goto("/admin/entry-charges");
+  const main = page.getByRole("main");
+  await main.getByLabel("Division", { exact: true }).selectOption(f.division);
+  await expect(main.getByTestId("amount-due")).toHaveText("CAD 125.00");
+  await expect(
+    main.getByRole("button", { name: "Record adjustment", exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    main.getByText("Revise fees for new charges", { exact: true }),
+  ).toHaveCount(0);
+  expect(
+    (await new AxeBuilder({ page }).include("main").analyze()).violations,
+  ).toEqual([]);
+  await page.screenshot({
+    path: info.outputPath("phone-representative-ledger.png"),
+    fullPage: true,
+  });
+  await pool.query(
+    "UPDATE team_representation SET revoked_at=clock_timestamp(),revocation_reason='Fictional authority ended' WHERE id=$1",
+    [grant],
+  );
+  await page.reload();
+  await expect(
+    main.getByRole("heading", {
+      name: `Fictional fee team ${f.suffix}`,
+      exact: true,
+    }),
+  ).toHaveCount(0);
+  await expect(
+    main.getByRole("option", {
+      name: `Fictional fee team ${f.suffix}`,
+      exact: true,
+    }),
+  ).toHaveCount(0);
 });

@@ -323,6 +323,18 @@ export function AuthorityRecovery({
                   </dd>
                 </>
               )}
+              {body.entryId && (
+                <>
+                  <dt>Entry record</dt>
+                  <dd>{body.entryId}</dd>
+                </>
+              )}
+              {body.expectedFeeVersion !== undefined && (
+                <>
+                  <dt>Reviewed fee version</dt>
+                  <dd>{body.expectedFeeVersion}</dd>
+                </>
+              )}
               {body.externalReference && (
                 <>
                   <dt>External receipt reference</dt>

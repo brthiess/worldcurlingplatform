@@ -278,7 +278,12 @@ export async function registrationCommand(userId: string, raw: unknown) {
             [divisionId],
           )
         ).rows[0].count;
-        const charge = await freezeEntryCharge(c, entryId!, divisionId);
+        const charge = await freezeEntryCharge(
+          c,
+          entryId!,
+          divisionId,
+          v.expectedFeeVersion,
+        );
         const financial = await chargeBalance(c, entryId!, charge);
         let next;
         if (action === "invite") {

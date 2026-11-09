@@ -161,6 +161,15 @@ export function ChargeWorkbench() {
     setReference("");
   }, [selected]);
   useEffect(() => {
+    if (!recovery.pending) return;
+    const saved = JSON.parse(recovery.pending.body);
+    if (selected !== saved.divisionId) {
+      setSelected(saved.divisionId);
+      return;
+    }
+    if (saved.entryId) setEntryId(saved.entryId);
+  }, [recovery.pending, selected]);
+  useEffect(() => {
     if (d?.fee) {
       setCurrency(d.fee.currency);
       setFeeAmount(inputAmount(d.fee.feeMinor, d.fee.currency));
@@ -198,6 +207,9 @@ export function ChargeWorkbench() {
           ...body,
           entryId: en.id,
           version: en.version,
+          ...(action === "freeze"
+            ? { expectedFeeVersion: d.fee?.version }
+            : {}),
           reason,
           ...(action === "freeze"
             ? {}
@@ -220,7 +232,11 @@ export function ChargeWorkbench() {
     }
   }
   return (
-    <main id="main" className="workspace registration-workspace">
+    <main
+      id="main"
+      className="workspace registration-workspace"
+      style={{ overflowWrap: "anywhere" }}
+    >
       <p className="eyebrow">Entry finances</p>
       <h1>Entry charges &amp; external receipts</h1>
       <p>
@@ -287,6 +303,9 @@ export function ChargeWorkbench() {
             </select>
             {d && (
               <>
+                <p>
+                  {d.eventName} · {d.name}
+                </p>
                 <section
                   className="ranking-history"
                   aria-label="Current fee policy"
@@ -327,45 +346,47 @@ export function ChargeWorkbench() {
                       >
                         <fieldset disabled={locked}>
                           <legend>New fee version</legend>
-                          <label>
-                            Fee currency
-                            <select
-                              value={currency}
-                              disabled={!!d.fee}
-                              onChange={(e) => setCurrency(e.target.value)}
-                            >
-                              {Object.keys(currencyDigits).map((c) => (
-                                <option key={c}>{c}</option>
-                              ))}
-                            </select>
-                          </label>
-                          <label>
+                          <label htmlFor="fee-currency">Fee currency</label>
+                          <select
+                            id="fee-currency"
+                            value={currency}
+                            disabled={!!d.fee}
+                            onChange={(e) => setCurrency(e.target.value)}
+                          >
+                            {Object.keys(currencyDigits).map((c) => (
+                              <option key={c}>{c}</option>
+                            ))}
+                          </select>
+                          <label htmlFor="new-fee-amount">
                             New fee amount ({currency})
-                            <input
-                              required
-                              inputMode="decimal"
-                              value={feeAmount}
-                              onChange={(e) => setFeeAmount(e.target.value)}
-                            />
                           </label>
-                          <label>
+                          <input
+                            id="new-fee-amount"
+                            required
+                            inputMode="decimal"
+                            value={feeAmount}
+                            onChange={(e) => setFeeAmount(e.target.value)}
+                          />
+                          <label htmlFor="new-payment-terms">
                             New payment terms
-                            <textarea
-                              required
-                              maxLength={2000}
-                              value={paymentTerms}
-                              onChange={(e) => setPaymentTerms(e.target.value)}
-                            />
                           </label>
-                          <label>
+                          <textarea
+                            id="new-payment-terms"
+                            required
+                            maxLength={2000}
+                            value={paymentTerms}
+                            onChange={(e) => setPaymentTerms(e.target.value)}
+                          />
+                          <label htmlFor="fee-revision-reason">
                             Fee revision reason
-                            <textarea
-                              required
-                              maxLength={1000}
-                              value={feeReason}
-                              onChange={(e) => setFeeReason(e.target.value)}
-                            />
                           </label>
+                          <textarea
+                            id="fee-revision-reason"
+                            required
+                            maxLength={1000}
+                            value={feeReason}
+                            onChange={(e) => setFeeReason(e.target.value)}
+                          />
                           <p>
                             The division currency is fixed. Opened capacity,
                             format and reservation window stay as recorded.
@@ -579,32 +600,33 @@ export function ChargeWorkbench() {
                                       External receipt
                                     </option>
                                   </select>
-                                  <label>
+                                  <label htmlFor="credit-amount">
                                     Amount ({en.charge.currency})
-                                    <input
-                                      required
-                                      inputMode="decimal"
-                                      value={amount}
-                                      onChange={(e) =>
-                                        setAmount(e.target.value)
-                                      }
-                                    />
                                   </label>
-                                  <label>
+                                  <input
+                                    id="credit-amount"
+                                    required
+                                    inputMode="decimal"
+                                    value={amount}
+                                    onChange={(e) => setAmount(e.target.value)}
+                                  />
+                                  <label htmlFor="credit-reason">
                                     Adjustment reason
-                                    <textarea
-                                      required
-                                      maxLength={1000}
-                                      value={reason}
-                                      onChange={(e) =>
-                                        setReason(e.target.value)
-                                      }
-                                    />
                                   </label>
+                                  <textarea
+                                    id="credit-reason"
+                                    required
+                                    maxLength={1000}
+                                    value={reason}
+                                    onChange={(e) => setReason(e.target.value)}
+                                  />
                                   {kind === "external_receipt" && (
-                                    <label>
-                                      External receipt reference
+                                    <div>
+                                      <label htmlFor="credit-reference">
+                                        External receipt reference
+                                      </label>
                                       <input
+                                        id="credit-reference"
                                         required
                                         maxLength={200}
                                         value={reference}
@@ -612,7 +634,7 @@ export function ChargeWorkbench() {
                                           setReference(e.target.value)
                                         }
                                       />
-                                    </label>
+                                    </div>
                                   )}
                                   <p>
                                     {kind === "external_receipt"
@@ -658,17 +680,16 @@ export function ChargeWorkbench() {
                                     admissions require their retained original
                                     terms.
                                   </p>
-                                  <label>
+                                  <label htmlFor="credit-reason">
                                     Adjustment reason
-                                    <textarea
-                                      required
-                                      maxLength={1000}
-                                      value={reason}
-                                      onChange={(e) =>
-                                        setReason(e.target.value)
-                                      }
-                                    />
                                   </label>
+                                  <textarea
+                                    id="credit-reason"
+                                    required
+                                    maxLength={1000}
+                                    value={reason}
+                                    onChange={(e) => setReason(e.target.value)}
+                                  />
                                   <button type="submit">
                                     Freeze normal charge
                                   </button>
