@@ -1,7 +1,7 @@
 {
   "recorded_date": "2026-11-08",
   "phase": "implementation",
-  "status": "active",
+  "status": "paused",
   "authoritative_spec": ".scratch/world-curling-platform/spec.md",
   "task_graph": ".scratch/world-curling-platform/tickets.json",
   "execution_issues": ".scratch/world-curling-platform/issues/",
@@ -65,7 +65,7 @@
   "git": {
     "remote": "https://github.com/brthiess/worldcurlingplatform.git",
     "push_as_work_progresses": true,
-    "last_verified_remote_integration_commit": "447576fa701f08c6a64c9bcd137c3f78c0269a10",
+    "last_verified_remote_integration_commit": "44f48dfacada33d96f8ed0aeaeb71e7fa7856b65",
     "integration_branch": "integration/world-curling-platform",
     "worktrees_created": [
       ".worktrees/WCP-001",
@@ -194,7 +194,7 @@
     "Close only reviewed integrated tickets with meaningful unit/PostgreSQL/API/frontend/browser evidence.",
     "Continue unblocked work and report provider/deployment limitations honestly."
   ],
-  "updated_at": "2026-11-09T03:18:09.277157+00:00",
+  "updated_at": "2026-11-09T03:42:44.744801+00:00",
   "active_tickets": [
     "WCP-007",
     "WCP-017",
@@ -545,6 +545,14 @@
       "reason": null,
       "commit": null,
       "evidence": null
+    },
+    {
+      "time": "2026-11-09T03:42:44.744801+00:00",
+      "ticket": null,
+      "status": "paused",
+      "reason": "User explicitly requested pause until tomorrow; partial checks preserved and no unfinished ticket closed.",
+      "commit": "44f48dfacada33d96f8ed0aeaeb71e7fa7856b65",
+      "evidence": "docs/agents/paused-2026-11-09.md"
     }
   ],
   "research": {
@@ -680,6 +688,29 @@
       "web_port": 3117,
       "news_fixture_port": 3217,
       "reserved_migration_prefix": "0030"
+    }
+  },
+  "pause": {
+    "requested_by": "user",
+    "requested_at": "2026-11-09T03:42:44.744801+00:00",
+    "reason": "Please pause the work for now when you can. I will continue tomorrow.",
+    "resume_note": "docs/agents/paused-2026-11-09.md",
+    "verified_completed_count": 19,
+    "unfinished_tickets": [
+      "WCP-007",
+      "WCP-017",
+      "WCP-034"
+    ],
+    "formally_accepted_integration": "11d9e6ce0c4b3bdf9188dc75f74987e4b628b886",
+    "provisional_primary_checkpoint": "44f48dfacada33d96f8ed0aeaeb71e7fa7856b65",
+    "primary_mutation_lock": "released",
+    "agents_running": false,
+    "owned_apps_workers_stopped": true,
+    "postgres": "retained idle; loopback55431",
+    "candidate_checkpoints": {
+      "WCP-007": "cc9676903a26e0072b8d46349e23a1cb3102ebb9",
+      "WCP-017": "ac7e6bcd7812c0bb8901a7c1b709e09544bd8631",
+      "WCP-034": "164616aacf3c866a5504be1902a1d3c2b079c9fa"
     }
   }
 }

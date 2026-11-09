@@ -2,6 +2,8 @@
 
 Started 2026-11-08 under the user's explicit implementation authorization.
 
+Paused at the user's explicit request on2026-11-09 UTC. See [the durable resume checkpoint](paused-2026-11-09.md). In-progress ticket statuses describe unfinished work; no agents continue running.
+
 - Workflow: `C:/Users/brthi/.codex/skills/implement-spec/SKILL.md`.
 - Authoritative requirements: `.scratch/world-curling-platform/spec.md`.
 - Task graph: `.scratch/world-curling-platform/tickets.json`; execute published `issues/`, never archived drafts.
