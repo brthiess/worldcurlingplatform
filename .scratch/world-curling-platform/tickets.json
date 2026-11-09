@@ -1151,13 +1151,17 @@
       "file": "22-run-pooled-round-robin-with-basic-public-standings.md",
       "id": "WCP-022",
       "path": "issues/22-run-pooled-round-robin-with-basic-public-standings.md",
-      "status": "in-progress",
+      "status": "completed",
       "labels": [
         "ready-for-agent"
       ],
       "blocked_by": [
         "WCP-019"
-      ]
+      ],
+      "completion": {
+        "commit": "11550560c9b0245b383091396634ec3a0a5a86d5",
+        "evidence": "docs/verification/WCP-022.md"
+      }
     },
     {
       "n": 23,
