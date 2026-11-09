@@ -2,7 +2,6 @@ import { test, expect, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 import { signInWithRateWindow } from "./auth-fixture";
 import pg from "pg";
-import { randomUUID } from "node:crypto";
 const db = new pg.Pool({ connectionString: process.env.DATABASE_URL });
 test.afterAll(async () => {
   await db.end();
@@ -20,10 +19,6 @@ async function signIn(page: Page) {
   ).toBeVisible();
 }
 test("fresh database shows honest empty staging history", async ({ page }) => {
-  test.skip(
-    process.env.WCP_IMPORT_EXPECT_EMPTY !== "true",
-    "Run against the fresh acceptance database before staging.",
-  );
   await signIn(page);
   await page.goto("/admin/imports");
   await expect(
