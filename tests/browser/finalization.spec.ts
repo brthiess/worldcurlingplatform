@@ -106,6 +106,118 @@ async function fixture() {
   ).toBe(200);
   return { divisionId, gameId, entries };
 }
+test("finalization reconciliation retains changed409 and wrong-path journals; whitelist and trim equivalent original confirms without any POST", async ({
+  page,
+}, info) => {
+  await page.context().addCookies(await organizer.cookies());
+  const f = await fixture(),
+    path = "/api/v1/division-finalizations",
+    url = `${path}?division=${f.divisionId}`;
+  const review = await (await page.request.get(url)).json();
+  const body = {
+    divisionId: f.divisionId,
+    version: 0,
+    requestId: randomUUID(),
+    sourceDigest: review.sourceDigest,
+    placements: f.entries.map((entryId, i) => ({ entryId, place: i + 1 })),
+    note: "  Original canonical recovery note  ",
+    rulesReference: "  Fictional finalization rules  ",
+    ignored: "outside server whitelist",
+  };
+  const saved = await page.request.post(path, {
+    headers: { Origin: process.env.BETTER_AUTH_URL! },
+    data: body,
+  });
+  expect(saved.status()).toBe(200);
+  const original = await saved.json(),
+    conflict = { ...body, note: "Different retained command" };
+  expect(
+    (
+      await page.request.post(path, {
+        headers: { Origin: process.env.BETTER_AUTH_URL! },
+        data: conflict,
+      })
+    ).status(),
+  ).toBe(409);
+  const key = `wcp027-finalization:${review.actorId}:${f.divisionId}`;
+  const pending = (value: unknown, target = path) => ({
+    actorId: review.actorId,
+    path: target,
+    body: JSON.stringify(value),
+    message: "Finalization 1 saved.",
+    acknowledged: false,
+  });
+  await page.goto(`/admin/finalizations?division=${f.divisionId}`);
+  await expect(page.getByLabel("Division", { exact: true })).toBeEnabled();
+  const seed = async (value: unknown) => {
+    await page.evaluate(
+      ({ key, value }) => sessionStorage.setItem(key, JSON.stringify(value)),
+      { key, value },
+    );
+    await page.reload();
+  };
+  await seed(pending(conflict));
+  const posts: string[] = [];
+  page.on("request", (r) => {
+    if (r.method() === "POST") posts.push(r.url());
+  });
+  const reconcile = () =>
+    page
+      .getByRole("button", {
+        name: "Reconcile recorded finalization command",
+        exact: true,
+      })
+      .click();
+  const success = page.getByText(
+    "The original command was reconciled with recorded history. Review its current status below.",
+    { exact: true },
+  );
+  await reconcile();
+  await expect
+    .poll(
+      async () =>
+        (await success.isVisible()) ||
+        (await page.getByRole("main").getByRole("alert").isVisible()),
+    )
+    .toBe(true);
+  await page.screenshot({
+    path: info.outputPath("finalization-conflict-settled.png"),
+  });
+  expect(
+    await page.evaluate((key) => sessionStorage.getItem(key), key),
+  ).not.toBeNull();
+  await expect(page.getByRole("main").getByRole("alert")).toContainText(
+    "Recorded state could not confirm",
+  );
+  await expect(success).not.toBeVisible();
+  await seed(pending(body, "/api/v1/entry-charges"));
+  await reconcile();
+  await expect(page.getByRole("main").getByRole("alert")).toContainText(
+    "Recorded state could not confirm",
+  );
+  expect(
+    await page.evaluate((key) => sessionStorage.getItem(key), key),
+  ).not.toBeNull();
+  const equivalent = Object.fromEntries(
+    Object.entries({
+      ...body,
+      note: body.note.trim(),
+      rulesReference: body.rulesReference.trim(),
+      ignored: "ignored property may change",
+    }).reverse(),
+  );
+  await seed(pending(equivalent));
+  await reconcile();
+  await expect(success).toBeVisible();
+  expect(
+    await page.evaluate((key) => sessionStorage.getItem(key), key),
+  ).toBeNull();
+  expect(posts).toEqual([]);
+  const after = await (await page.request.get(url)).json();
+  expect(after.history).toHaveLength(1);
+  expect(after.selected.digest).toBe(original.digest);
+});
+
 test("organizer reviews, finalizes and replaces changed results on a phone with immutable public history", async ({
   page,
 }, info) => {

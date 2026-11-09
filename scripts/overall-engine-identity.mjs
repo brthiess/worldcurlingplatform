@@ -9,6 +9,7 @@ export function overallEngineIdentity() {
     "src/domain/ranking-inputs.ts",
     "src/domain/finalization.ts",
     "src/domain/canonical-json.ts",
+    "src/domain/finalization-command.ts",
     "src/domain/entries.ts",
     "src/modules/rankings/overall.ts",
     "src/modules/rankings/inputs.ts",

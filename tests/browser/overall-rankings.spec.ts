@@ -88,11 +88,8 @@ test("reconciliation retains a conflicting full command and confirms only the or
   await page.reload();
   const posts: string[] = [];
   page.on("request", (r) => {
-    if (
-      r.method() === "POST" &&
-      new URL(r.url()).pathname === "/api/v1/overall-rankings"
-    )
-      posts.push(r.postData() ?? "");
+    if (r.method() === "POST")
+      posts.push(`${new URL(r.url()).pathname}:${r.postData() ?? ""}`);
   });
   await page
     .getByRole("button", {
