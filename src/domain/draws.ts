@@ -15,6 +15,7 @@ export type DrawFixture = {
   a: DrawSource;
   b: DrawSource;
   stage?: string;
+  group?: string;
   terminals?: { winner?: DrawTerminal; loser?: DrawTerminal };
 };
 export function sourceLabel(source: DrawSource, compact = false): string {

@@ -1,3 +1,9 @@
+import {
+  POOL_TEMPLATE,
+  pooledRoundRobin,
+  poolStandings,
+  type PoolGroup,
+} from "@/domain/pools";
 import { randomUUID } from "node:crypto";
 import type { PoolClient } from "pg";
 import { pool } from "@/db";
@@ -21,7 +27,9 @@ export class DrawError extends Error {
   }
 }
 type Graph = Omit<ReturnType<typeof singleKnockout>, "games"> & {
+  groups?: PoolGroup[];
   games: (ReturnType<typeof singleKnockout>["games"][number] & {
+    group?: string;
     id: string;
   })[];
 };
@@ -132,7 +140,9 @@ export async function saveDraw(userId: string, id: string, input: unknown) {
   };
   if (
     (x?.template !== undefined &&
-      ![SINGLE_TEMPLATE, TRIPLE_TEMPLATE].includes(x.template)) ||
+      ![SINGLE_TEMPLATE, TRIPLE_TEMPLATE, POOL_TEMPLATE].includes(
+        x.template,
+      )) ||
     !x ||
     typeof x.requestId !== "string" ||
     !/^[a-zA-Z0-9-]{1,80}$/.test(x.requestId) ||
@@ -219,7 +229,11 @@ export async function saveDraw(userId: string, id: string, input: unknown) {
       try {
         validateRegistrationDrawField(
           registeredFamily,
-          template === TRIPLE_TEMPLATE ? "triple_knockout" : "single_knockout",
+          template === TRIPLE_TEMPLATE
+            ? "triple_knockout"
+            : template === POOL_TEMPLATE
+              ? "round_robin"
+              : "single_knockout",
           fullField.filter((e) => e.admitted).map((e) => e.id),
           selectedIds,
         );
@@ -234,7 +248,9 @@ export async function saveDraw(userId: string, id: string, input: unknown) {
         generated =
           x.template === TRIPLE_TEMPLATE
             ? tripleKnockout(x.seedEntryIds!)
-            : singleKnockout(x.seedEntryIds!);
+            : x.template === POOL_TEMPLATE
+              ? pooledRoundRobin(x.seedEntryIds!)
+              : singleKnockout(x.seedEntryIds!);
       } catch (e) {
         throw new DrawError((e as Error).message);
       }
@@ -393,7 +409,7 @@ export async function saveDraw(userId: string, id: string, input: unknown) {
           [
             g.id,
             id,
-            `${graph.template === TRIPLE_TEMPLATE ? (g.stage === "P" ? "Playoffs" : `${g.stage} path`) : "Single knockout"} · ${g.key}`,
+            `${graph.template === TRIPLE_TEMPLATE ? (g.stage === "P" ? "Playoffs" : `${g.stage} path`) : graph.template === POOL_TEMPLATE ? `Pool ${g.group} · Round ${g.round}` : "Single knockout"} · ${g.key}`,
             participant(g.a)?.entryId ?? null,
             participant(g.b)?.entryId ?? null,
             label(g.a),
@@ -422,7 +438,9 @@ export async function saveDraw(userId: string, id: string, input: unknown) {
         id,
         graph.template === TRIPLE_TEMPLATE
           ? "Triple knockout · sixteen entries · 2 A / 3 B / 3 C qualifiers · fixed playoffs"
-          : "Single knockout · eight slots, six or eight seeded entries",
+          : graph.template === POOL_TEMPLATE
+            ? "Pooled round robin · two pools of four · three rounds · manual playoff selection"
+            : "Single knockout · eight slots, six or eight seeded entries",
       ]);
     }
     await c.query("COMMIT");
@@ -480,10 +498,19 @@ export async function publicDraw(id: string) {
     const graph = current.graph
       ? {
           template: current.graph.template,
+          ...(current.graph.groups
+            ? {
+                groups: current.graph.groups.map((g) => ({
+                  key: g.key,
+                  seeds: [...g.seeds],
+                })),
+              }
+            : {}),
           games: current.graph.games.map((g) => ({
             id: g.id,
             key: g.key,
             round: g.round,
+            ...(g.group ? { group: g.group } : {}),
             a: source(g.a),
             b: source(g.b),
             ...(g.stage ? { stage: g.stage } : {}),
@@ -513,6 +540,10 @@ export async function publicDraw(id: string) {
       division: row,
       games,
       terminals,
+      pools:
+        current.template === POOL_TEMPLATE && graph?.groups
+          ? poolStandings(graph.groups, current.seeds, graph.games, games)
+          : [],
       history,
     };
   } catch (e) {

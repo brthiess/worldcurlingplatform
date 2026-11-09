@@ -1,3 +1,4 @@
+import { POOL_TEMPLATE } from "@/domain/pools";
 import type { PublicDraw } from "@/modules/draws/draws";
 import { selectedDrawPath, sourceLabel, TRIPLE_TEMPLATE } from "@/domain/draws";
 type Props = {
@@ -7,6 +8,7 @@ type Props = {
   view?: string;
   timezone?: string;
   onlySelected?: boolean;
+  pool?: string;
 };
 export function DrawPanel({
   data,
@@ -15,15 +17,26 @@ export function DrawPanel({
   view = "bracket",
   timezone = "UTC",
   onlySelected = false,
+  pool = "",
 }: Props) {
   const graph = data.graph;
   if (!graph) return null;
   const seed = data.seeds.find((s) => s.entryId === selected);
   const path = new Set(selectedDrawPath(graph, seed?.seed, selected, games));
   const triple = graph.template === TRIPLE_TEMPLATE;
+  const pooled = graph.template === POOL_TEMPLATE;
   const visible = graph.games.filter(
-    (g) => !onlySelected || !selected || path.has(g.key),
+    (g) =>
+      (!pool || g.group === pool) &&
+      (!onlySelected || !selected || path.has(g.key)),
   );
+  if (pooled && !visible.length)
+    return (
+      <p className="empty">
+        No games for the selected team in this pool. Select its pool or show all
+        games.
+      </p>
+    );
   const routeHref = (id: string) =>
     visible.some((g) => g.id === id) ? `#draw-node-${id}` : `/games/${id}`;
   const groups = (triple ? ["A", "B", "C", "P"] : ["1", "2", "3"]).filter(
@@ -40,15 +53,19 @@ export function DrawPanel({
           C: "C path · last qualification chance",
           P: "Playoffs · single knockout",
         }[group]
-      : { 1: "Quarterfinals", 2: "Semifinals", 3: "Final" }[group];
+      : pooled
+        ? `Round ${group}`
+        : { 1: "Quarterfinals", 2: "Semifinals", 3: "Final" }[group];
   return (
     <>
       <p className="legend">
-        {triple
-          ? "Winner and loser route links connect A, B, C and playoffs. Qualification and elimination are separate destinations."
-          : "Winner routes connect each round."}{" "}
-        A highlighted possible route depends on future results. Time is shown
-        only after a session is assigned.
+        {pooled
+          ? "Each team plays the other three teams in its pool once. Playoff selection remains manual."
+          : triple
+            ? "Winner and loser route links connect A, B, C and playoffs. Qualification and elimination are separate destinations."
+            : "Winner routes connect each round."}{" "}
+        {!pooled && "A highlighted possible route depends on future results. "}
+        Time is shown only after a session is assigned.
       </p>
       {graph.byes.length > 0 && (
         <section className="notice" aria-label="Structural byes">
@@ -69,7 +86,9 @@ export function DrawPanel({
         role="region"
         aria-label={
           view === "list"
-            ? "Knockout game list"
+            ? pooled
+              ? "Pool game list"
+              : "Knockout game list"
             : "Knockout bracket, scroll horizontally on small screens"
         }
         tabIndex={view === "list" ? undefined : 0}
@@ -197,53 +216,59 @@ export function DrawPanel({
                           })}
                         </p>
                       )}
-                      <p
-                        className="legend route-connectors"
-                        aria-label={`${node.key} outcome routes`}
-                      >
-                        {graph.games.flatMap((g) =>
-                          (["a", "b"] as const).flatMap((side) => {
-                            const s = g[side];
-                            const route =
-                              "winner" in s && s.winner === node.key
-                                ? "Winner"
-                                : "loser" in s && s.loser === node.key
-                                  ? "Loser"
-                                  : null;
-                            return route
-                              ? [
-                                  <a key={g.key + side} href={routeHref(g.id)}>
-                                    {route} →{" "}
-                                    {"winner" in s && s.qualifier
-                                      ? `${s.qualifier} → `
-                                      : ""}
-                                    {g.key}.{side.toUpperCase()}
-                                  </a>,
-                                ]
-                              : [];
-                          }),
-                        )}
-                        {node.terminals?.loser && (
-                          <span
-                            className={
-                              node.terminals.loser.kind === "eliminated"
-                                ? "elimination-route"
-                                : "placement-route"
-                            }
-                          >
-                            Loser → {node.terminals.loser.label}
-                            {node.terminals.loser.place
-                              ? ` · Place ${node.terminals.loser.place}`
-                              : ""}
-                          </span>
-                        )}
-                        {node.terminals?.winner?.kind === "placed" && (
-                          <span className="qualification-route">
-                            Winner → Champion · Place 1
-                          </span>
-                        )}
-                        {node.key === "F" ? "Winner → champion" : ""}
-                      </p>
+                      {!pooled && (
+                        <p
+                          role="group"
+                          className="legend route-connectors"
+                          aria-label={`${node.key} outcome routes`}
+                        >
+                          {graph.games.flatMap((g) =>
+                            (["a", "b"] as const).flatMap((side) => {
+                              const s = g[side];
+                              const route =
+                                "winner" in s && s.winner === node.key
+                                  ? "Winner"
+                                  : "loser" in s && s.loser === node.key
+                                    ? "Loser"
+                                    : null;
+                              return route
+                                ? [
+                                    <a
+                                      key={g.key + side}
+                                      href={routeHref(g.id)}
+                                    >
+                                      {route} →{" "}
+                                      {"winner" in s && s.qualifier
+                                        ? `${s.qualifier} → `
+                                        : ""}
+                                      {g.key}.{side.toUpperCase()}
+                                    </a>,
+                                  ]
+                                : [];
+                            }),
+                          )}
+                          {node.terminals?.loser && (
+                            <span
+                              className={
+                                node.terminals.loser.kind === "eliminated"
+                                  ? "elimination-route"
+                                  : "placement-route"
+                              }
+                            >
+                              Loser → {node.terminals.loser.label}
+                              {node.terminals.loser.place
+                                ? ` · Place ${node.terminals.loser.place}`
+                                : ""}
+                            </span>
+                          )}
+                          {node.terminals?.winner?.kind === "placed" && (
+                            <span className="qualification-route">
+                              Winner → Champion · Place 1
+                            </span>
+                          )}
+                          {node.key === "F" ? "Winner → champion" : ""}
+                        </p>
+                      )}
                     </article>
                   );
                 })}
