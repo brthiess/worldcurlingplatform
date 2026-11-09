@@ -1,4 +1,5 @@
 "use client";
+import { POOL_TEMPLATE } from "@/domain/pools";
 import { EventEntryLinks } from "@/components/public-rosters";
 import { GameResultHistory, LineupEvidence } from "./game-result-history";
 import { useEffect, useState, useCallback, useRef } from "react";
@@ -271,7 +272,9 @@ export function ScoresView({
                           <a
                             href={`/events/${data.event.id}/bracket?division=${encodeURIComponent(d.id)}`}
                           >
-                            Competition bracket / game list
+                            {d.drawTemplate === POOL_TEMPLATE
+                              ? "Pools and standings"
+                              : "Competition bracket / game list"}
                           </a>
                         </span>
                       )}
@@ -545,7 +548,10 @@ export function ScoresView({
             <a
               href={`/events/${data.event.id}/bracket?division=${encodeURIComponent(data.selectedDivisionId!)}`}
             >
-              Competition bracket / game list →
+              {data.divisions.find((d) => d.id === data.selectedDivisionId)
+                ?.drawTemplate === POOL_TEMPLATE
+                ? "Pools and standings →"
+                : "Competition bracket / game list →"}
             </a>
           </p>
         )}

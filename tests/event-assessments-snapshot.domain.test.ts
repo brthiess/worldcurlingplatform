@@ -470,3 +470,85 @@ test("the exact published triple profile keeps qualification plus playoffs outsi
   f.evidence.event.singleKnockout = true;
   assert.match(assessFourPlayer(prepare()).issues.join(" "), /format\/stages/);
 });
+
+test("the exact pool profile has no single reduction or inferred playoff qualification; evidence and association gates remain", () => {
+  const f = fixture();
+  const literal = [
+    ["A01", 1, 8, 1],
+    ["A02", 4, 5, 4],
+    ["A03", 1, 5, 1],
+    ["A04", 8, 4, 4],
+    ["A05", 1, 4, 1],
+    ["A06", 5, 8, 5],
+    ["B01", 2, 7, 2],
+    ["B02", 3, 6, 3],
+    ["B03", 2, 6, 2],
+    ["B04", 7, 3, 3],
+    ["B05", 2, 3, 2],
+    ["B06", 6, 7, 6],
+  ] as const;
+  f.snapshot.source.games = literal.map(([id, a, b, w]) => ({
+    id,
+    drawId: null,
+    entryA: `entry-${a - 1}`,
+    entryB: `entry-${b - 1}`,
+    result: {
+      winnerEntryId: `entry-${w - 1}`,
+      outcome: "conceded",
+      lineupA: {
+        members: f.players[a - 1].map((playerId) => ({
+          playerId,
+          identityStatus: "identified",
+        })),
+      },
+      lineupB: {
+        members: f.players[b - 1].map((playerId) => ({
+          playerId,
+          identityStatus: "identified",
+        })),
+      },
+    },
+  }));
+  f.evidence.event.qualificationGameIds = literal.map((g) => g[0]);
+  f.evidence.entries.forEach((e, i) => {
+    e.games = f.snapshot.source.games
+      .filter((g) => [g.entryA, g.entryB].includes(e.entryId))
+      .map((g) => ({ gameId: g.id, segments: [f.players[i]] }));
+  });
+  const profile: PublishedFormat = {
+    divisionId: "division",
+    revision: 2,
+    templateId: "application-pools2x4-v1",
+    templateVersion: 1,
+    definition: { family: "round_robin" },
+    graph: {
+      games: f.snapshot.source.games.map((g) => ({ id: g.id, key: g.id })),
+    },
+    nodes: f.snapshot.source.games.map((g) => ({ gameId: g.id, key: g.id })),
+    seeds: f.snapshot.source.entries.map((e) => ({
+      entryId: e.id,
+      version: 1,
+    })),
+  };
+  const prepare = (p = profile) =>
+    prepareEventCalculation(f.evidence, f.snapshot, f.roster, [], "UTC", p);
+  const value = prepare();
+  assert.equal(value.singleKnockout, false);
+  assert.ok(
+    value.entries.every((e) => !e.qualified && e.firstPlayoffWon === null),
+  );
+  assert.ok(!value.issues.some((i) => i.includes("format mapping")));
+  for (const bad of [
+    { ...profile, templateVersion: 2 },
+    { ...profile, definition: { family: "single_knockout" } },
+    { ...profile, nodes: profile.nodes.slice(1) },
+    { ...profile, seeds: profile.seeds.slice(1) },
+    { ...profile, divisionId: "other" },
+  ])
+    assert.equal(assessFourPlayer(prepare(bad)).state, "blocked");
+  f.evidence.entries[0].eligibility = "unknown";
+  assert.equal(assessFourPlayer(prepare()).state, "blocked");
+  f.evidence.entries[0].eligibility = "eligible";
+  f.evidence.event.qualificationGameIds = [];
+  assert.equal(assessFourPlayer(prepare()).state, "blocked");
+});
