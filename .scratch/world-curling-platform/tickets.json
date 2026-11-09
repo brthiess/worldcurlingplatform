@@ -522,13 +522,17 @@
       "file": "10-record-entry-charges-waivers-and-external-payments.md",
       "id": "WCP-010",
       "path": "issues/10-record-entry-charges-waivers-and-external-payments.md",
-      "status": "in-progress",
+      "status": "completed",
       "labels": [
         "ready-for-agent"
       ],
       "blocked_by": [
         "WCP-009"
-      ]
+      ],
+      "completion": {
+        "commit": "80649e4f5316955124403d6b885f8b557634a011",
+        "evidence": "docs/verification/WCP-010-merge.md"
+      }
     },
     {
       "n": 11,

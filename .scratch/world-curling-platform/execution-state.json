@@ -42,6 +42,7 @@
     "WCP-006",
     "WCP-008",
     "WCP-009",
+    "WCP-010",
     "WCP-012",
     "WCP-013",
     "WCP-018",
@@ -124,6 +125,10 @@
         "commit": "62c63082c99125fafb0ccc37f1bc268a1217c313",
         "evidence": "docs/verification/WCP-009-merge.md"
       },
+      "WCP-010": {
+        "commit": "80649e4f5316955124403d6b885f8b557634a011",
+        "evidence": "docs/verification/WCP-010-merge.md"
+      },
       "WCP-012": {
         "commit": "bae3812",
         "evidence": "docs/verification/WCP-012.md"
@@ -180,19 +185,20 @@
     "Close only reviewed integrated tickets with meaningful unit/PostgreSQL/API/frontend/browser evidence.",
     "Continue unblocked work and report provider/deployment limitations honestly."
   ],
-  "updated_at": "2026-11-09T00:39:37.076646+00:00",
+  "updated_at": "2026-11-09T01:53:49.484837+00:00",
   "active_tickets": [
     "WCP-007",
-    "WCP-010",
     "WCP-034"
   ],
   "frontier": [
+    "WCP-011",
     "WCP-017",
     "WCP-021",
     "WCP-022",
     "WCP-023",
     "WCP-024",
     "WCP-026",
+    "WCP-028",
     "WCP-030"
   ],
   "events": [
@@ -499,6 +505,14 @@
       "reason": null,
       "commit": null,
       "evidence": null
+    },
+    {
+      "time": "2026-11-09T01:53:49.484837+00:00",
+      "ticket": "WCP-010",
+      "status": "completed",
+      "reason": null,
+      "commit": "80649e4f5316955124403d6b885f8b557634a011",
+      "evidence": "docs/verification/WCP-010-merge.md"
     }
   ],
   "research": {
