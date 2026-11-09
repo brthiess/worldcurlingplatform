@@ -137,7 +137,7 @@ export default function Admin() {
             <a href="/admin/schedule">Draw scheduling</a>
           </p>
           <p>
-            <a href="/admin/draws">Single knockout draws</a>
+            <a href="/admin/draws">Competition draws</a>
           </p>
           <p>
             <a href="/admin/news">News sources and moderation</a>
