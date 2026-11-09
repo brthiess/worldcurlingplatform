@@ -1278,3 +1278,15 @@ footer {
 .draw-list .draw-round { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr)); margin-bottom:1.5rem; }
 .draw-list .draw-round h3 { grid-column:1/-1; }
 .draw-graph:focus-visible { outline:3px solid #12634e; outline-offset:2px; }
+.overall-workbench { max-width: 1200px; margin-inline: auto; padding: 1rem; }
+.overall-workbench section { margin-block: 1.5rem; }
+.overall-workbench fieldset { min-width: 0; margin-block: 1rem; padding: 1rem; border: 1px solid #8a9ba8; border-radius: .35rem; }
+.overall-fields { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,260px),1fr)); gap: 1rem; }
+.overall-workbench label { display: grid; gap: .35rem; margin-block: .6rem; }
+.overall-workbench input,.overall-workbench select,.overall-workbench textarea { width: 100%; max-width: 100%; min-width: 0; }
+.overall-workbench textarea { min-height: 5rem; }
+.overall-workbench pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 35rem; overflow: auto; }
+.overall-workbench code { overflow-wrap: anywhere; }
+.overall-table-scroll { overflow-x: auto; }
+.overall-table-scroll table { min-width: 650px; width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.overall-table-scroll th,.overall-table-scroll td { padding: .7rem; text-align: left; border-bottom: 1px solid #cad3db; }

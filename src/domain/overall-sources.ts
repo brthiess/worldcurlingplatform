@@ -1,2 +1,21 @@
 // Actual bytes retrieved for WCP-034; original bodies retained privately. Application interpretations remain separately labelled.
-export const overallSources = [{"retrievedAt":"2026-11-09T00:28:51.9702646Z","id":"four","url":"https://worldcurling.org/teamrankings/ranking-calculations-four-player/","sha256":"5ccea29a731aa10aea6246d2ae77187b07bcbfc3f704d399b5ce6dff84992d85"},{"retrievedAt":"2026-11-09T00:28:52.2366150Z","id":"overview","url":"https://worldcurling.org/teamrankings/","sha256":"5584acce366bec79f1d081c2631c44ec7ebb15d89dc12a1d8264f21f5c856280"},{"retrievedAt":"2026-11-09T00:28:52.6180688Z","id":"eligibility","url":"https://worldcurling.org/wp-content/uploads/2026/07/WCTRS-Team-and-Player-Eligibility-Rules-2026-2027.pdf","sha256":"c13342eef3033965562db54038e46a86e4090d00fd11e5cba27d02c6ac77fc99"}];
+export const overallSources = [
+  {
+    retrievedAt: "2026-11-09T00:28:51.9702646Z",
+    id: "four",
+    url: "https://worldcurling.org/teamrankings/ranking-calculations-four-player/",
+    sha256: "5ccea29a731aa10aea6246d2ae77187b07bcbfc3f704d399b5ce6dff84992d85",
+  },
+  {
+    retrievedAt: "2026-11-09T00:28:52.2366150Z",
+    id: "overview",
+    url: "https://worldcurling.org/teamrankings/",
+    sha256: "5584acce366bec79f1d081c2631c44ec7ebb15d89dc12a1d8264f21f5c856280",
+  },
+  {
+    retrievedAt: "2026-11-09T00:28:52.6180688Z",
+    id: "eligibility",
+    url: "https://worldcurling.org/wp-content/uploads/2026/07/WCTRS-Team-and-Player-Eligibility-Rules-2026-2027.pdf",
+    sha256: "c13342eef3033965562db54038e46a86e4090d00fd11e5cba27d02c6ac77fc99",
+  },
+];

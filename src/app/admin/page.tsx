@@ -147,6 +147,7 @@ export default function Admin() {
           </p>
           <p>
             <a href="/admin/event-assessments">Four-player event assessments</a>
+            <a href="/admin/overall-rankings">Four-player overall drafts</a>
           </p>
           <button
             className="secondary"
