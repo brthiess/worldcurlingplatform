@@ -92,6 +92,8 @@ async function source(c: PoolClient, id: string, lock = false) {
     games: results,
   };
 }
+/** Private current sporting projection; calculation callers own edition/entry/division/game locks. */
+export const currentFinalizationSource = source;
 async function ranking(c: PoolClient, s: Awaited<ReturnType<typeof source>>) {
   const issues: { code: string; message: string; entryId?: string }[] = [];
   const d = (
