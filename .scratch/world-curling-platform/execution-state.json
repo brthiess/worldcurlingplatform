@@ -23,6 +23,7 @@
     "WCP-010",
     "WCP-012",
     "WCP-013",
+    "WCP-014",
     "WCP-017",
     "WCP-018",
     "WCP-019",
@@ -66,7 +67,7 @@
   "git": {
     "remote": "https://github.com/brthiess/worldcurlingplatform.git",
     "push_as_work_progresses": true,
-    "last_verified_remote_integration_commit": "af4e9302cbe3ead63fa6582f33caf6a8e49fb1de",
+    "last_verified_remote_integration_commit": "c83fd9709b7277da59db1c95db1a49431929cf75",
     "integration_branch": "integration/world-curling-platform",
     "worktrees_created": [
       ".worktrees/WCP-001",
@@ -90,7 +91,8 @@
       ".worktrees/WCP-034",
       ".worktrees/WCP-007",
       ".worktrees/WCP-022",
-      ".worktrees/WCP-017"
+      ".worktrees/WCP-017",
+      ".worktrees/WCP-014"
     ],
     "initialized": true,
     "baseline_commit": "f6d6d8d",
@@ -204,14 +206,14 @@
     "max_parallel_children": 3,
     "accepted_integration_after_resume": "af4e9302cbe3ead63fa6582f33caf6a8e49fb1de"
   },
-  "updated_at": "2026-11-09T22:50:18.749075+00:00",
+  "updated_at": "2026-11-09T22:51:28.038200+00:00",
   "active_tickets": [
+    "WCP-014",
     "WCP-017",
     "WCP-034"
   ],
   "frontier": [
     "WCP-011",
-    "WCP-014",
     "WCP-021",
     "WCP-023",
     "WCP-024",
@@ -579,6 +581,14 @@
       "reason": null,
       "commit": "af4e9302cbe3ead63fa6582f33caf6a8e49fb1de",
       "evidence": "docs/verification/WCP-007-merge.md"
+    },
+    {
+      "time": "2026-11-09T22:51:28.038200+00:00",
+      "ticket": "WCP-014",
+      "status": "in-progress",
+      "reason": null,
+      "commit": null,
+      "evidence": null
     }
   ],
   "research": {
@@ -714,6 +724,15 @@
       "web_port": 3117,
       "news_fixture_port": 3217,
       "reserved_migration_prefix": "0030"
+    },
+    "WCP-014": {
+      "worktree": ".worktrees/WCP-014",
+      "branch": "ticket/WCP-014",
+      "database_prefix": "wcp014",
+      "web_port": 3114,
+      "news_fixture_port": 3214,
+      "reserved_migration_prefix": "0031",
+      "crawler_source_access": "read-only frozen export only"
     }
   },
   "pause": {
