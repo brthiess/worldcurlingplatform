@@ -92,7 +92,8 @@
       ".worktrees/WCP-007",
       ".worktrees/WCP-022",
       ".worktrees/WCP-017",
-      ".worktrees/WCP-014"
+      ".worktrees/WCP-014",
+      ".worktrees/WCP-034-fixture-fix"
     ],
     "initialized": true,
     "baseline_commit": "f6d6d8d",
@@ -202,11 +203,11 @@
     "from_checkpoint": "d667c4f717d7a5045ed1313e41e5502169135e60",
     "from_note": "docs/agents/paused-2026-11-09.md",
     "formally_accepted_integration": "11d9e6ce0c4b3bdf9188dc75f74987e4b628b886",
-    "pending_source_on_primary": null,
+    "pending_source_on_primary": "WCP-034 provisional; combined API failed due malformed identity fixture; correction in progress",
     "max_parallel_children": 3,
     "accepted_integration_after_resume": "af4e9302cbe3ead63fa6582f33caf6a8e49fb1de"
   },
-  "updated_at": "2026-11-09T22:51:28.038200+00:00",
+  "updated_at": "2026-11-09T23:18:21.497301+00:00",
   "active_tickets": [
     "WCP-014",
     "WCP-017",
@@ -589,6 +590,14 @@
       "reason": null,
       "commit": null,
       "evidence": null
+    },
+    {
+      "time": "2026-11-09T23:18:21.497301+00:00",
+      "ticket": "WCP-034",
+      "status": "in-progress",
+      "reason": "Complete107 API run106pass/1fail; concrete orphan ranking-header fixture diagnosed; isolated fresh fixture correction, no acceptance",
+      "commit": "c604334e23c0753dcb0bb8eeb815d2e255d6e191",
+      "evidence": "docs/verification/WCP-034-integration-findings.md"
     }
   ],
   "research": {
@@ -699,7 +708,16 @@
       "database_prefix": "wcp034",
       "web_port": 3134,
       "news_fixture_port": 3234,
-      "reserved_migration_prefix": "0027"
+      "reserved_migration_prefix": "0027",
+      "fixture_fix": {
+        "worktree": ".worktrees/WCP-034-fixture-fix",
+        "branch": "fix/WCP-034-ranking-fixture",
+        "database_prefix": "wcp034_fixturefix",
+        "web_port": 3154,
+        "news_fixture_port": 3254,
+        "scope": "Correct malformed identity ranking collision fixture via actual staff API; no product schema change expected",
+        "base": "337ca11a9423131f4cdedd0fb99c821ec9720264"
+      }
     },
     "WCP-007": {
       "worktree": ".worktrees/WCP-007",
