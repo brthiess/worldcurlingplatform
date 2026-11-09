@@ -2,7 +2,7 @@ import { startWorker } from "./runtime";
 import { pool } from "../db";
 const boss = await startWorker();
 console.log(
-  "Worker listening: runtime-probe, ranking-four-event, news-fetch, hourly approved feed refresh",
+  "Worker listening: runtime-probe, historical-import-stage, ranking-four-event, news-fetch, hourly approved feed refresh",
 );
 let stopping = false;
 async function stop() {

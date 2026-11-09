@@ -4,6 +4,7 @@ import { fetchSource } from "../modules/news/service";
 import { newsQueue } from "../modules/news/queue";
 import { assessmentQueue } from "../modules/rankings/assessment-queue";
 import { processEventAssessment } from "../modules/rankings/assessments";
+import { importQueue, processImport } from "../modules/imports/staging";
 export const probeQueue = "runtime-probe";
 export async function startWorker(database?: Pool) {
   const pool = database ?? (await import("../db")).pool;
@@ -11,6 +12,11 @@ export async function startWorker(database?: Pool) {
   boss.on("error", (error) => console.error("Worker error:", error.message));
   await boss.start();
   await boss.createQueue(probeQueue);
+  await boss.createQueue(importQueue);
+  await boss.work<{importId:string}>(importQueue,{pollingIntervalSeconds:1},async ([job])=>{
+    if(typeof job.data.importId!=="string" || !/^[a-zA-Z0-9-]{1,80}$/.test(job.data.importId))throw new Error("Invalid import identifier");
+    await processImport(pool,job.data.importId);
+  });
   await boss.createQueue(assessmentQueue);
   await boss.work<{ assessmentId: string }>(
     assessmentQueue,

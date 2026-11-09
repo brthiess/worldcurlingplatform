@@ -154,6 +154,7 @@ export default function Admin() {
           <p>
             <a href="/admin/event-assessments">Four-player event assessments</a>
           </p>
+          <p><a href="/admin/imports">Historical import staging</a></p>
           <button
             className="secondary"
             disabled={busy}

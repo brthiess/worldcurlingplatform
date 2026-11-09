@@ -1336,3 +1336,9 @@ footer {
 }
 
 [role="tab"][aria-selected="true"] { box-shadow: inset 0 -4px 0 #fff; text-decoration: underline; text-underline-offset: .3rem; }
+.import-workbench .import-key { display:block; overflow-wrap:anywhere; white-space:normal; }
+.import-workbench pre { white-space:pre-wrap; overflow-wrap:anywhere; max-height:32rem; overflow:auto; background:#f0f4f7; padding:1rem; }
+.import-workbench section { margin-block:1.5rem; }
+.import-workbench dd { margin-inline-start:0; margin-block-end:.75rem; }
+.import-workbench .table-scroll th:first-child { min-width:7rem; white-space:normal; }
+.import-workbench article button { margin:.25rem; }
