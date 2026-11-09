@@ -14,8 +14,9 @@ import {
 } from "../src/domain/event-assessment-snapshot";
 import { assessFourPlayer } from "../src/domain/event-assessments";
 import { source } from "./ranking-inputs-fixtures";
-function fixture() {
-  const ids = Array.from({ length: 8 }, (_, i) => `entry-${i}`),
+import { tripleResults } from "./triple-draws-fixture";
+function fixture(count = 8) {
+  const ids = Array.from({ length: count }, (_, i) => `entry-${i}`),
     players = ids.map((_, i) =>
       Array.from({ length: 4 }, (_, j) => `player-${i}-${j}`),
     );
@@ -23,7 +24,7 @@ function fixture() {
     id: `game-${i}`,
     drawId: `draw-${i}`,
     entryA: id,
-    entryB: ids[(i + 1) % 8],
+    entryB: ids[(i + 1) % count],
     result: {
       winnerEntryId: id,
       outcome: "conceded",
@@ -34,7 +35,7 @@ function fixture() {
         })),
       },
       lineupB: {
-        members: players[(i + 1) % 8].map((playerId) => ({
+        members: players[(i + 1) % count].map((playerId) => ({
           playerId,
           identityStatus: "identified",
         })),
@@ -382,4 +383,90 @@ test("immutable published profile and exact game/entry associations establish th
       ).state,
       "blocked",
     );
+});
+
+test("the exact published triple profile keeps qualification plus playoffs outside the single-knockout reduction", () => {
+  const f = fixture(16);
+  f.snapshot.source.games = tripleResults.map((row) => ({
+    id: row.key,
+    drawId: null,
+    entryA: `entry-${row.a - 1}`,
+    entryB: `entry-${row.b - 1}`,
+    result: {
+      winnerEntryId: `entry-${row.winner - 1}`,
+      outcome: "conceded",
+      lineupA: {
+        members: f.players[row.a - 1].map((playerId) => ({
+          playerId,
+          identityStatus: "identified",
+        })),
+      },
+      lineupB: {
+        members: f.players[row.b - 1].map((playerId) => ({
+          playerId,
+          identityStatus: "identified",
+        })),
+      },
+    },
+  }));
+  // The eight qualification exits share ninth in this explicit finalization fixture;
+  // no unique ninth-through-sixteenth ordering is inferred from the draw.
+  const places = [2, 5, 3, 5, 3, 9, 9, 5, 9, 9, 9, 9, 5, 9, 9, 1];
+  f.snapshot.placements = f.snapshot.source.entries.map((e, i) => ({
+    entryId: e.id,
+    place: places[i],
+  }));
+  f.evidence.event.formatReview = { family: "unknown", sourceId: "", note: "" };
+  f.evidence.event.qualificationGameIds = tripleResults
+    .filter((g) => !g.key.startsWith("P"))
+    .map((g) => g.key);
+  f.evidence.event.playoffGameIds = tripleResults
+    .filter((g) => g.key.startsWith("P"))
+    .map((g) => g.key);
+  f.evidence.entries.forEach((e, i) => {
+    e.games = f.snapshot.source.games
+      .filter((g) => [g.entryA, g.entryB].includes(e.entryId))
+      .map((g) => ({ gameId: g.id, segments: [f.players[i]] }));
+    e.firstPlayoffGameId =
+      tripleResults.find(
+        (g) => g.key.startsWith("P") && [g.a, g.b].includes(i + 1),
+      )?.key ?? null;
+  });
+  const profile: PublishedFormat = {
+    divisionId: "division",
+    revision: 2,
+    templateId: "application-tko16-q8-233-v1",
+    templateVersion: 1,
+    definition: { family: "triple_knockout" },
+    graph: { games: tripleResults.map((g) => ({ id: g.key, key: g.key })) },
+    nodes: tripleResults.map((g) => ({ gameId: g.key, key: g.key })),
+    seeds: f.snapshot.source.entries.map((e) => ({
+      entryId: e.id,
+      version: 1,
+    })),
+  };
+  const prepare = (p = profile) =>
+    prepareEventCalculation(f.evidence, f.snapshot, f.roster, [], "UTC", p);
+  const result = assessFourPlayer(prepare());
+  assert.equal(result.state, "completed", result.issues.join(" "));
+  // 16 * 1/5 * (24/16) * ((16+16)/32) = 24/5; champion * 15/2 = 36.
+  assert.equal(result.sfm, "24/5");
+  assert.equal(
+    result.awards.find((a) => a.entryId === "entry-15")!.points,
+    "36",
+  );
+  assert.equal(
+    result.stages.some((s) => s.stage === "single knockout reduction"),
+    false,
+  );
+  for (const bad of [
+    { ...profile, templateId: "unreviewed-triple" },
+    { ...profile, templateVersion: 2 },
+    { ...profile, definition: { family: "single_knockout" } },
+    { ...profile, nodes: profile.nodes.slice(1) },
+    { ...profile, divisionId: "different" },
+  ])
+    assert.equal(assessFourPlayer(prepare(bad)).state, "blocked");
+  f.evidence.event.singleKnockout = true;
+  assert.match(assessFourPlayer(prepare()).issues.join(" "), /format\/stages/);
 });
