@@ -15,6 +15,7 @@ export function eventEngineIdentity() {
     "src/domain/ranking-inputs.ts",
     "src/domain/entries.ts",
     "src/domain/finalization.ts",
+    "src/domain/canonical-json.ts",
     "src/modules/competition/finalization.ts",
     "src/modules/rankings/inputs.ts",
     "src/modules/rankings/assessments.ts",

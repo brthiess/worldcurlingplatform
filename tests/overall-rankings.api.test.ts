@@ -6,6 +6,7 @@ import pg from "pg";
 import { authRequest } from "./auth-request";
 import { assessmentFixture } from "./event-assessments-fixture";
 import { source } from "./ranking-inputs-fixtures";
+import { createHash } from "node:crypto";
 const db = new pg.Pool({ connectionString: process.env.DATABASE_URL, max: 3 }),
   base = process.env.BETTER_AUTH_URL!;
 after(() => db.end());
@@ -118,6 +119,38 @@ test("real persisted awards produce immutable overall contributions, command ret
     evidence,
   };
   const done = await json("/api/v1/overall-rankings", cmd);
+  const receipts = (await json(path)).receipts,
+    receipt = receipts.find(
+      (r: any) =>
+        r.actorId === "demo-administrator" && r.requestId === cmd.requestId,
+    );
+  const canonical = (v: any): string =>
+    Array.isArray(v)
+      ? "[" + v.map(canonical).join(",") + "]"
+      : v && typeof v === "object"
+        ? "{" +
+          Object.keys(v)
+            .sort()
+            .map((k) => JSON.stringify(k) + ":" + canonical(v[k]))
+            .join(",") +
+          "}"
+        : JSON.stringify(v);
+  assert.equal(
+    receipt.commandDigest,
+    createHash("sha256").update(canonical(cmd)).digest("hex"),
+  );
+  assert.equal(receipt.path, "/api/v1/overall-rankings");
+  assert.equal(receipt.action, "calculate");
+  assert.equal(receipt.discipline, "men_four");
+  assert.equal(receipt.effectiveDate, "2026-11-23");
+  assert.equal(receipt.runId, done.id);
+  const anotherDate = await json(
+    `/api/v1/overall-rankings?discipline=men_four&date=2026-11-24&rules=${f.rulesId}`,
+  );
+  assert.equal(
+    anotherDate.receipts.some((r: any) => r.requestId === cmd.requestId),
+    false,
+  );
   assert.equal(done.result.state, "ready", JSON.stringify(done.result.issues));
   assert.equal(
     done.result.rows.find((r: any) => r.id === f.seasonIds[0]).total,
@@ -307,6 +340,27 @@ test("real persisted awards produce immutable overall contributions, command ret
     .getSetCookie()
     .map((c) => c.split(";")[0])
     .join("; ");
+  const deniedReceipts = await fetch(base + path, {
+    headers: { cookie: otherCookie },
+  });
+  assert.equal(deniedReceipts.status, 403);
+  assert.equal(Object.hasOwn(await deniedReceipts.json(), "receipts"), false);
+  assert.equal((await fetch(base + path)).status, 401);
+  assert.equal(
+    (
+      await fetch(base + "/api/v1/overall-rankings", {
+        method: "POST",
+        headers: {
+          cookie,
+          Origin: base,
+          "Content-Type": "application/json",
+          "X-WCP-Actor": "another-actor",
+        },
+        body: JSON.stringify(cmd),
+      })
+    ).status,
+    403,
+  );
   assert.equal(
     (
       await fetch(base + `/api/v1/overall-rankings?id=${done.id}`, {

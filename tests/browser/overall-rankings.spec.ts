@@ -10,6 +10,169 @@ import { source } from "../ranking-inputs-fixtures";
 const db = new pg.Pool({ connectionString: process.env.DATABASE_URL, max: 3 });
 test.afterAll(() => db.end());
 test.use({ actionTimeout: 10000 });
+
+test("reconciliation retains a conflicting full command and confirms only the original actor path context and digest without POST", async ({
+  page,
+}, info) => {
+  test.setTimeout(180000);
+  await page.goto("/admin");
+  await page.getByLabel("Demo persona").selectOption("administrator");
+  await page.getByLabel("Demo password").fill(process.env.DEMO_PASSWORD!);
+  await signInWithRateWindow(
+    page,
+    page.getByRole("button", { name: "Sign in", exact: true }),
+  );
+  const send = async (path: string, body?: unknown) => {
+    const r = body
+      ? await page.request.post(path, {
+          headers: { Origin: process.env.BETTER_AUTH_URL! },
+          data: body,
+        })
+      : await page.request.get(path);
+    return { status: r.status(), json: () => r.json(), text: () => r.text() };
+  };
+  const f = await overallFixture(db, send),
+    url = `/api/v1/overall-rankings?discipline=${f.discipline}&date=2026-11-23&rules=${f.rulesId}`,
+    w = await (await page.request.get(url)).json(),
+    body = {
+      action: "calculate",
+      discipline: f.discipline,
+      effectiveDate: "2026-11-23",
+      rulesId: f.rulesId,
+      version: w.version,
+      sourceDigest: w.review.sourceDigest,
+      requestId: crypto.randomUUID(),
+      evidence: overallReviewEvidence(w.review, f),
+      recoveryProbe: {
+        é: 1,
+        Z: 2,
+        "😀": [true, null, "Unicode canonical bytes"],
+      },
+    };
+  const committed = await page.request.post("/api/v1/overall-rankings", {
+    headers: { Origin: process.env.BETTER_AUTH_URL! },
+    data: body,
+  });
+  expect(committed.status()).toBe(200);
+  const original = await committed.json();
+  expect(original.result.state).toBe("ready");
+  const conflict = {
+    ...body,
+    evidence: {
+      ...body.evidence,
+      reviewNote:
+        "Different uncommitted full command reusing the actual committed request",
+    },
+  };
+  const rejected = await page.request.post("/api/v1/overall-rankings", {
+    headers: { Origin: process.env.BETTER_AUTH_URL! },
+    data: conflict,
+  });
+  expect(rejected.status()).toBe(409);
+  const key = `overall-ranking-command:${w.actorId}`,
+    pending = (value: unknown, path = "/api/v1/overall-rankings") => ({
+      actorId: w.actorId,
+      path,
+      body: JSON.stringify(value),
+      message: "Overall draft and immutable contributions saved.",
+      acknowledged: false,
+    });
+  await page.goto("/admin/overall-rankings");
+  await expect(
+    page.getByRole("combobox", { name: "Rule-source edition", exact: true }),
+  ).toBeEnabled();
+  await page.evaluate(
+    ({ key, value }) => sessionStorage.setItem(key, JSON.stringify(value)),
+    { key, value: pending(conflict) },
+  );
+  await page.reload();
+  const posts: string[] = [];
+  page.on("request", (r) => {
+    if (
+      r.method() === "POST" &&
+      new URL(r.url()).pathname === "/api/v1/overall-rankings"
+    )
+      posts.push(r.postData() ?? "");
+  });
+  await page
+    .getByRole("button", {
+      name: "Reconcile recorded overall ranking command",
+      exact: true,
+    })
+    .click();
+  await expect
+    .poll(
+      async () =>
+        (await page
+          .getByText(
+            "The original command was reconciled with recorded history. Review its current status below.",
+            { exact: true },
+          )
+          .isVisible()) ||
+        (await page.getByRole("main").getByRole("alert").isVisible()),
+    )
+    .toBe(true);
+  await page.screenshot({ path: info.outputPath("conflict-settled.png") });
+  expect(
+    await page.evaluate((key) => sessionStorage.getItem(key), key),
+  ).not.toBeNull();
+  await expect(page.getByRole("main").getByRole("alert")).toContainText(
+    "Recorded state could not confirm the original command",
+  );
+  await expect(
+    page.getByText(
+      "The original command was reconciled with recorded history. Review its current status below.",
+      { exact: true },
+    ),
+  ).toHaveCount(0);
+  expect(posts).toEqual([]);
+  // A journal aimed at another authorized command kind must not use this receipt.
+  await page.evaluate(
+    ({ key, value }) => sessionStorage.setItem(key, JSON.stringify(value)),
+    { key, value: pending(body, "/api/v1/entry-charges") },
+  );
+  await page.reload();
+  await page
+    .getByRole("button", {
+      name: "Reconcile recorded overall ranking command",
+      exact: true,
+    })
+    .click();
+  await expect(page.getByRole("main").getByRole("alert")).toContainText(
+    "Recorded state could not confirm",
+  );
+  expect(
+    await page.evaluate((key) => sessionStorage.getItem(key), key),
+  ).not.toBeNull();
+  // Property order differs but canonical command content is exactly original.
+  const reordered = Object.fromEntries(Object.entries(body).reverse());
+  await page.evaluate(
+    ({ key, value }) => sessionStorage.setItem(key, JSON.stringify(value)),
+    { key, value: pending(reordered) },
+  );
+  await page.reload();
+  await page
+    .getByRole("button", {
+      name: "Reconcile recorded overall ranking command",
+      exact: true,
+    })
+    .click();
+  await expect(
+    page.getByText(
+      "The original command was reconciled with recorded history. Review its current status below.",
+      { exact: true },
+    ),
+  ).toBeVisible();
+  expect(
+    await page.evaluate((key) => sessionStorage.getItem(key), key),
+  ).toBeNull();
+  expect(posts).toEqual([]);
+  const preserved = await (
+    await page.request.get(`/api/v1/overall-rankings?id=${original.id}`)
+  ).json();
+  expect(preserved.manifestDigest).toBe(original.manifestDigest);
+  expect(preserved.resultDigest).toBe(original.resultDigest);
+});
 test("overall review loads and shows honest empty/input state", async ({
   page,
 }) => {

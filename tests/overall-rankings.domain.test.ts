@@ -14,6 +14,25 @@ import {
 import { overallEvidence } from "../src/domain/overall-ranking-input";
 import { seasonInput } from "../src/domain/ranking-inputs";
 import { source as documentary } from "./ranking-inputs-fixtures";
+import { canonicalJson } from "../src/domain/canonical-json";
+import { freezeContents } from "../src/domain/finalization";
+import { createHash } from "node:crypto";
+
+test("frozen command canonical bytes preserve Unicode code-unit ordering, dates and null array values", () => {
+  const expected =
+      '{"Z":"2026-11-09T00:00:00.000Z","a":{"A":1,"z":2},"é":[1,null]}',
+    value = {
+      é: [1, undefined],
+      a: { z: 2, A: 1 },
+      Z: new Date("2026-11-09T00:00:00Z"),
+    };
+  assert.equal(canonicalJson(value), expected);
+  assert.equal(freezeContents(value).contents, expected);
+  assert.equal(
+    freezeContents(value).digest,
+    createHash("sha256").update(expected, "utf8").digest("hex"),
+  );
+});
 
 test("F4 inclusive overall checkpoints count best awards and retain exact dated carryover", () => {
   const expected = [

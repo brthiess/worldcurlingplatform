@@ -13,6 +13,7 @@ import type {
 import type { Source } from "@/domain/ranking-inputs";
 import { OverallTransferEditor } from "./overall-transfer-editor";
 import { OverallField } from "./overall-field";
+import { canonicalJson } from "@/domain/canonical-json";
 import { useAuthorityCommand, AuthorityRecovery } from "./authority-command";
 type Saved = {
   id: string;
@@ -38,7 +39,16 @@ type Workspace = {
   review?: OverallSource & { sourceDigest: string };
   version?: number;
   history?: { id: string; version: number; state: string }[];
-  receipts?: { actorId: string; requestId: string; runId: string }[];
+  receipts?: {
+    actorId: string;
+    requestId: string;
+    runId: string;
+    commandDigest: string;
+    action: string;
+    path: string;
+    discipline: string;
+    effectiveDate: string;
+  }[];
   selected?: Saved | null;
 };
 const path = "/api/v1/overall-rankings";
@@ -137,6 +147,7 @@ export function OverallRankingsWorkbench() {
         setEvidence(value);
         setSubjectId(value.subjects[0]?.registrationId ?? "");
       }
+      return next;
     } catch (e) {
       setError((e as Error).message);
       setStale(true);
@@ -157,11 +168,56 @@ export function OverallRankingsWorkbench() {
     },
     async (pending) => {
       const b = JSON.parse(pending.body);
+      if (
+        pending.actorId !== workspace?.actorId ||
+        pending.path !== path ||
+        !["calculate", "replay"].includes(b.action) ||
+        !["men_four", "women_four"].includes(b.discipline) ||
+        typeof b.effectiveDate !== "string" ||
+        typeof b.requestId !== "string"
+      )
+        return false;
       const current = await read<Workspace>(
-        `${path}?discipline=${b.discipline}&date=${b.effectiveDate}&rules=${b.rulesId ?? rules}`,
+        `${path}?discipline=${encodeURIComponent(b.discipline)}&date=${encodeURIComponent(b.effectiveDate)}&rules=${encodeURIComponent(b.rulesId ?? rules)}`,
       );
-      return !!current.receipts?.some(
-        (r) => r.actorId === pending.actorId && r.requestId === b.requestId,
+      if (current.actorId !== pending.actorId) return false;
+      const bytes = await crypto.subtle.digest(
+          "SHA-256",
+          new TextEncoder().encode(canonicalJson(b)),
+        ),
+        digest = Array.from(new Uint8Array(bytes), (x) =>
+          x.toString(16).padStart(2, "0"),
+        ).join("");
+      const receipt = current.receipts?.find(
+        (r) =>
+          r.actorId === pending.actorId &&
+          r.requestId === b.requestId &&
+          r.path === pending.path &&
+          r.action === b.action &&
+          r.discipline === b.discipline &&
+          r.effectiveDate === b.effectiveDate &&
+          r.commandDigest === digest,
+      );
+      if (!receipt) return false;
+      if (
+        b.action === "replay"
+          ? receipt.runId !== b.runId
+          : !current.history?.some(
+              (h) => h.id === receipt.runId && h.version === b.version + 1,
+            )
+      )
+        return false;
+      const refreshed = await load(
+        b.discipline,
+        b.effectiveDate,
+        b.rulesId ?? rules,
+        true,
+        true,
+      );
+      return (
+        refreshed?.actorId === pending.actorId &&
+        refreshed.review?.discipline === b.discipline &&
+        refreshed.review?.effectiveDate === b.effectiveDate
       );
     },
     (status) => {

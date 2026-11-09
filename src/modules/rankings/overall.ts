@@ -156,7 +156,7 @@ export async function overallWorkspace(
     ).rows;
     const receipts = (
       await c.query(
-        'SELECT r.actor_id AS "actorId",r.request_id AS "requestId",r.run_id AS "runId" FROM overall_ranking_receipt r JOIN overall_ranking_run x ON x.id=r.run_id WHERE x.discipline=$1 AND x.effective_date=$2',
+        'SELECT r.actor_id AS "actorId",r.request_id AS "requestId",r.run_id AS "runId",r.command_digest AS "commandDigest",r.action,\'/api/v1/overall-rankings\' AS path,x.discipline,x.effective_date::text AS "effectiveDate" FROM overall_ranking_receipt r JOIN overall_ranking_run x ON x.id=r.run_id WHERE x.discipline=$1 AND x.effective_date=$2',
         [d, date],
       )
     ).rows;
