@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { PublicLink, usePublicFilters } from "./public-context";
 import { FavoriteButton, useFavorites } from "./favorites";
 import type { Favorite } from "@/domain/discovery";
+import { disciplines } from "@/domain/applications";
 type Result = Favorite & { name: string; description: string };
 export function PublicSearch() {
   const { filters, change } = usePublicFilters(),
@@ -47,7 +48,7 @@ export function PublicSearch() {
             kind: "team",
             id: t.id,
             name: t.name,
-            description: `${t.discipline} · core: ${t.core.map((p) => p.name).join(", ")}`,
+            description: `${disciplines[t.discipline as keyof typeof disciplines] ?? "Discipline not recorded"} · core: ${t.core.map((p) => p.name).join(", ")}`,
           }),
         ),
         ...players.map(
