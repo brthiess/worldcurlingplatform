@@ -1,3 +1,4 @@
+import { POOL_TEMPLATE } from "@/domain/pools";
 import type { PublicDraw } from "@/modules/draws/draws";
 import { selectedDrawPath, sourceLabel, TRIPLE_TEMPLATE } from "@/domain/draws";
 type Props = {
@@ -7,6 +8,7 @@ type Props = {
   view?: string;
   timezone?: string;
   onlySelected?: boolean;
+  pool?: string;
 };
 export function DrawPanel({
   data,
@@ -15,14 +17,18 @@ export function DrawPanel({
   view = "bracket",
   timezone = "UTC",
   onlySelected = false,
+  pool = "",
 }: Props) {
   const graph = data.graph;
   if (!graph) return null;
   const seed = data.seeds.find((s) => s.entryId === selected);
   const path = new Set(selectedDrawPath(graph, seed?.seed, selected, games));
   const triple = graph.template === TRIPLE_TEMPLATE;
+  const pooled = graph.template === POOL_TEMPLATE;
   const visible = graph.games.filter(
-    (g) => !onlySelected || !selected || path.has(g.key),
+    (g) =>
+      (!pool || g.group === pool) &&
+      (!onlySelected || !selected || path.has(g.key)),
   );
   const routeHref = (id: string) =>
     visible.some((g) => g.id === id) ? `#draw-node-${id}` : `/games/${id}`;
@@ -40,15 +46,19 @@ export function DrawPanel({
           C: "C path · last qualification chance",
           P: "Playoffs · single knockout",
         }[group]
-      : { 1: "Quarterfinals", 2: "Semifinals", 3: "Final" }[group];
+      : pooled
+        ? `Round ${group}`
+        : { 1: "Quarterfinals", 2: "Semifinals", 3: "Final" }[group];
   return (
     <>
       <p className="legend">
-        {triple
-          ? "Winner and loser route links connect A, B, C and playoffs. Qualification and elimination are separate destinations."
-          : "Winner routes connect each round."}{" "}
-        A highlighted possible route depends on future results. Time is shown
-        only after a session is assigned.
+        {pooled
+          ? "Each team plays the other three teams in its pool once. Playoff selection remains manual."
+          : triple
+            ? "Winner and loser route links connect A, B, C and playoffs. Qualification and elimination are separate destinations."
+            : "Winner routes connect each round."}{" "}
+        {!pooled && "A highlighted possible route depends on future results. "}
+        Time is shown only after a session is assigned.
       </p>
       {graph.byes.length > 0 && (
         <section className="notice" aria-label="Structural byes">
@@ -69,7 +79,9 @@ export function DrawPanel({
         role="region"
         aria-label={
           view === "list"
-            ? "Knockout game list"
+            ? pooled
+              ? "Pool game list"
+              : "Knockout game list"
             : "Knockout bracket, scroll horizontally on small screens"
         }
         tabIndex={view === "list" ? undefined : 0}
@@ -198,6 +210,7 @@ export function DrawPanel({
                         </p>
                       )}
                       <p
+                        role="group"
                         className="legend route-connectors"
                         aria-label={`${node.key} outcome routes`}
                       >

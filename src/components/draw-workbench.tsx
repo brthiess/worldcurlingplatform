@@ -1,4 +1,5 @@
 "use client";
+import { POOL_TEMPLATE } from "@/domain/pools";
 import { useEffect, useRef, useState } from "react";
 import type { drawWorkspace } from "@/modules/draws/draws";
 import { DrawPanel } from "./draw-panel";
@@ -61,7 +62,9 @@ export function DrawWorkbench() {
         if (retainedCommand.action === "preview") {
           const profile = retainedCommand.template ?? SINGLE_TEMPLATE;
           if (
-            ![SINGLE_TEMPLATE, TRIPLE_TEMPLATE].includes(profile) ||
+            ![SINGLE_TEMPLATE, TRIPLE_TEMPLATE, POOL_TEMPLATE].includes(
+              profile,
+            ) ||
             !Array.isArray(retainedCommand.seedEntryIds) ||
             !retainedCommand.seedEntryIds.every(
               (entry: unknown) => typeof entry === "string",
@@ -306,7 +309,12 @@ export function DrawWorkbench() {
                   value={template}
                   onChange={(e) => {
                     const value = e.target.value,
-                      n = value === TRIPLE_TEMPLATE ? 16 : 6;
+                      n =
+                        value === TRIPLE_TEMPLATE
+                          ? 16
+                          : value === POOL_TEMPLATE
+                            ? 8
+                            : 6;
                     setTemplate(value);
                     setCount(n);
                     setSeeds((old) =>
@@ -314,6 +322,9 @@ export function DrawWorkbench() {
                     );
                   }}
                 >
+                  <option value={POOL_TEMPLATE}>
+                    Pooled round robin · two pools of four
+                  </option>
                   <option value={SINGLE_TEMPLATE}>
                     Single knockout · six or eight entries
                   </option>
@@ -324,7 +335,9 @@ export function DrawWorkbench() {
                 <p>
                   {template === TRIPLE_TEMPLATE
                     ? "Exactly sixteen teams, no byes. Eight qualifiers enter seven fixed playoff games. A first loss follows B, a second follows C; C losers leave qualification. Playoff losses end championship participation."
-                    : "Eight slots. With six entries, seeds 1 and 2 enter the semifinals directly; byes create no physical game or win. No bronze game."}
+                    : template === POOL_TEMPLATE
+                      ? "Eight teams: pool A seeds 1, 4, 5, 8; pool B seeds 2, 3, 6, 7. Three rounds, twelve games. Equal records remain tied; playoff selection is manual."
+                      : "Eight slots. With six entries, seeds 1 and 2 enter the semifinals directly; byes create no physical game or win. No bronze game."}
                 </p>
                 <label htmlFor="field-count">Field size</label>
                 <select
@@ -340,6 +353,8 @@ export function DrawWorkbench() {
                 >
                   {template === TRIPLE_TEMPLATE ? (
                     <option value={16}>Sixteen entries · no byes</option>
+                  ) : template === POOL_TEMPLATE ? (
+                    <option value={8}>Eight entries · two pools</option>
                   ) : (
                     <>
                       <option value={6}>

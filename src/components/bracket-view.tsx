@@ -2,12 +2,15 @@
 import { useEffect, useState, useCallback } from "react";
 import type { PublicDraw } from "@/modules/draws/draws";
 import { DrawPanel } from "./draw-panel";
+import { POOL_TEMPLATE } from "@/domain/pools";
+import { PoolTable } from "./pool-table";
 import { TRIPLE_TEMPLATE } from "@/domain/draws";
 export function BracketView({ eventId }: { eventId: string }) {
   const [data, setData] = useState<PublicDraw | null>(null),
     [error, setError] = useState(""),
     [loading, setLoading] = useState(true),
     [selected, setSelected] = useState(""),
+    [group, setGroup] = useState("A"),
     [view, setView] = useState("bracket"),
     [pathOnly, setPathOnly] = useState(false),
     [updated, setUpdated] = useState<Date | null>(null);
@@ -57,6 +60,7 @@ export function BracketView({ eventId }: { eventId: string }) {
     const sync = () => {
       const p = new URLSearchParams(window.location.search);
       setSelected(p.get("entry") ?? "");
+      setGroup(p.get("pool") === "B" ? "B" : "A");
       setView(p.get("view") === "list" ? "list" : "bracket");
       setPathOnly(p.get("path") === "team");
     };
@@ -74,11 +78,13 @@ export function BracketView({ eventId }: { eventId: string }) {
     const url = new URL(window.location.href);
     value ? url.searchParams.set(key, value) : url.searchParams.delete(key);
     window.history.pushState({}, "", url);
-    key === "entry"
-      ? setSelected(value)
-      : key === "path"
-        ? setPathOnly(value === "team")
-        : setView(value);
+    key === "pool"
+      ? setGroup(value)
+      : key === "entry"
+        ? setSelected(value)
+        : key === "path"
+          ? setPathOnly(value === "team")
+          : setView(value);
   }
   const next = data?.games.find(
     (g) =>
@@ -89,9 +95,11 @@ export function BracketView({ eventId }: { eventId: string }) {
     <main id="main">
       <p className="eyebrow">Competition draw</p>
       <h1>
-        {data?.template === TRIPLE_TEMPLATE
-          ? "Triple knockout bracket"
-          : "Single knockout bracket"}
+        {data?.template === POOL_TEMPLATE
+          ? "Pools and standings"
+          : data?.template === TRIPLE_TEMPLATE
+            ? "Triple knockout bracket"
+            : "Single knockout bracket"}
       </h1>
       <p>
         <a
@@ -158,22 +166,24 @@ export function BracketView({ eventId }: { eventId: string }) {
                 ))}
               </select>
             </div>
-            <div role="group" aria-label="Draw view">
-              <button
-                className="secondary"
-                aria-pressed={view === "bracket"}
-                onClick={() => choose("view", "bracket")}
-              >
-                Bracket
-              </button>
-              <button
-                className="secondary"
-                aria-pressed={view === "list"}
-                onClick={() => choose("view", "list")}
-              >
-                Game list
-              </button>
-            </div>
+            {data.template !== POOL_TEMPLATE && (
+              <div role="group" aria-label="Draw view">
+                <button
+                  className="secondary"
+                  aria-pressed={view === "bracket"}
+                  onClick={() => choose("view", "bracket")}
+                >
+                  Bracket
+                </button>
+                <button
+                  className="secondary"
+                  aria-pressed={view === "list"}
+                  onClick={() => choose("view", "list")}
+                >
+                  Game list
+                </button>
+              </div>
+            )}
           </div>
           {selected && (
             <section
@@ -237,14 +247,85 @@ export function BracketView({ eventId }: { eventId: string }) {
               </button>
             </section>
           )}
-          <DrawPanel
-            data={data}
-            games={data.games}
-            selected={selected}
-            view={view}
-            timezone={data.division.timezone}
-            onlySelected={pathOnly}
-          />
+          {data.template === POOL_TEMPLATE && (
+            <>
+              <div role="tablist" aria-label="Pools">
+                {data.pools.map((p) => (
+                  <button
+                    key={p.key}
+                    type="button"
+                    role="tab"
+                    id={`pool-tab-${p.key}`}
+                    aria-selected={group === p.key}
+                    aria-controls={`pool-panel-${p.key}`}
+                    tabIndex={group === p.key ? 0 : -1}
+                    onClick={() => choose("pool", p.key)}
+                    onKeyDown={(e) => {
+                      if (
+                        ["ArrowRight", "ArrowLeft", "Home", "End"].includes(
+                          e.key,
+                        )
+                      ) {
+                        e.preventDefault();
+                        const next =
+                          e.key === "Home"
+                            ? "A"
+                            : e.key === "End"
+                              ? "B"
+                              : group === "A"
+                                ? "B"
+                                : "A";
+                        choose("pool", next);
+                        document.getElementById(`pool-tab-${next}`)?.focus();
+                      }
+                    }}
+                  >
+                    Pool {p.key}
+                  </button>
+                ))}
+              </div>
+              <section
+                hidden
+                role="tabpanel"
+                id={`pool-panel-${group === "A" ? "B" : "A"}`}
+                aria-labelledby={`pool-tab-${group === "A" ? "B" : "A"}`}
+              />
+              <section
+                role="tabpanel"
+                id={`pool-panel-${group}`}
+                aria-labelledby={`pool-tab-${group}`}
+                tabIndex={0}
+              >
+                <PoolTable pool={data.pools.find((p) => p.key === group)} />
+                <p>
+                  <a
+                    href={`/events/${encodeURIComponent(eventId)}?division=${encodeURIComponent(data.divisionId)}`}
+                  >
+                    Event schedule and scores →
+                  </a>
+                </p>
+                <DrawPanel
+                  data={data}
+                  games={data.games}
+                  selected={selected}
+                  view="list"
+                  timezone={data.division.timezone}
+                  onlySelected={pathOnly}
+                  pool={group}
+                />
+              </section>
+            </>
+          )}
+          {data.template !== POOL_TEMPLATE && (
+            <DrawPanel
+              data={data}
+              games={data.games}
+              selected={selected}
+              view={view}
+              timezone={data.division.timezone}
+              onlySelected={pathOnly}
+            />
+          )}
           <details>
             <summary>Published revision history</summary>
             <ol>

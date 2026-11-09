@@ -470,3 +470,43 @@ test("the exact published triple profile keeps qualification plus playoffs outsi
   f.evidence.event.singleKnockout = true;
   assert.match(assessFourPlayer(prepare()).issues.join(" "), /format\/stages/);
 });
+
+test("the exact pool profile has no single reduction or inferred playoff qualification; evidence and association gates remain", () => {
+  const f = fixture();
+  const profile: PublishedFormat = {
+    divisionId: "division",
+    revision: 2,
+    templateId: "application-pools2x4-v1",
+    templateVersion: 1,
+    definition: { family: "round_robin" },
+    graph: {
+      games: f.snapshot.source.games.map((g) => ({ id: g.id, key: g.id })),
+    },
+    nodes: f.snapshot.source.games.map((g) => ({ gameId: g.id, key: g.id })),
+    seeds: f.snapshot.source.entries.map((e) => ({
+      entryId: e.id,
+      version: 1,
+    })),
+  };
+  const prepare = (p = profile) =>
+    prepareEventCalculation(f.evidence, f.snapshot, f.roster, [], "UTC", p);
+  const value = prepare();
+  assert.equal(value.singleKnockout, false);
+  assert.ok(
+    value.entries.every((e) => !e.qualified && e.firstPlayoffWon === null),
+  );
+  assert.ok(!value.issues.some((i) => i.includes("format mapping")));
+  for (const bad of [
+    { ...profile, templateVersion: 2 },
+    { ...profile, definition: { family: "single_knockout" } },
+    { ...profile, nodes: profile.nodes.slice(1) },
+    { ...profile, seeds: profile.seeds.slice(1) },
+    { ...profile, divisionId: "other" },
+  ])
+    assert.equal(assessFourPlayer(prepare(bad)).state, "blocked");
+  f.evidence.entries[0].eligibility = "unknown";
+  assert.equal(assessFourPlayer(prepare()).state, "blocked");
+  f.evidence.entries[0].eligibility = "eligible";
+  f.evidence.event.qualificationGameIds = [];
+  assert.equal(assessFourPlayer(prepare()).state, "blocked");
+});
