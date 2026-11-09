@@ -91,6 +91,85 @@ async function fixture() {
   assert.equal(candidate.status, 201);
   return { id, ids, entry };
 }
+test("candidate disambiguation exposes only public context and leaves the existing profile projection unchanged", async () => {
+  const f = await fixture(),
+    eventId = randomUUID(),
+    divisionId = randomUUID(),
+    secretName = `Unpublished candidate context ${randomUUID()}`;
+  const app = await req("/api/v1/applications", {
+    id: eventId,
+    requestId: randomUUID(),
+    action: "create",
+    application: {
+      organizationId: "prairie-club",
+      seriesId: "prairie",
+      name: secretName,
+      startsOn: "2031-11-08",
+      endsOn: "2031-11-10",
+      city: "Regina",
+      country: "Canada",
+      venue: "",
+      timezone: "America/Regina",
+      divisions: [
+        {
+          id: divisionId,
+          name: "Private draft division",
+          discipline: "men_four",
+        },
+      ],
+    },
+  });
+  assert.equal(app.status, 201);
+  const hidden = await req("/api/v1/entries", {
+    id: randomUUID(),
+    requestId: randomUUID(),
+    version: 0,
+    entry: {
+      divisionId,
+      name: "Hidden candidate participation",
+      coreKnown: false,
+      corePlayerIds: [],
+      members: [
+        {
+          playerId: f.ids[0],
+          role: "substitute",
+          position: "",
+          participation: "declared",
+        },
+      ],
+    },
+  });
+  assert.equal(hidden.status, 201);
+  const r = await fetch(base + "/api/v1/public/player-candidates");
+  assert.equal(r.status, 200);
+  const candidates = await r.json();
+  const p = candidates.find((p: any) => p.id === f.ids[0]);
+  assert.deepEqual(Object.keys(p).sort(), [
+    "contexts",
+    "id",
+    "identityStatus",
+    "name",
+    "origin",
+  ]);
+  assert.ok(p.contexts.includes("Prairie Open 2026 · Men’s four-player"));
+  assert.equal(JSON.stringify(candidates).includes(secretName), false);
+  assert.equal(
+    JSON.stringify(candidates).includes("Private draft division"),
+    false,
+  );
+  const publicProfile = await (
+    await fetch(base + `/api/v1/public/players/${f.ids[0]}`)
+  ).json();
+  assert.deepEqual(Object.keys(publicProfile).sort(), [
+    "biography",
+    "handedness",
+    "id",
+    "identityStatus",
+    "name",
+    "origin",
+    "photoUrl",
+  ]);
+});
 test("staff factual correction appends evidence and preserves the exact old lineup; retries are actor and byte bound", async () => {
   const f = await fixture();
   const body = {
@@ -388,6 +467,105 @@ test("a persistence failure rolls back the entry, new core and audit together", 
     await db.query(
       `ALTER TABLE identity_correction DROP CONSTRAINT IF EXISTS ${constraint}`,
     );
+    await db.end();
+  }
+});
+
+test("a factual core correction never transfers an old representative grant or player account link", async () => {
+  const f = await fixture(),
+    db = new pg.Pool({ connectionString: process.env.DATABASE_URL }),
+    divisionId = randomUUID(),
+    entryId = randomUUID(),
+    ownerId = randomUUID();
+  try {
+    await db.query(
+      "INSERT INTO division(id,event_id,name,discipline,format,entry_season) VALUES($1,'prairie-2026','Correction authority fixture','men_four','Organizer recorded','2026-27')",
+      [divisionId],
+    );
+    const created = await req("/api/v1/entries", {
+      id: entryId,
+      version: 0,
+      requestId: randomUUID(),
+      entry: {
+        divisionId,
+        name: "Represented mistaken identity",
+        coreKnown: true,
+        corePlayerIds: f.ids.slice(0, 4),
+        members: f.ids
+          .slice(0, 4)
+          .map((playerId) => ({
+            playerId,
+            role: "core",
+            position: "",
+            participation: "declared",
+          })),
+        registerSeason: { season: "2026-27", version: 0 },
+      },
+    });
+    assert.equal(created.status, 201);
+    const before = await created.json();
+    const granted = await req("/api/v1/team-representation", {
+      action: "grant",
+      id: randomUUID(),
+      requestId: randomUUID(),
+      userId: "demo-reviewer",
+      registrationId: before.registration.id,
+      actions: ["amend"],
+      reason: "Explicit original team-season authority",
+    });
+    assert.equal(granted.status, 200);
+    await db.query(
+      "INSERT INTO auth_user(id,name,email,email_verified) VALUES($1,'Correction account fixture',$2,true)",
+      [ownerId, `${ownerId}@demo.invalid`],
+    );
+    await db.query(
+      "INSERT INTO player_account_link(player_id,user_id) VALUES($1,$2)",
+      [f.ids[0], ownerId],
+    );
+    const links = await db.query(
+      "SELECT * FROM player_account_link WHERE user_id=$1",
+      [ownerId],
+    );
+    assert.equal(
+      (await req(`/api/v1/entries/${entryId}`, undefined, "reviewer")).status,
+      200,
+    );
+    const corrected = await req("/api/v1/identity-corrections", {
+      requestId: randomUUID(),
+      entryId,
+      version: 1,
+      fromPlayerId: f.ids[0],
+      toPlayerId: f.ids[4],
+      reason: "Wrong regular player selected, not a permanent transition",
+      source: "Reviewed original entry form",
+    });
+    assert.equal(corrected.status, 200);
+    assert.equal((await corrected.json()).outcome, "applied");
+    assert.equal(
+      (await req(`/api/v1/entries/${entryId}`, undefined, "reviewer")).status,
+      403,
+    );
+    assert.equal(
+      (await req(`/api/v1/entries/${entryId}?version=1`, undefined, "reviewer"))
+        .status,
+      403,
+    );
+    const current = await (await req(`/api/v1/entries/${entryId}`)).json();
+    assert.equal(current.registration, null);
+    assert.deepEqual(
+      (
+        await db.query("SELECT * FROM player_account_link WHERE user_id=$1", [
+          ownerId,
+        ])
+      ).rows,
+      links.rows,
+    );
+    assert.equal(
+      (await (await req(`/api/v1/entries/${entryId}?version=1`)).json())
+        .registration.id,
+      before.registration.id,
+    );
+  } finally {
     await db.end();
   }
 });

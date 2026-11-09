@@ -58,6 +58,7 @@ async function get<T>(path: string): Promise<T> {
 }
 export function IdentityCorrections() {
   const outcomeRef = useRef<HTMLElement>(null);
+  const recoveryRef = useRef<HTMLDivElement>(null);
   const [workspace, setWorkspace] = useState<Workspace | null>(null),
     [players, setPlayers] = useState<Player[]>([]),
     [loading, setLoading] = useState(true),
@@ -75,7 +76,7 @@ export function IdentityCorrections() {
   async function load() {
     const [w, p] = await Promise.all([
       get<Workspace>("/api/v1/identity-corrections"),
-      get<Player[]>("/api/v1/public/players"),
+      get<Player[]>("/api/v1/public/player-candidates"),
     ]);
     setWorkspace(w);
     setPlayers(p);
@@ -128,6 +129,9 @@ export function IdentityCorrections() {
       outcomeRef.current?.focus();
     }
   }, [result]);
+  useEffect(() => {
+    if (recovery.error) recoveryRef.current?.focus();
+  }, [recovery.error]);
   async function select(id: string) {
     setSelectedId(id);
     setEntry(null);
@@ -194,7 +198,12 @@ export function IdentityCorrections() {
             </p>
           ) : (
             <>
-              <AuthorityRecovery state={recovery} label="identity correction" />
+              <div ref={recoveryRef} tabIndex={-1}>
+                <AuthorityRecovery
+                  state={recovery}
+                  label="identity correction"
+                />
+              </div>
               {result && (
                 <section
                   className="notice"

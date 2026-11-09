@@ -140,7 +140,7 @@ export function EntriesWorkbench() {
     try {
       const [w, p, t] = await Promise.all([
         fetch("/api/v1/entries", { cache: "no-store" }),
-        fetch("/api/v1/public/players", { cache: "no-store" }),
+        fetch("/api/v1/public/player-candidates", { cache: "no-store" }),
         fetch("/api/v1/public/teams", { cache: "no-store" }),
       ]);
       if (!w.ok)

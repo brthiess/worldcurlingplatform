@@ -25,7 +25,7 @@ test("factual selection replaces only the mistaken ID and preserves roles and un
     correctedSelection(
       {
         coreKnown: false,
-        corePlayerIds: ["wrong"],
+        corePlayerIds: [],
         members: [
           {
             playerId: "wrong",
@@ -40,7 +40,7 @@ test("factual selection replaces only the mistaken ID and preserves roles and un
     ),
     {
       coreKnown: false,
-      corePlayerIds: ["right"],
+      corePlayerIds: [],
       members: [
         {
           playerId: "right",
@@ -52,6 +52,45 @@ test("factual selection replaces only the mistaken ID and preserves roles and un
       collision: false,
     },
   );
+});
+
+test("a factual regular-core replacement preserves every unaffected member and distinguishes the resulting selection", () => {
+  const before = {
+    coreKnown: true,
+    corePlayerIds: ["a", "b", "c", "wrong"],
+    members: [
+      {
+        playerId: "a",
+        role: "core" as const,
+        position: "lead",
+        participation: "declared" as const,
+      },
+      {
+        playerId: "wrong",
+        role: "core" as const,
+        position: "skip",
+        participation: "declared" as const,
+      },
+    ],
+  };
+  const after = correctedSelection(before, "wrong", "right");
+  assert.deepEqual(after.corePlayerIds, ["a", "b", "c", "right"]);
+  assert.deepEqual(after.members, [
+    {
+      playerId: "a",
+      role: "core",
+      position: "lead",
+      participation: "declared",
+    },
+    {
+      playerId: "right",
+      role: "core",
+      position: "skip",
+      participation: "declared",
+    },
+  ]);
+  assert.deepEqual(before.corePlayerIds, ["a", "b", "c", "wrong"]);
+  assert.equal(after.collision, false);
 });
 
 test("person collision leaves the proposed source evidence untouched", () => {

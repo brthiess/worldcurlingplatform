@@ -9,12 +9,18 @@ import {
 } from "@/domain/profiles";
 export async function publicPlayers(id?: string) {
   const result = await pool.query(
-    `SELECT p.id,p.name,p.origin,p.biography,p.handedness,p.identity_status AS "identityStatus",CASE WHEN p.photo_asset_id IS NOT NULL THEN '/api/v1/public/photos/' || p.photo_asset_id ELSE NULL END AS "photoUrl",
-     ARRAY(SELECT DISTINCT ev.name || ' · ' || d.name FROM event_lineup_member m JOIN event_entry en ON en.id=m.entry_id AND en.version=m.version JOIN division d ON d.id=en.division_id JOIN event_edition ev ON ev.id=d.event_id WHERE m.player_id=p.id AND ev.published AND ev.admission_status='approved' ORDER BY 1 LIMIT 4) AS contexts
-     FROM player p WHERE ($1::text IS NULL OR p.id=$1) ORDER BY p.name,p.id`,
+    `SELECT id,name,origin,biography,handedness,identity_status AS "identityStatus",CASE WHEN photo_asset_id IS NOT NULL THEN '/api/v1/public/photos/' || photo_asset_id ELSE NULL END AS "photoUrl" FROM player WHERE ($1::text IS NULL OR id=$1) ORDER BY name,id`,
     [id ?? null],
   );
   return id ? (result.rows[0] ?? null) : result.rows;
+}
+/** Explicit disambiguation projection; unpublished event names and private account/review fields never leave this boundary. */
+export async function publicPlayerCandidates() {
+  return (
+    await pool.query(`SELECT p.id,p.name,p.origin,p.identity_status AS "identityStatus",
+    ARRAY(SELECT DISTINCT ev.name || ' · ' || d.name FROM event_lineup_member m JOIN event_entry en ON en.id=m.entry_id AND en.version=m.version JOIN division d ON d.id=en.division_id JOIN event_edition ev ON ev.id=d.event_id WHERE m.player_id=p.id AND ev.published AND ev.admission_status='approved' ORDER BY 1 LIMIT 4) AS contexts
+    FROM player p ORDER BY p.name,p.id`)
+  ).rows;
 }
 export async function claimWorkspace(userId: string) {
   const admin = await pool.query(
