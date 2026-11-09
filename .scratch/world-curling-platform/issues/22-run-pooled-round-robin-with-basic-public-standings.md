@@ -4,7 +4,7 @@ number: 22
 title: "Run pooled round robin with basic public standings"
 parent: WCP-SPEC-001
 type: implementation
-status: in-progress
+status: completed
 labels: [ready-for-agent]
 blocked_by: [WCP-019]
 source_spec_sha256: 045B46988225B6C8C0020B23C8C5D4EAA8E2E1916256148A0FDA26B5DA8673FD
@@ -18,7 +18,7 @@ published: 2026-11-07
 
 **Blocked by:** [19: Preview and run a single-knockout draw through public views](19-preview-and-run-a-single-knockout-draw-through-public-views.md).
 
-**Status:** in-progress
+**Status:** completed
 
 ## Parent and scope
 
@@ -31,13 +31,13 @@ published: 2026-11-07
 
 ## Acceptance criteria
 
-- [ ] Generate a bounded documented pool configuration and persist its games/groups; expose wins/losses/ties as supported by results.
-- [ ] Keep unresolved standings ties explicit and leave playoff qualifier/seed selection manual.
-- [ ] Document the single-group/pool behavior exercised and avoid claiming every group/stage combination.
-- [ ] **Unit testing:** Check fixture uniqueness/completeness and standings from independently listed game outcomes, including unknown/unfinished and tied cases.
-- [ ] **Database/API verification:** Confirm games and read updated pool/standings APIs with correct division/group boundaries and no duplicate game counting.
-- [ ] **Frontend quality:** Provide readable pool tabs/standings/schedule links on phones, clear tie/pending labels and live refresh that preserves selected group.
-- [ ] Record actual verification commands/results and relevant browser/screenshots or API evidence. Report meaningful uncovered branches or limitations; do not claim checks that were not run.
+- [x] Generate a bounded documented pool configuration and persist its games/groups; expose wins/losses/ties as supported by results.
+- [x] Keep unresolved standings ties explicit and leave playoff qualifier/seed selection manual.
+- [x] Document the single-group/pool behavior exercised and avoid claiming every group/stage combination.
+- [x] **Unit testing:** Check fixture uniqueness/completeness and standings from independently listed game outcomes, including unknown/unfinished and tied cases.
+- [x] **Database/API verification:** Confirm games and read updated pool/standings APIs with correct division/group boundaries and no duplicate game counting.
+- [x] **Frontend quality:** Provide readable pool tabs/standings/schedule links on phones, clear tie/pending labels and live refresh that preserves selected group.
+- [x] Record actual verification commands/results and relevant browser/screenshots or API evidence. Report meaningful uncovered branches or limitations; do not claim checks that were not run.
 
 ## Slice boundary
 

@@ -172,6 +172,12 @@ export function prepareEventCalculation(
       // The fixed single-elimination playoffs are one stage of the published
       // triple profile; they do not make the entire event single knockout.
       singleFormat = false;
+    else if (
+      publishedFormat.templateId === "application-pools2x4-v1" &&
+      publishedFormat.templateVersion === 1 &&
+      publishedFormat.definition.family === "round_robin"
+    )
+      singleFormat = false;
     else
       issues.push(
         "Published competition profile needs a supported explicit calculation-format mapping.",
