@@ -7,6 +7,21 @@ import PgBoss from "pg-boss";
 import { freezeContents } from "../src/domain/finalization";
 import { authRequest } from "./auth-request";
 import { assessmentFixture } from "./event-assessments-fixture";
+function independentReceiptDigest(value: unknown): string {
+  const sorted = (v: any): any =>
+    Array.isArray(v)
+      ? v.map(sorted)
+      : v !== null && typeof v === "object"
+        ? Object.fromEntries(
+            Object.keys(v)
+              .sort()
+              .map((k) => [k, sorted(v[k])]),
+          )
+        : v;
+  return createHash("sha256")
+    .update(JSON.stringify(sorted(value)))
+    .digest("hex");
+}
 const db = new pg.Pool({ connectionString: process.env.DATABASE_URL, max: 4 }),
   base = process.env.BETTER_AUTH_URL!,
   sessions = new Map<string, string>();
@@ -97,6 +112,38 @@ test("complete real event queues immutable duplicate-safe assessment and worker 
   const submitted = await send("/api/v1/event-assessments", cmd);
   assert.equal(submitted.status, 200, await submitted.clone().text());
   const first = await submitted.json();
+  const receiptView = await workspace();
+  assert.deepEqual(
+    receiptView.receipts.find((r: any) => r.requestId === cmd.requestId),
+    {
+      actorId: receiptView.actorId,
+      requestId: cmd.requestId,
+      assessmentId: first.id,
+      commandDigest: independentReceiptDigest(cmd),
+      divisionId: f.divisionId,
+      version: 1,
+      path: "/api/v1/event-assessments",
+    },
+  );
+  assert.equal(
+    (
+      await request(
+        "",
+        `/api/v1/event-assessments?division=${f.divisionId}&rules=${f.rulesId}`,
+      )
+    ).status,
+    401,
+  );
+  assert.equal(
+    (
+      await request(
+        await login("organizer"),
+        `/api/v1/event-assessments?division=${f.divisionId}&rules=${f.rulesId}`,
+      )
+    ).status,
+    403,
+  );
+
   const deliveries = await Promise.all(
     Array.from({ length: 3 }, () => send("/api/v1/event-assessments", cmd)),
   );

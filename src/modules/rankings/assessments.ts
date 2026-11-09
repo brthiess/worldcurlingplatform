@@ -207,7 +207,7 @@ export async function assessmentWorkspace(
       history,
       receipts: (
         await c.query(
-          'SELECT r.actor_id AS "actorId",r.request_id AS "requestId",r.assessment_id AS "assessmentId" FROM event_calculation_receipt r JOIN event_assessment a ON a.id=r.assessment_id WHERE a.division_id=$1',
+          'SELECT r.actor_id AS "actorId",r.request_id AS "requestId",r.assessment_id AS "assessmentId",r.command_digest AS "commandDigest",a.division_id AS "divisionId",a.version,\'/api/v1/event-assessments\' AS path FROM event_calculation_receipt r JOIN event_assessment a ON a.id=r.assessment_id WHERE a.division_id=$1',
           [divisionId],
         )
       ).rows,

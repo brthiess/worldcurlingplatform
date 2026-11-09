@@ -1,4 +1,6 @@
 "use client";
+import { canonicalJson } from "@/domain/canonical-json";
+import { finalizationCommand } from "@/domain/finalization-command";
 import { useCallback, useEffect, useState } from "react";
 import { useAuthorityCommand, AuthorityRecovery } from "./authority-command";
 type Entry = {
@@ -57,6 +59,15 @@ type Frozen = {
   note: string;
 };
 type Review = {
+  actorId?: string;
+  receipts?: {
+    actorId: string;
+    requestId: string;
+    divisionId: string;
+    version: number;
+    commandDigest: string;
+    path: string;
+  }[];
   source: Source;
   sourceDigest: string;
   version: number;
@@ -223,7 +234,7 @@ export function FinalizationWorkbench() {
       );
       setNote(f?.note ?? "");
       setRules(f?.rulesReference ?? "");
-      return true;
+      return next;
     } catch (e) {
       setError(
         e instanceof TypeError
@@ -273,17 +284,60 @@ export function FinalizationWorkbench() {
         throw new Error("Saved view could not be refreshed.");
     },
     async (saved) => {
-      const body = JSON.parse(saved.body),
-        r = await fetch(
-          `/api/v1/division-finalizations?division=${encodeURIComponent(body.divisionId)}`,
-          { cache: "no-store" },
-        );
+      const path = "/api/v1/division-finalizations";
+      if (saved.path !== path || saved.actorId !== actorId) return false;
+      const body = JSON.parse(saved.body);
+      if (
+        body.divisionId !== id ||
+        !Number.isSafeInteger(body.version) ||
+        typeof body.note !== "string" ||
+        typeof body.rulesReference !== "string"
+      )
+        return false;
+      const r = await fetch(
+        `${path}?division=${encodeURIComponent(body.divisionId)}`,
+        { cache: "no-store" },
+      );
       if (!r.ok) return false;
       const data = (await r.json()) as Review;
+      if (
+        data.actorId !== saved.actorId ||
+        data.source.division.id !== body.divisionId
+      )
+        return false;
+      const commandDigest = Array.from(
+        new Uint8Array(
+          await crypto.subtle.digest(
+            "SHA-256",
+            new TextEncoder().encode(canonicalJson(finalizationCommand(body))),
+          ),
+        ),
+      )
+        .map((b) => b.toString(16).padStart(2, "0"))
+        .join("");
+      if (
+        !data.receipts?.some(
+          (v) =>
+            v.actorId === saved.actorId &&
+            v.requestId === body.requestId &&
+            v.path === saved.path &&
+            v.divisionId === body.divisionId &&
+            v.version === body.version + 1 &&
+            v.commandDigest === commandDigest &&
+            data.history.some(
+              (h) =>
+                h.version === v.version &&
+                h.actorId === v.actorId &&
+                h.requestId === v.requestId,
+            ),
+        )
+      )
+        return false;
+      const refreshed = await load(body.divisionId);
       return (
-        data.history.some(
-          (v) => v.requestId === body.requestId && v.actorId === saved.actorId,
-        ) && (await load(body.divisionId))
+        !!refreshed &&
+        refreshed.actorId === saved.actorId &&
+        refreshed.source.division.id === body.divisionId
       );
     },
   );
