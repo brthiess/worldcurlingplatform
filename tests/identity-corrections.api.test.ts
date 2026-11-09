@@ -474,13 +474,18 @@ test("a persistence failure rolls back the entry, new core and audit together", 
 test("a factual core correction never transfers an old representative grant or player account link", async () => {
   const f = await fixture(),
     db = new pg.Pool({ connectionString: process.env.DATABASE_URL }),
+    eventId = randomUUID(),
     divisionId = randomUUID(),
     entryId = randomUUID(),
     ownerId = randomUUID();
   try {
     await db.query(
-      "INSERT INTO division(id,event_id,name,discipline,format,entry_season) VALUES($1,'prairie-2026','Correction authority fixture','men_four','Organizer recorded','2026-27')",
-      [divisionId],
+      "INSERT INTO event_edition(id,series_id,name,venue,location,timezone,starts_on,ends_on,origin,published,admission_status) VALUES($1,'prairie','Correction authority edition','Fixture ice','Fixture location','UTC','2032-11-08','2032-11-10','fictional_demo',true,'approved')",
+      [eventId],
+    );
+    await db.query(
+      "INSERT INTO division(id,event_id,name,discipline,format,entry_season) VALUES($1,$2,'Correction authority fixture','men_four','Organizer recorded','2026-27')",
+      [divisionId, eventId],
     );
     const created = await req("/api/v1/entries", {
       id: entryId,
@@ -491,14 +496,12 @@ test("a factual core correction never transfers an old representative grant or p
         name: "Represented mistaken identity",
         coreKnown: true,
         corePlayerIds: f.ids.slice(0, 4),
-        members: f.ids
-          .slice(0, 4)
-          .map((playerId) => ({
-            playerId,
-            role: "core",
-            position: "",
-            participation: "declared",
-          })),
+        members: f.ids.slice(0, 4).map((playerId) => ({
+          playerId,
+          role: "core",
+          position: "",
+          participation: "declared",
+        })),
         registerSeason: { season: "2026-27", version: 0 },
       },
     });
