@@ -4,7 +4,7 @@ number: 33
 title: "Calculate four-player event assessments and point awards"
 parent: WCP-SPEC-001
 type: implementation
-status: in-progress
+status: completed
 labels: [ready-for-agent]
 blocked_by: [WCP-027, WCP-032]
 source_spec_sha256: 045B46988225B6C8C0020B23C8C5D4EAA8E2E1916256148A0FDA26B5DA8673FD
@@ -18,7 +18,7 @@ published: 2026-11-07
 
 **Blocked by:** [27: Finalize division results and preserve revised snapshots](27-finalize-division-results-and-preserve-revised-snapshots.md); [32: Review official rosters, WCTRS sources and starting entitlements](32-review-official-rosters-wctrs-sources-and-starting-entitlements.md).
 
-**Status:** in-progress
+**Status:** completed
 
 ## Parent and scope
 
@@ -31,13 +31,13 @@ published: 2026-11-07
 
 ## Acceptance criteria
 
-- [ ] Use the applicable 2026-27 rules, exact cutoff/pre-event ranking and event-edition inputs with eligible/excluded entries and explained factors.
-- [ ] Persist a replayable assessment/award revision and durable calculation job state; incomplete required inputs block a verified result instead of producing invented points.
-- [ ] Preserve source/rule/engine/input references and explicit adjustments; do not publish a world ranking list in this slice.
-- [ ] **Unit testing:** Use independent sourced fixtures for field-strength/factors, award placement, eligibility/exclusion and stage-specific rounding, including missing/invalid inputs.
-- [ ] **Database/API verification:** Queue/retry calculations using real PostgreSQL, inspect completed/failed/blocked jobs and prove immutable input/result associations and duplicate safety.
-- [ ] **Frontend quality:** Show an administrator useful assessment/award breakdown, inputs, exclusions and job/issues state rather than a bare unexplained points number.
-- [ ] Record actual verification commands/results and relevant browser/screenshots or API evidence. Report meaningful uncovered branches or limitations; do not claim checks that were not run.
+- [x] Use the applicable 2026-27 rules, exact cutoff/pre-event ranking and event-edition inputs with eligible/excluded entries and explained factors.
+- [x] Persist a replayable assessment/award revision and durable calculation job state; incomplete required inputs block a verified result instead of producing invented points.
+- [x] Preserve source/rule/engine/input references and explicit adjustments; do not publish a world ranking list in this slice.
+- [x] **Unit testing:** Use independent sourced fixtures for field-strength/factors, award placement, eligibility/exclusion and stage-specific rounding, including missing/invalid inputs.
+- [x] **Database/API verification:** Queue/retry calculations using real PostgreSQL, inspect completed/failed/blocked jobs and prove immutable input/result associations and duplicate safety.
+- [x] **Frontend quality:** Show an administrator useful assessment/award breakdown, inputs, exclusions and job/issues state rather than a bare unexplained points number.
+- [x] Record actual verification commands/results and relevant browser/screenshots or API evidence. Report meaningful uncovered branches or limitations; do not claim checks that were not run.
 
 ## Slice boundary
 
