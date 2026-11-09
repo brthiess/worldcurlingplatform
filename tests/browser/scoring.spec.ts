@@ -120,7 +120,7 @@ test("phone save updates already-open public scores by polling and retains draw 
 }, info) => {
   await page.setViewportSize({ width: 360, height: 800 });
   await page.goto("/admin");
-  await page.getByRole("link", { name: "Enter live scores →" }).click();
+  await page.locator('a[href="/admin/games/game-2"]').click();
   const fan = await context.newPage();
   await fan.goto("/?draw=draw-1");
   await expect(fan.getByRole("table")).toHaveCount(1);

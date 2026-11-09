@@ -4,7 +4,7 @@ number: 20
 title: "Run the main 16-team triple-knockout demonstration"
 parent: WCP-SPEC-001
 type: implementation
-status: in-progress
+status: completed
 labels: [ready-for-agent]
 blocked_by: [WCP-019]
 source_spec_sha256: 045B46988225B6C8C0020B23C8C5D4EAA8E2E1916256148A0FDA26B5DA8673FD
@@ -18,7 +18,7 @@ published: 2026-11-07
 
 **Blocked by:** [19: Preview and run a single-knockout draw through public views](19-preview-and-run-a-single-knockout-draw-through-public-views.md).
 
-**Status:** in-progress
+**Status:** completed
 
 ## Parent and scope
 
@@ -31,13 +31,13 @@ published: 2026-11-07
 
 ## Acceptance criteria
 
-- [ ] Document one exact 16-team template, including its qualifier count/destinations, byes if any, and full A/B/C winner/loser routing before implementing it.
-- [ ] Use the stored graph, not loss count alone, and demonstrate representative A, B and C paths plus qualification/elimination.
-- [ ] Keep the current/next homepage draw, game links and bracket/list views consistent with confirmed results; defer played-downstream conflict repair.
-- [ ] **Unit testing:** Use an independently reviewed expected routing fixture; cover each routing/qualification branch and whole-graph completeness without mirroring generator code.
-- [ ] **Database/API verification:** Drive representative and full bounded completion sequences through scoring APIs and assert final placements/qualifiers and next slots match the expected graph.
-- [ ] **Frontend quality:** Verify a fan can follow one selected team on a phone and desktop through A/B/C and its next known game, with legible connectors and a readable list alternative.
-- [ ] Record actual verification commands/results and relevant browser/screenshots or API evidence. Report meaningful uncovered branches or limitations; do not claim checks that were not run.
+- [x] Document one exact 16-team template, including its qualifier count/destinations, byes if any, and full A/B/C winner/loser routing before implementing it.
+- [x] Use the stored graph, not loss count alone, and demonstrate representative A, B and C paths plus qualification/elimination.
+- [x] Keep the current/next homepage draw, game links and bracket/list views consistent with confirmed results; defer played-downstream conflict repair.
+- [x] **Unit testing:** Use an independently reviewed expected routing fixture; cover each routing/qualification branch and whole-graph completeness without mirroring generator code.
+- [x] **Database/API verification:** Drive representative and full bounded completion sequences through scoring APIs and assert final placements/qualifiers and next slots match the expected graph.
+- [x] **Frontend quality:** Verify a fan can follow one selected team on a phone and desktop through A/B/C and its next known game, with legible connectors and a readable list alternative.
+- [x] Record actual verification commands/results and relevant browser/screenshots or API evidence. Report meaningful uncovered branches or limitations; do not claim checks that were not run.
 
 ## Slice boundary
 

@@ -140,7 +140,7 @@ export default function Admin() {
             <a href="/admin/schedule">Draw scheduling</a>
           </p>
           <p>
-            <a href="/admin/draws">Single knockout draws</a>
+            <a href="/admin/draws">Competition draws</a>
           </p>
           <p>
             <a href="/admin/news">News sources and moderation</a>
@@ -242,8 +242,8 @@ export default function Admin() {
             value={persona}
             onChange={(event) => setPersona(event.target.value)}
           >
-            <option value="scorekeeper">Scorekeeper · one assigned game</option>
-            <option value="organizer">Organizer · Prairie Open</option>
+            <option value="scorekeeper">Scorekeeper · assigned games</option>
+            <option value="organizer">Organizer · assigned editions</option>
             <option value="reviewer">Reviewer · read only</option>
             <option value="administrator">
               Administrator · platform scope

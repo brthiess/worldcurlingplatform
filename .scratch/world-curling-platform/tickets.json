@@ -370,7 +370,7 @@
       "file": "07-correct-mistaken-player-selections-and-flag-identity-collisions.md",
       "id": "WCP-007",
       "path": "issues/07-correct-mistaken-player-selections-and-flag-identity-collisions.md",
-      "status": "ready-for-agent",
+      "status": "in-progress",
       "labels": [
         "ready-for-agent"
       ],
@@ -1046,13 +1046,17 @@
       "file": "20-run-the-main-16-team-triple-knockout-demonstration.md",
       "id": "WCP-020",
       "path": "issues/20-run-the-main-16-team-triple-knockout-demonstration.md",
-      "status": "in-progress",
+      "status": "completed",
       "labels": [
         "ready-for-agent"
       ],
       "blocked_by": [
         "WCP-019"
-      ]
+      ],
+      "completion": {
+        "commit": "b57cc0cbd16f3ac396305d7a22111182e5a9446c",
+        "evidence": "docs/verification/WCP-020-merge.md"
+      }
     },
     {
       "n": 21,

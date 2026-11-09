@@ -22,3 +22,5 @@ The parent specification's Testing Decisions already authorizes domain public in
 ## Environment observations
 
 The starting folder contained planning/tracker documents and no application or Git repository. Git was initialized after read-only review. Sandboxed Git/npm fail on parent-directory access; reviewed escalated shell commands work. Node is 20.19.0; PostgreSQL 13 binaries/service are installed; Docker's daemon was unavailable at preflight. Prefer a dedicated project-local PostgreSQL cluster/database rather than modifying unrelated databases. No hosted domain, provider credentials or reviewed hosting quote has been supplied.
+
+- Generated-only reclamation on2026-11-09 UTC covered inactive accepted WCP-009 and WCP-019 (`node_modules` and `.next`). All four resolved targets were checked inside the workspace, reparse points rejected, and old runtime listener ports confirmed inactive. Source, configuration, immutable data and verification reports remain. Reinstall/build before rerunning there.
