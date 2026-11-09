@@ -825,3 +825,260 @@ test("raw HTTP correction bytes reject BOM and malformed UTF-8, while earlier or
     await db.end();
   }
 });
+
+test("factual correction preserves frozen charges and old credits, serializes an explicit financial adjustment, and removes old financial authority", async () => {
+  const f = await fixture(),
+    db = new pg.Pool({ connectionString: process.env.DATABASE_URL, max: 4 }),
+    eventId = randomUUID(),
+    divisionId = randomUUID(),
+    entryId = randomUUID();
+  const barrier = await db.connect();
+  let correcting: Promise<Response> | undefined,
+    adjusting: Promise<Response> | undefined;
+  async function blockedBy(pid: number) {
+    const end = Date.now() + 10000;
+    while (Date.now() < end) {
+      const r = await db.query(
+        "SELECT pid FROM pg_stat_activity WHERE datname=current_database() AND $1=ANY(pg_blocking_pids(pid)) ORDER BY query_start",
+        [pid],
+      );
+      if (r.rowCount) return Number(r.rows[0].pid);
+      await new Promise((r) => setTimeout(r, 25));
+    }
+    throw new Error(
+      "Financial/correction writer did not reach its real lock barrier",
+    );
+  }
+  async function ledger(role = "administrator") {
+    const r = await req("/api/v1/entry-charges", undefined, role);
+    assert.equal(r.status, 200);
+    return r.json();
+  }
+  try {
+    await db.query(
+      "INSERT INTO event_edition(id,series_id,name,venue,location,timezone,starts_on,ends_on,origin,published,admission_status) VALUES($1,'prairie','Factual financial correction fixture','Fixture ice','Fixture location','UTC','2033-11-08','2033-11-10','fictional_demo',true,'approved')",
+      [eventId],
+    );
+    await db.query(
+      "INSERT INTO division(id,event_id,name,discipline,format,entry_season) VALUES($1,$2,'Factual ledger fixture','men_four','single_knockout','2026-27')",
+      [divisionId, eventId],
+    );
+    const created = await req("/api/v1/entries", {
+      id: entryId,
+      version: 0,
+      requestId: randomUUID(),
+      entry: {
+        divisionId,
+        name: "Factual financial identity",
+        coreKnown: true,
+        corePlayerIds: f.ids.slice(0, 4),
+        members: f.ids
+          .slice(0, 4)
+          .map((playerId) => ({
+            playerId,
+            role: "core",
+            position: "",
+            participation: "declared",
+          })),
+        registerSeason: { season: "2026-27", version: 0 },
+      },
+    });
+    assert.equal(created.status, 201);
+    const original = await created.json();
+    assert.equal(
+      (
+        await req("/api/v1/team-representation", {
+          action: "grant",
+          id: randomUUID(),
+          requestId: randomUUID(),
+          userId: "demo-reviewer",
+          registrationId: original.registration.id,
+          actions: ["submit", "amend", "payment"],
+          reason: "Original exact team-season financial representative",
+        })
+      ).status,
+      200,
+    );
+    assert.equal(
+      (
+        await req("/api/v1/registration", {
+          action: "open",
+          requestId: randomUUID(),
+          divisionId,
+          version: 0,
+          terms: {
+            mode: "open",
+            capacity: 2,
+            requirements: "Declared event lineup",
+            feeMinor: 12500,
+            currency: "CAD",
+            paymentTerms: "Original frozen CAD125 fee",
+            paymentWindowMinutes: 60,
+            format: "single_knockout",
+            formatNotes: "Single elimination",
+          },
+        })
+      ).status,
+      200,
+    );
+    const admission = {
+      action: "request",
+      requestId: randomUUID(),
+      divisionId,
+      entryId,
+      version: 0,
+      expectedFeeVersion: 1,
+    };
+    assert.equal(
+      (await req("/api/v1/registration", admission, "reviewer")).status,
+      200,
+    );
+    assert.equal(
+      (
+        await req("/api/v1/entry-charges", {
+          action: "discount",
+          requestId: randomUUID(),
+          divisionId,
+          entryId,
+          version: 1,
+          amountMinor: 1500,
+          currency: "CAD",
+          reason: "Original junior discount",
+        })
+      ).status,
+      200,
+    );
+    const external = {
+      action: "external_receipt",
+      requestId: randomUUID(),
+      divisionId,
+      entryId,
+      version: 2,
+      amountMinor: 4000,
+      currency: "CAD",
+      reason: "Original staff-attested bank receipt",
+      externalReference: `factual-${randomUUID()}`,
+    };
+    const receiptResponse = await req("/api/v1/entry-charges", external);
+    assert.equal(receiptResponse.status, 200);
+    const receipt = await receiptResponse.json();
+    assert.equal(
+      (
+        await req("/api/v1/entry-charges", {
+          action: "revise_fee",
+          requestId: randomUUID(),
+          divisionId,
+          version: 1,
+          reason: "New fee applies only to future charges",
+          terms: {
+            feeMinor: 18025,
+            currency: "CAD",
+            paymentTerms: "Future CAD180.25 fee",
+          },
+        })
+      ).status,
+      200,
+    );
+    const before = (await ledger()).entries.find((e: any) => e.id === entryId);
+    assert.equal(before.charge.feeMinor, 12500);
+    assert.equal(before.balance.dueMinor, 7000);
+    assert.equal(
+      (await ledger("reviewer")).entries.some((e: any) => e.id === entryId),
+      true,
+    );
+    await barrier.query("BEGIN");
+    const pid = Number(
+      (await barrier.query("SELECT pg_backend_pid() AS pid")).rows[0].pid,
+    );
+    await barrier.query("SELECT id FROM division WHERE id=$1 FOR UPDATE", [
+      divisionId,
+    ]);
+    correcting = req("/api/v1/identity-corrections", {
+      requestId: randomUUID(),
+      entryId,
+      version: 1,
+      fromPlayerId: f.ids[0],
+      toPlayerId: f.ids[4],
+      reason:
+        "Factual wrong regular player selected, not a sporting transition",
+      source: "Reviewed original lineup form",
+    });
+    const correctionPid = await blockedBy(pid);
+    adjusting = req("/api/v1/entry-charges", {
+      action: "discount",
+      requestId: randomUUID(),
+      divisionId,
+      entryId,
+      version: 3,
+      amountMinor: 500,
+      currency: "CAD",
+      reason: "Separately authorized concurrent discount",
+    });
+    await blockedBy(correctionPid);
+    await barrier.query("ROLLBACK");
+    const correction = await correcting;
+    assert.equal(correction.status, 200);
+    assert.equal((await correction.json()).outcome, "applied");
+    assert.equal((await adjusting).status, 200);
+    const currentLedger = await ledger(),
+      after = currentLedger.entries.find((e: any) => e.id === entryId);
+    assert.deepEqual(after.charge, before.charge);
+    assert.deepEqual(after.history.slice(0, 2), before.history);
+    assert.equal(after.history.length, 3);
+    assert.equal(after.history[2].kind, "discount");
+    assert.equal(after.history[2].amountMinor, 500);
+    assert.equal(after.balance.dueMinor, 6500);
+    assert.equal(after.balance.externalMinor, 4000);
+    assert.equal(
+      currentLedger.divisions.find((d: any) => d.id === divisionId).fee
+        .feeMinor,
+      18025,
+    );
+    assert.equal(
+      (await ledger("reviewer")).entries.some((e: any) => e.id === entryId),
+      false,
+    );
+    assert.equal(
+      (await req("/api/v1/registration", admission, "reviewer")).status,
+      403,
+    );
+    const representativeRegistration = await (
+      await req("/api/v1/registration", undefined, "reviewer")
+    ).json();
+    assert.equal(
+      representativeRegistration.receipts.some(
+        (r: any) => r.requestId === admission.requestId,
+      ),
+      false,
+    );
+    const replay = await req("/api/v1/entry-charges", external);
+    assert.equal(replay.status, 200);
+    assert.deepEqual(await replay.json(), { ...receipt, replayed: true });
+    const issue = await req("/api/v1/identity-corrections", {
+      requestId: randomUUID(),
+      entryId,
+      version: 2,
+      fromPlayerId: f.ids[4],
+      toPlayerId: f.ids[1],
+      reason: "Conflicting identity proposal must preserve the ledger",
+      source: "Second source needing staff review",
+    });
+    assert.equal(issue.status, 200);
+    assert.equal((await issue.json()).outcome, "issue");
+    const unchanged = (await ledger()).entries.find(
+      (e: any) => e.id === entryId,
+    );
+    assert.deepEqual(unchanged.charge, after.charge);
+    assert.deepEqual(unchanged.history, after.history);
+    assert.deepEqual(unchanged.balance, after.balance);
+    assert.equal(
+      (await (await req(`/api/v1/entries/${entryId}`)).json()).version,
+      2,
+    );
+  } finally {
+    await barrier.query("ROLLBACK");
+    await Promise.allSettled([correcting, adjusting].filter(Boolean));
+    barrier.release();
+    await db.end();
+  }
+});
