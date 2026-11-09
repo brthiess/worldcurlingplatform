@@ -1,5 +1,15 @@
 # Manual entries and roster boundaries
 
+## Factual selection corrections (WCP-007)
+
+Correction bodies use valid UTF-8 JSON without a leading byte-order mark. Malformed UTF-8 and BOM-prefixed bodies return400; they are never replacement-decoded or normalized into another command. The receipt digest is over the actual accepted HTTP bytes. Ordinary prior valid UTF-8 command receipts retain the same digest and replay behavior.
+
+World Curling staff use `/admin/identity-corrections` and `GET/POST /api/v1/identity-corrections`. POST accepts `{requestId,entryId,version,fromPlayerId,toPlayerId,reason,source}` for one explicit mistaken selection in the reviewed current entry. It appends a factual correction audit and lineup revision, distinct from a real permanent-core transition in the ordinary entry editor. Old team cores, season rosters, game/result snapshots, ranking inputs and awards stay immutable. A corrected core uses a separate identity and clears the current season-registration association; no account/photo link, representative grant or entitlement transfers. Staff must review any resulting ranking eligibility separately.
+
+The command returns an immutable receipt with `outcome:"applied"` or `outcome:"issue"`. Person/team/entry/ranking-subject collisions retain the proposed/before evidence and staff issue atomically, with no canonical entry/core changes. An accepted issue is not a successful merge. Multi-record consolidation, lineage and historical reassessment cascades remain deferred. A repeated request requires the same actor and exact serialized bytes; altered bytes or a stale new command return409. Current staff authority is required before receipt replay and all private reads. `GET ...?requestId=...` returns only the current actor's receipt for exact-command reconciliation; the staff workspace lists retained corrections and issues.
+
+`GET /api/v1/public/player-candidates` is an explicit disambiguation projection (`id,name,origin,identityStatus,contexts`). Context contains only known current participation in admitted, published editions. Unknown context stays empty; equal names never merge or certify a match. Existing public player profile projections remain unchanged. Both entry and correction search require explicit record selection, and the entry editor supports a separately declared provisional player when uncertain.
+
 ## Team-season representation (WCP-008)
 
 `GET/POST /api/v1/team-representation` reads the current account's grants (all grants plus staff setup fields for World Curling administrators), and accepts reasoned staff commands. Grant: `{action:"grant",id,requestId,userId,registrationId,actions:["submit","amend","withdraw","payment"],reason}`. Revoke: `{action:"revoke",id,requestId,reason}`. Each command retains its exact actor/request/body and one atomic authority-history/audit receipt. Current staff authority is checked before exact receipt replay; conflicting request reuse returns409. Scope is immutable; revoke and grant separately. Only named actions apply to that exact canonical team and season; player-profile links grant no team power.

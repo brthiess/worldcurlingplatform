@@ -38,7 +38,7 @@ function valid(value: unknown): value is RetainedAuthorityCommand {
     typeof c.path !== "string" ||
     typeof c.actorId !== "string" ||
     !(
-      /^\/api\/v1\/(approval-delegations|role-grants|team-representation|entries|division-finalizations|event-assessments|registration|entry-charges)$/.test(
+      /^\/api\/v1\/(approval-delegations|role-grants|team-representation|entries|division-finalizations|event-assessments|registration|identity-corrections|entry-charges)$/.test(
         c.path,
       ) ||
       /^\/api\/v1\/entries\/[-\w]{1,80}$/.test(c.path) ||
@@ -201,6 +201,8 @@ export function AuthorityRecovery({
   retryLabel?: string;
 }) {
   const body = state.pending ? JSON.parse(state.pending.body) : null;
+  const identityCorrection =
+    state.pending?.path === "/api/v1/identity-corrections";
   return (
     <>
       {state.error && (
@@ -225,12 +227,14 @@ export function AuthorityRecovery({
             <dl style={{ overflowWrap: "anywhere" }}>
               <dt>Action</dt>
               <dd>
-                {body.action ??
-                  (state.pending.path.includes("/entries")
-                    ? "Save entry"
-                    : body.divisionId
-                      ? "Finalize division results"
-                      : "Assign scoring access")}
+                {identityCorrection
+                  ? "Correct factual player selection"
+                  : (body.action ??
+                    (state.pending.path.includes("/entries")
+                      ? "Save entry"
+                      : body.divisionId
+                        ? "Finalize division results"
+                        : "Assign scoring access"))}
               </dd>
               {body.entry && (
                 <>
@@ -327,6 +331,34 @@ export function AuthorityRecovery({
                 <>
                   <dt>Entry record</dt>
                   <dd>{body.entryId}</dd>
+                </>
+              )}
+              {identityCorrection && (
+                <>
+                  <dt>Original account</dt>
+                  <dd>{state.pending.actorId}</dd>
+                  <dt>Reviewed entry revision</dt>
+                  <dd>{body.version}</dd>
+                  <dt>Mistaken player record</dt>
+                  <dd>
+                    <a
+                      href={`/players/${encodeURIComponent(body.fromPlayerId)}`}
+                      aria-label={`Open mistaken player record ${body.fromPlayerId}`}
+                    >
+                      {body.fromPlayerId}
+                    </a>
+                  </dd>
+                  <dt>Proposed replacement record</dt>
+                  <dd>
+                    <a
+                      href={`/players/${encodeURIComponent(body.toPlayerId)}`}
+                      aria-label={`Open proposed player record ${body.toPlayerId}`}
+                    >
+                      {body.toPlayerId}
+                    </a>
+                  </dd>
+                  <dt>Source evidence</dt>
+                  <dd>{body.source}</dd>
                 </>
               )}
               {body.expectedFeeVersion !== undefined &&

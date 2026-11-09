@@ -14,6 +14,14 @@ export async function publicPlayers(id?: string) {
   );
   return id ? (result.rows[0] ?? null) : result.rows;
 }
+/** Explicit disambiguation projection; unpublished event names and private account/review fields never leave this boundary. */
+export async function publicPlayerCandidates() {
+  return (
+    await pool.query(`SELECT p.id,p.name,p.origin,p.identity_status AS "identityStatus",
+    ARRAY(SELECT DISTINCT ev.name || ' · ' || d.name FROM event_lineup_member m JOIN event_entry en ON en.id=m.entry_id AND en.version=m.version JOIN division d ON d.id=en.division_id JOIN event_edition ev ON ev.id=d.event_id WHERE m.player_id=p.id AND ev.published AND ev.admission_status='approved' ORDER BY 1 LIMIT 4) AS contexts
+    FROM player p ORDER BY p.name,p.id`)
+  ).rows;
+}
 export async function claimWorkspace(userId: string) {
   const admin = await pool.query(
     "SELECT id FROM role_grant WHERE user_id=$1 AND role='administrator' AND event_id IS NULL AND game_id IS NULL",
