@@ -64,7 +64,11 @@ export function calculateOverall(
     excludedSubjects: { id: string; name: string; reason: string }[] = [];
   if (source.rules.state !== "reviewed")
     issues.push("Review the exact rules/source revision.");
-  try{supportedOverallCheckpoint(source.rules.data,source.effectiveDate);}catch(e){issues.push((e as Error).message);}
+  try {
+    supportedOverallCheckpoint(source.rules.data, source.effectiveDate);
+  } catch (e) {
+    issues.push((e as Error).message);
+  }
   if (!evidence.reviewNote || !evidence.sources.length)
     issues.push("Record sourced overall review rationale.");
   const same = (a: string[], b: string[]) =>
@@ -163,7 +167,9 @@ export function calculateOverall(
         entryId: award.entryId,
         sourceDigest: a.digest,
         resultDigest: a.resultDigest!,
-        ...(input.calculation.entries.find((x:{entryId:string})=>x.entryId===award.entryId)?.eligibility === "excluded"
+        ...(input.calculation.entries.find(
+          (x: { entryId: string }) => x.entryId === award.entryId,
+        )?.eligibility === "excluded"
           ? { excluded: "Frozen event assessment exclusion" }
           : {}),
       });
@@ -240,12 +246,53 @@ export function calculateOverall(
       continue;
     }
     const owned = awards.filter((a) => a.registrationId === s.registrationId);
-    for(const t of r.adjustments.historicalTransfers??[]){
+    for (const t of r.adjustments.historicalTransfers ?? []) {
       // Documentary prior-season subtotals verify032 individual rights only.
       // They never manufacture a current event award or add a manual ranking total.
-      const departure=t.leftOn<'2025-10-31'?'pre':t.leftOn>'2025-10-31'?'post':'unknown',joined=t.joinedOn===null?'none':t.joinedOn<'2025-10-31'?'pre':t.joinedOn>'2025-10-31'?'post':'unknown';
-      if(!t.sourceId||!t.note||t.leftOn<'2025-08-01'||t.leftOn>='2026-08-01'||t.joinedOn&&(t.joinedOn<t.leftOn||t.joinedOn>='2026-08-01')||`${departure}-${joined}`!==t.branch){issues.push(`${s.name}: historical transfer dates/source/applicability are unresolved; October31 boundary has no inferred deadline instant.`);continue;}
-      try{const right=transferEntitlement(t.branch,t.oldPlayed,t.newPlayed,t.oldFinal,t.newFinal),c=input.data.contributions.find(c=>c.playerId===t.playerId);if(!c||c.amount!==right)issues.push(`${s.name}: sourced historical transfer entitlement does not match the current reviewed individual amount.`);}catch(e){issues.push(`${s.name}: ${(e as Error).message}`);}
+      const departure =
+          t.leftOn < "2025-10-31"
+            ? "pre"
+            : t.leftOn > "2025-10-31"
+              ? "post"
+              : "unknown",
+        joined =
+          t.joinedOn === null
+            ? "none"
+            : t.joinedOn < "2025-10-31"
+              ? "pre"
+              : t.joinedOn > "2025-10-31"
+                ? "post"
+                : "unknown";
+      if (
+        !t.sourceId ||
+        !t.applicabilitySourceId ||
+        !t.note ||
+        t.leftOn < "2025-08-01" ||
+        t.leftOn >= "2026-08-01" ||
+        (t.joinedOn && (t.joinedOn < t.leftOn || t.joinedOn >= "2026-08-01")) ||
+        `${departure}-${joined}` !== t.branch
+      ) {
+        issues.push(
+          `${s.name}: historical transfer dates/source/applicability are unresolved; October31 boundary has no inferred deadline instant. Current rule publication alone does not establish retrospective applicability.`,
+        );
+        continue;
+      }
+      try {
+        const right = transferEntitlement(
+            t.branch,
+            t.oldPlayed,
+            t.newPlayed,
+            t.oldFinal,
+            t.newFinal,
+          ),
+          c = input.data.contributions.find((c) => c.playerId === t.playerId);
+        if (!c || c.amount !== right)
+          issues.push(
+            `${s.name}: sourced historical transfer entitlement does not match the current reviewed individual amount.`,
+          );
+      } catch (e) {
+        issues.push(`${s.name}: ${(e as Error).message}`);
+      }
     }
     for (const d of [
       ...r.adjustments.exclusions,

@@ -246,4 +246,179 @@ test("real persisted awards produce immutable overall contributions, command ret
     (await json(`/api/v1/overall-rankings?id=${done.id}`)).resultDigest,
     done.resultDigest,
   );
+  const conflictRequest = randomUUID(),
+    dates = ["2026-11-24", "2026-11-25"],
+    beforeCounts = (
+      await db.query(
+        "SELECT (SELECT count(*) FROM overall_ranking_run) AS runs,(SELECT count(*) FROM audit_record WHERE action='overall_ranking_calculated') AS audits",
+      )
+    ).rows[0];
+  const contexts = await Promise.all(
+    dates.map((date) =>
+      json(
+        `/api/v1/overall-rankings?discipline=men_four&date=${date}&rules=${f.rulesId}`,
+      ),
+    ),
+  );
+  const concurrent = await Promise.all(
+    contexts.map((w, i) =>
+      send("/api/v1/overall-rankings", {
+        ...cmd,
+        effectiveDate: dates[i],
+        version: w.version,
+        sourceDigest: w.review.sourceDigest,
+        requestId: conflictRequest,
+      }),
+    ),
+  );
+  assert.deepEqual(concurrent.map((r) => r.status).sort(), [200, 409]);
+  const afterCounts = (
+    await db.query(
+      "SELECT (SELECT count(*) FROM overall_ranking_run) AS runs,(SELECT count(*) FROM audit_record WHERE action='overall_ranking_calculated') AS audits",
+    )
+  ).rows[0];
+  assert.equal(Number(afterCounts.runs) - Number(beforeCounts.runs), 1);
+  assert.equal(Number(afterCounts.audits) - Number(beforeCounts.audits), 1);
+  assert.equal((await fetch(base + "/api/v1/overall-rankings")).status, 401);
+  assert.equal(
+    (
+      await fetch(base + "/api/v1/overall-rankings", {
+        method: "POST",
+        headers: {
+          cookie,
+          Origin: "https://untrusted.invalid",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(cmd),
+      })
+    ).status,
+    403,
+  );
+  const login = await authRequest(base + "/api/auth/sign-in/email", {
+    method: "POST",
+    headers: { Origin: base, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      email: "organizer@demo.invalid",
+      password: process.env.DEMO_PASSWORD,
+    }),
+  });
+  assert.equal(login.status, 200);
+  const otherCookie = login.headers
+    .getSetCookie()
+    .map((c) => c.split(";")[0])
+    .join("; ");
+  assert.equal(
+    (
+      await fetch(base + `/api/v1/overall-rankings?id=${done.id}`, {
+        headers: { cookie: otherCookie },
+      })
+    ).status,
+    403,
+  );
+  const grants = (
+    await db.query(
+      "DELETE FROM role_grant WHERE user_id='demo-administrator' AND role='administrator' RETURNING *",
+    )
+  ).rows;
+  try {
+    assert.equal(
+      (await send("/api/v1/overall-rankings", cmd)).status,
+      403,
+      "Current authority precedes receipt replay",
+    );
+    assert.equal(
+      (await send(`/api/v1/overall-rankings?id=${done.id}`)).status,
+      403,
+    );
+  } finally {
+    for (const g of grants)
+      await db.query(
+        "INSERT INTO role_grant(id,user_id,role,event_id,game_id) VALUES($1,$2,$3,$4,$5)",
+        [g.id, g.user_id, g.role, g.event_id, g.game_id],
+      );
+  }
+  const starting = await json(`/api/v1/ranking-inputs?id=${f.reviewIds[0]}`);
+  await json("/api/v1/ranking-inputs", {
+    id: starting.id,
+    kind: "season",
+    version: starting.version,
+    requestId: randomUUID(),
+    state: "draft",
+    data: starting.data,
+  });
+  const incomplete = await json(path),
+    incompleteRun = await json("/api/v1/overall-rankings", {
+      ...cmd,
+      version: incomplete.version,
+      sourceDigest: incomplete.review.sourceDigest,
+      requestId: randomUUID(),
+      evidence: {
+        ...evidence,
+        events: evidence.events.map((e: any) => ({ ...e, state: "excluded" })),
+      },
+    });
+  assert.equal(incompleteRun.result.state, "blocked");
+  assert.match(
+    incompleteRun.result.issues.join(" "),
+    /current complete reviewed starting/,
+  );
+  assert.equal(
+    (await json(`/api/v1/overall-rankings?id=${done.id}`)).resultDigest,
+    done.resultDigest,
+  );
+  await assert.rejects(
+    () =>
+      db.query(
+        "UPDATE overall_ranking_run SET result_contents='{}' WHERE id=$1",
+        [done.id],
+      ),
+    /immutable/,
+  );
+  await assert.rejects(
+    () =>
+      db.query("DELETE FROM overall_ranking_receipt WHERE run_id=$1", [
+        done.id,
+      ]),
+    /immutable/,
+  );
+  const failedContext = await json(path),
+    failedCommand = {
+      ...cmd,
+      version: failedContext.version,
+      sourceDigest: failedContext.review.sourceDigest,
+      requestId: randomUUID(),
+    },
+    beforeFailure = (
+      await db.query("SELECT count(*) AS count FROM overall_ranking_run")
+    ).rows[0].count;
+  await db.query(
+    "CREATE FUNCTION wcp034_test_audit_failure() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'controlled034audit failure'; END $$; CREATE TRIGGER wcp034_test_audit_failure BEFORE INSERT ON audit_record FOR EACH ROW WHEN (NEW.action='overall_ranking_calculated') EXECUTE FUNCTION wcp034_test_audit_failure()",
+  );
+  try {
+    assert.equal(
+      (await send("/api/v1/overall-rankings", failedCommand)).status,
+      503,
+    );
+    assert.equal(
+      (await db.query("SELECT count(*) AS count FROM overall_ranking_run"))
+        .rows[0].count,
+      beforeFailure,
+    );
+  } finally {
+    await db.query(
+      "DROP TRIGGER wcp034_test_audit_failure ON audit_record; DROP FUNCTION wcp034_test_audit_failure()",
+    );
+  }
+  const recovered = await json("/api/v1/overall-rankings", failedCommand);
+  assert.equal(
+    (await json("/api/v1/overall-rankings", failedCommand)).id,
+    recovered.id,
+  );
+  assert.equal(
+    Number(
+      (await db.query("SELECT count(*) AS count FROM overall_ranking_run"))
+        .rows[0].count,
+    ) - Number(beforeFailure),
+    1,
+  );
 });

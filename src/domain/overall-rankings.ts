@@ -19,11 +19,34 @@ export type OverallAward = {
   points: string;
   excluded?: string;
 };
-export function supportedOverallCheckpoint(rules:RulesInput,date:string){
- const schedule=[['2026-08-01',1,'1'],['2026-09-15',2,'3/4'],['2026-10-06',3,'5/8'],['2026-10-27',4,'1/2'],['2026-11-17',5,'3/8'],['2026-12-08',6,'1/4'],['2026-12-29',7,'1/8'],['2027-01-19',8,'0']] as const;
- const expected=schedule.filter(s=>s[0]<=date).at(-1),c=checkpointAt(rules,'four_overall',date);
- if(!expected||!c||rules.season!=='2026-27'||rules.effectiveFrom!=='2026-08-01'||rules.effectiveTo!=='2027-08-01'||c.from!==expected[0]||c.maxEvents!==expected[1]||c.priorWeight!==expected[2])throw new EntryError('No supported sourced 2026-27 overall checkpoint covers this date; modified schedules are not implemented.',422);
- return c;
+export function supportedOverallCheckpoint(rules: RulesInput, date: string) {
+  const schedule = [
+    ["2026-08-01", 1, "1"],
+    ["2026-09-15", 2, "3/4"],
+    ["2026-10-06", 3, "5/8"],
+    ["2026-10-27", 4, "1/2"],
+    ["2026-11-17", 5, "3/8"],
+    ["2026-12-08", 6, "1/4"],
+    ["2026-12-29", 7, "1/8"],
+    ["2027-01-19", 8, "0"],
+  ] as const;
+  const expected = schedule.filter((s) => s[0] <= date).at(-1),
+    c = checkpointAt(rules, "four_overall", date);
+  if (
+    !expected ||
+    !c ||
+    rules.season !== "2026-27" ||
+    rules.effectiveFrom !== "2026-08-01" ||
+    rules.effectiveTo !== "2027-08-01" ||
+    c.from !== expected[0] ||
+    c.maxEvents !== expected[1] ||
+    c.priorWeight !== expected[2]
+  )
+    throw new EntryError(
+      "No supported sourced 2026-27 overall checkpoint covers this date; modified schedules are not implemented.",
+      422,
+    );
+  return c;
 }
 export function compareRational(a: string, b: string) {
   const [n, d = "1"] = a.split("/"),
@@ -38,7 +61,7 @@ export function overallContribution(
   starting: string,
   awards: OverallAward[],
 ) {
-  const checkpoint = supportedOverallCheckpoint(rules,date);
+  const checkpoint = supportedOverallCheckpoint(rules, date);
   if (!checkpoint || rules.season !== "2026-27")
     throw new EntryError(
       "No supported 2026-27 overall checkpoint covers this date.",

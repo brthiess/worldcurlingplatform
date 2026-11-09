@@ -1,7 +1,29 @@
 import { EntryError, identifier, plainText } from "./entries";
-import { sourceInput, exact, calendarDate, type Source } from "./ranking-inputs";
-import { overallPolicy, type PriorRoster,type TransferBranch } from "./overall-rankings";
-export type HistoricalTransfer={playerId:string;season:"2025-26";branch:TransferBranch;leftOn:string;joinedOn:string|null;oldPlayed:string;newPlayed:string;oldFinal:string|null;newFinal:string|null;sourceId:string;note:string};
+import {
+  sourceInput,
+  exact,
+  calendarDate,
+  type Source,
+} from "./ranking-inputs";
+import {
+  overallPolicy,
+  type PriorRoster,
+  type TransferBranch,
+} from "./overall-rankings";
+export type HistoricalTransfer = {
+  playerId: string;
+  season: "2025-26";
+  branch: TransferBranch;
+  leftOn: string;
+  joinedOn: string | null;
+  oldPlayed: string;
+  newPlayed: string;
+  oldFinal: string | null;
+  newFinal: string | null;
+  sourceId: string;
+  applicabilitySourceId: string;
+  note: string;
+};
 export type SubjectReview = {
   registrationId: string;
   eligibility: "eligible" | "excluded" | "unknown";
@@ -24,7 +46,7 @@ export type SubjectReview = {
       sourceId: string;
       note: string;
     }[];
-    historicalTransfers?:HistoricalTransfer[];
+    historicalTransfers?: HistoricalTransfer[];
   };
 };
 export type OverallEvidence = {
@@ -115,8 +137,53 @@ export function overallEvidence(raw: unknown): OverallEvidence {
           decision: v.decision as "retain" | "exclude",
         };
       });
-    const historicalTransfers=list(a.historicalTransfers??[],5).map(raw=>{const t=obj(raw),branch=t.branch as TransferBranch;if(t.season!=="2025-26"||!["pre-none","pre-pre","pre-post","post-none","post-post"].includes(branch))throw new EntryError("Select a supported sourced historical2025-26 ownership branch.");return {playerId:identifier(t.playerId),season:"2025-26" as const,branch,leftOn:calendarDate(t.leftOn),joinedOn:t.joinedOn==null||t.joinedOn===""?null:calendarDate(t.joinedOn),oldPlayed:exact.value(t.oldPlayed),newPlayed:exact.value(t.newPlayed),oldFinal:t.oldFinal==null||t.oldFinal===""?null:exact.value(t.oldFinal),newFinal:t.newFinal==null||t.newFinal===""?null:exact.value(t.newFinal),sourceId:ref(t.sourceId),note:text(t.note)};});
-    if(new Set(historicalTransfers.map(t=>t.playerId)).size!==historicalTransfers.length)throw new EntryError("Review each historical transfer owner once.");
+    const historicalTransfers = list(a.historicalTransfers ?? [], 5).map(
+      (raw) => {
+        const t = obj(raw),
+          branch = t.branch as TransferBranch;
+        if (
+          t.season !== "2025-26" ||
+          ![
+            "pre-none",
+            "pre-pre",
+            "pre-post",
+            "post-none",
+            "post-post",
+          ].includes(branch)
+        )
+          throw new EntryError(
+            "Select a supported sourced historical2025-26 ownership branch.",
+          );
+        return {
+          playerId: identifier(t.playerId),
+          season: "2025-26" as const,
+          branch,
+          leftOn: calendarDate(t.leftOn),
+          joinedOn:
+            t.joinedOn == null || t.joinedOn === ""
+              ? null
+              : calendarDate(t.joinedOn),
+          oldPlayed: exact.value(t.oldPlayed),
+          newPlayed: exact.value(t.newPlayed),
+          oldFinal:
+            t.oldFinal == null || t.oldFinal === ""
+              ? null
+              : exact.value(t.oldFinal),
+          newFinal:
+            t.newFinal == null || t.newFinal === ""
+              ? null
+              : exact.value(t.newFinal),
+          sourceId: ref(t.sourceId),
+          applicabilitySourceId: ref(t.applicabilitySourceId),
+          note: text(t.note),
+        };
+      },
+    );
+    if (
+      new Set(historicalTransfers.map((t) => t.playerId)).size !==
+      historicalTransfers.length
+    )
+      throw new EntryError("Review each historical transfer owner once.");
     if (
       new Set(exclusions.map((x) => x.awardId)).size !== exclusions.length ||
       new Set(rosterChanges.map((x) => x.awardId)).size !== rosterChanges.length
@@ -128,7 +195,7 @@ export function overallEvidence(raw: unknown): OverallEvidence {
       );
     if (
       adjustmentState === "none" &&
-      (exclusions.length || rosterChanges.length||historicalTransfers.length)
+      (exclusions.length || rosterChanges.length || historicalTransfers.length)
     )
       throw new EntryError("Recorded adjustments require the reviewed state.");
     return {

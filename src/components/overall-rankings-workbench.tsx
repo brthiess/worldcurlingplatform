@@ -11,6 +11,8 @@ import type {
   calculateOverall,
 } from "@/domain/overall-calculation";
 import type { Source } from "@/domain/ranking-inputs";
+import { OverallTransferEditor } from "./overall-transfer-editor";
+import { OverallField } from "./overall-field";
 import { useAuthorityCommand, AuthorityRecovery } from "./authority-command";
 type Saved = {
   id: string;
@@ -96,7 +98,13 @@ export function OverallRankingsWorkbench() {
     [stale, setStale] = useState(false),
     [detailId, setDetailId] = useState(""),
     [importText, setImportText] = useState("");
-  async function load(d = discipline, dt = date, r = rules, reset = false, recovery = false) {
+  async function load(
+    d = discipline,
+    dt = date,
+    r = rules,
+    reset = false,
+    recovery = false,
+  ) {
     setLoading(true);
     try {
       const next = await read<Workspace>(
@@ -107,14 +115,31 @@ export function OverallRankingsWorkbench() {
       setError("");
       setStale(false);
       if (next.review && (reset || !evidence)) {
-        const value = next.selected?.manifest.evidence ?? fresh(next.review);
+        const saved = next.selected?.manifest.evidence,
+          blank = fresh(next.review);
+        const value = saved
+          ? {
+              ...saved,
+              subjects: blank.subjects.map(
+                (s) =>
+                  saved.subjects.find(
+                    (old) => old.registrationId === s.registrationId,
+                  ) ?? s,
+              ),
+              events: blank.events.map(
+                (e) =>
+                  saved.events.find((old) => old.divisionId === e.divisionId) ??
+                  e,
+              ),
+            }
+          : blank;
         setEvidence(value);
         setSubjectId(value.subjects[0]?.registrationId ?? "");
       }
     } catch (e) {
       setError((e as Error).message);
       setStale(true);
-      if(recovery)throw e;
+      if (recovery) throw e;
     } finally {
       setLoading(false);
     }
@@ -170,7 +195,7 @@ export function OverallRankingsWorkbench() {
     value: string,
     change: (id: string) => void,
   ) => (
-    <label>
+    <OverallField>
       {label}
       <select value={value} onChange={(e) => change(e.target.value)}>
         <option value="">Unresolved source</option>
@@ -180,7 +205,7 @@ export function OverallRankingsWorkbench() {
           </option>
         ))}
       </select>
-    </label>
+    </OverallField>
   );
   const ownedAwards =
     workspace?.review?.events.flatMap((e) => {
@@ -245,7 +270,7 @@ export function OverallRankingsWorkbench() {
       <fieldset disabled={locked}>
         <legend>List context</legend>
         <div className="overall-fields">
-          <label>
+          <OverallField>
             Discipline
             <select
               value={discipline}
@@ -261,8 +286,8 @@ export function OverallRankingsWorkbench() {
               <option value="men_four">Men's four-player overall</option>
               <option value="women_four">Women's four-player overall</option>
             </select>
-          </label>
-          <label>
+          </OverallField>
+          <OverallField>
             Effective date
             <input
               type="date"
@@ -274,8 +299,8 @@ export function OverallRankingsWorkbench() {
                 setStale(true);
               }}
             />
-          </label>
-          <label>
+          </OverallField>
+          <OverallField>
             Rule-source edition
             <select
               value={rules}
@@ -292,7 +317,7 @@ export function OverallRankingsWorkbench() {
                 </option>
               ))}
             </select>
-          </label>
+          </OverallField>
         </div>
         <button
           type="button"
@@ -311,6 +336,18 @@ export function OverallRankingsWorkbench() {
         <>
           <section aria-labelledby="overall-sources">
             <h2 id="overall-sources">Sources and coverage</h2>
+            <button
+              type="button"
+              disabled={locked}
+              onClick={() => {
+                setEvidence(fresh(workspace.review!));
+                setSubjectId(
+                  workspace.review!.subjects[0]?.registrationId ?? "",
+                );
+              }}
+            >
+              Start new evidence review
+            </button>
             <p>
               Inclusive effective date {workspace.review.effectiveDate}. Events
               count when their recorded completion date is on or before it. This
@@ -342,7 +379,7 @@ export function OverallRankingsWorkbench() {
                         ["Retrieved SHA-256", "sha256"],
                       ] as const
                     ).map(([label, key]) => (
-                      <label key={key}>
+                      <OverallField key={key}>
                         {label}
                         <input
                           value={s[key]}
@@ -355,7 +392,7 @@ export function OverallRankingsWorkbench() {
                             })
                           }
                         />
-                      </label>
+                      </OverallField>
                     ))}
                   </div>
                   <button
@@ -392,7 +429,7 @@ export function OverallRankingsWorkbench() {
               >
                 Add evidence source
               </button>
-              <label>
+              <OverallField>
                 Overall review rationale
                 <textarea
                   value={evidence.reviewNote}
@@ -400,7 +437,7 @@ export function OverallRankingsWorkbench() {
                     setEvidence({ ...evidence, reviewNote: e.target.value })
                   }
                 />
-              </label>
+              </OverallField>
             </fieldset>
             {!workspace.review.events.length && (
               <p>
@@ -436,7 +473,7 @@ export function OverallRankingsWorkbench() {
                     {event.finalizationVersion ?? "Absent"}.
                   </p>
                   <div className="overall-fields">
-                    <label>
+                    <OverallField>
                       Event coverage
                       <select
                         value={row.state}
@@ -452,19 +489,19 @@ export function OverallRankingsWorkbench() {
                           Sourced exclusion from this list
                         </option>
                       </select>
-                    </label>
+                    </OverallField>
                     {sourceSelect(
                       "Event coverage source",
                       row.sourceId,
                       (sourceId) => update({ sourceId }),
                     )}
-                    <label>
+                    <OverallField>
                       Event coverage rationale
                       <textarea
                         value={row.note}
                         onChange={(e) => update({ note: e.target.value })}
                       />
-                    </label>
+                    </OverallField>
                   </div>
                 </fieldset>
               );
@@ -480,7 +517,7 @@ export function OverallRankingsWorkbench() {
             </p>
             <fieldset disabled={locked}>
               <legend>Review subject</legend>
-              <label>
+              <OverallField>
                 Season subject
                 <select
                   value={subjectId}
@@ -492,7 +529,7 @@ export function OverallRankingsWorkbench() {
                     </option>
                   ))}
                 </select>
-              </label>
+              </OverallField>
               {current && subject && (
                 <>
                   <h3>{current.name}</h3>
@@ -509,7 +546,7 @@ export function OverallRankingsWorkbench() {
                     </p>
                   ))}
                   <div className="overall-fields">
-                    <label>
+                    <OverallField>
                       Subject eligibility
                       <select
                         value={subject.eligibility}
@@ -526,22 +563,22 @@ export function OverallRankingsWorkbench() {
                         </option>
                         <option value="excluded">Sourced list exclusion</option>
                       </select>
-                    </label>
+                    </OverallField>
                     {sourceSelect(
                       "Subject eligibility source",
                       subject.sourceId,
                       (sourceId) => change({ sourceId }),
                     )}
-                    <label>
+                    <OverallField>
                       Subject eligibility rationale
                       <textarea
                         value={subject.note}
                         onChange={(e) => change({ note: e.target.value })}
                       />
-                    </label>
+                    </OverallField>
                   </div>
                   <div className="overall-fields">
-                    <label>
+                    <OverallField>
                       Continuity decision
                       <select
                         value={subject.continuity.state}
@@ -580,7 +617,7 @@ export function OverallRankingsWorkbench() {
                           Retained three of four / four of five
                         </option>
                       </select>
-                    </label>
+                    </OverallField>
                     {sourceSelect(
                       "Continuity source",
                       subject.continuity.sourceId,
@@ -589,7 +626,7 @@ export function OverallRankingsWorkbench() {
                           continuity: { ...subject.continuity, sourceId },
                         }),
                     )}
-                    <label>
+                    <OverallField>
                       Continuity rationale
                       <textarea
                         value={subject.continuity.note}
@@ -602,14 +639,14 @@ export function OverallRankingsWorkbench() {
                           })
                         }
                       />
-                    </label>
+                    </OverallField>
                   </div>
                   {subject.continuity.prior && (
                     <fieldset>
                       <legend>
                         Sourced previous official roster and rights
                       </legend>
-                      <label>
+                      <OverallField>
                         Prior final team total
                         <input
                           value={subject.continuity.prior.total}
@@ -625,10 +662,10 @@ export function OverallRankingsWorkbench() {
                             })
                           }
                         />
-                      </label>
+                      </OverallField>
                       {subject.continuity.prior.members.map((m, i) => (
                         <div className="overall-fields" key={i}>
-                          <label>
+                          <OverallField>
                             Prior player {i + 1}
                             <input
                               value={m.playerId}
@@ -653,8 +690,8 @@ export function OverallRankingsWorkbench() {
                                 })
                               }
                             />
-                          </label>
-                          <label>
+                          </OverallField>
+                          <OverallField>
                             Prior exact share {i + 1}
                             <input
                               value={m.share}
@@ -676,13 +713,13 @@ export function OverallRankingsWorkbench() {
                                 })
                               }
                             />
-                          </label>
+                          </OverallField>
                         </div>
                       ))}
                     </fieldset>
                   )}
                   <div className="overall-fields">
-                    <label>
+                    <OverallField>
                       Ordinary adjustments
                       <select
                         value={subject.adjustments.state}
@@ -706,7 +743,7 @@ export function OverallRankingsWorkbench() {
                           Sourced ordinary decisions below
                         </option>
                       </select>
-                    </label>
+                    </OverallField>
                     {sourceSelect(
                       "Adjustment applicability source",
                       subject.adjustments.sourceId,
@@ -715,7 +752,7 @@ export function OverallRankingsWorkbench() {
                           adjustments: { ...subject.adjustments, sourceId },
                         }),
                     )}
-                    <label>
+                    <OverallField>
                       Adjustment applicability rationale
                       <textarea
                         value={subject.adjustments.note}
@@ -728,7 +765,7 @@ export function OverallRankingsWorkbench() {
                           })
                         }
                       />
-                    </label>
+                    </OverallField>
                   </div>
                   <p>
                     Unknown penalty/exemption arithmetic cannot be waived here.
@@ -740,7 +777,7 @@ export function OverallRankingsWorkbench() {
                     <fieldset key={i}>
                       <legend>Award ownership decision {i + 1}</legend>
                       <div className="overall-fields">
-                        <label>
+                        <OverallField>
                           Frozen award
                           <select
                             value={a.awardId}
@@ -766,8 +803,8 @@ export function OverallRankingsWorkbench() {
                               </option>
                             ))}
                           </select>
-                        </label>
-                        <label>
+                        </OverallField>
+                        <OverallField>
                           Award decision
                           <select
                             value={a.decision}
@@ -796,7 +833,7 @@ export function OverallRankingsWorkbench() {
                             </option>
                             <option value="exclude">Exclude award</option>
                           </select>
-                        </label>
+                        </OverallField>
                         {sourceSelect(
                           "Award decision source",
                           a.sourceId,
@@ -812,7 +849,7 @@ export function OverallRankingsWorkbench() {
                               },
                             }),
                         )}
-                        <label>
+                        <OverallField>
                           Award decision rationale
                           <textarea
                             value={a.note}
@@ -831,7 +868,7 @@ export function OverallRankingsWorkbench() {
                               })
                             }
                           />
-                        </label>
+                        </OverallField>
                       </div>
                       <button
                         type="button"
@@ -873,6 +910,20 @@ export function OverallRankingsWorkbench() {
                   >
                     Add award ownership decision
                   </button>
+                  <OverallTransferEditor
+                    value={subject.adjustments.historicalTransfers ?? []}
+                    players={current.starting?.data.rankingPlayerIds ?? []}
+                    sources={evidence.sources}
+                    onChange={(historicalTransfers) =>
+                      change({
+                        adjustments: {
+                          ...subject.adjustments,
+                          state: "reviewed",
+                          historicalTransfers,
+                        },
+                      })
+                    }
+                  />
                 </>
               )}
             </fieldset>
@@ -880,13 +931,13 @@ export function OverallRankingsWorkbench() {
           <details>
             <summary>Optional evidence JSON import</summary>
             <fieldset disabled={locked}>
-              <label>
+              <OverallField>
                 Evidence JSON
                 <textarea
                   value={importText}
                   onChange={(e) => setImportText(e.target.value)}
                 />
-              </label>
+              </OverallField>
               <button
                 type="button"
                 onClick={() => {
@@ -1039,7 +1090,7 @@ export function OverallRankingsWorkbench() {
           )}
           <fieldset disabled={locked}>
             <legend>Immutable history and replay</legend>
-            <label>
+            <OverallField>
               Draft revision
               <select
                 value={selected.id}
@@ -1060,7 +1111,7 @@ export function OverallRankingsWorkbench() {
                   </option>
                 ))}
               </select>
-            </label>
+            </OverallField>
             <button
               type="button"
               onClick={() =>
@@ -1071,7 +1122,7 @@ export function OverallRankingsWorkbench() {
                     runId: selected.id,
                     discipline,
                     effectiveDate: selected.effectiveDate,
-                      rulesId: rules,
+                    rulesId: rules,
                     requestId: crypto.randomUUID(),
                   },
                   "Frozen replay matched the original contributions and result digest.",
