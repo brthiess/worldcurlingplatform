@@ -61,7 +61,7 @@
   "git": {
     "remote": "https://github.com/brthiess/worldcurlingplatform.git",
     "push_as_work_progresses": true,
-    "last_verified_remote_integration_commit": "5beed950cf93033e15d758b5d57d18d4eec6bfcd",
+    "last_verified_remote_integration_commit": "bce0bfc978fe3d191bd761fabd0cebea30f21ab2",
     "integration_branch": "integration/world-curling-platform",
     "worktrees_created": [
       ".worktrees/WCP-001",
@@ -87,7 +87,7 @@
     ],
     "initialized": true,
     "baseline_commit": "f6d6d8d",
-    "remote_ref_verified_at": "2026-11-09T00:39:54.099613+00:00"
+    "remote_ref_verified_at": "2026-11-09T01:11:50.806255+00:00"
   },
   "verification": {
     "policy": "Only completed tickets have reviewed required-check evidence; each record is limited to its ticket scope.",
