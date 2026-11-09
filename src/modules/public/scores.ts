@@ -59,6 +59,7 @@ export type PublicEvent = {
     format: string;
     rankingStatus: string;
     hasPublishedDraw: boolean;
+    drawTemplate?: string | null;
   }[];
   selectedDivisionId: string | null;
   event: {
@@ -74,7 +75,13 @@ export type PublicEvent = {
     format: string;
     registrationStatus: string;
   };
-  draws: { id: string; number: number; startsAt: string; durationMinutes: number; state: string }[];
+  draws: {
+    id: string;
+    number: number;
+    startsAt: string;
+    durationMinutes: number;
+    state: string;
+  }[];
   games: PublicGame[];
   selection: ReturnType<typeof selectDraws>;
 };
@@ -99,7 +106,7 @@ async function projectEvent(
   );
   if (!result.rows.length) return null;
   const divisionResult = await connection.execute(
-    sql`SELECT d.id,d.name,d.discipline,d.format,d.ranking_status AS "rankingStatus",EXISTS(SELECT 1 FROM competition_draw cd WHERE cd.division_id=d.id AND cd.state='published') AS "hasPublishedDraw" FROM division d WHERE d.event_id=${id} ORDER BY d.name,d.id`,
+    sql`SELECT d.id,d.name,d.discipline,d.format,d.ranking_status AS "rankingStatus",EXISTS(SELECT 1 FROM competition_draw cd WHERE cd.division_id=d.id AND cd.state='published') AS "hasPublishedDraw",(SELECT r.template_id FROM competition_draw cd JOIN draw_revision r ON r.division_id=cd.division_id AND r.version=cd.version WHERE cd.division_id=d.id AND cd.state='published') AS "drawTemplate" FROM division d WHERE d.event_id=${id} ORDER BY d.name,d.id`,
   );
   const divisions = divisionResult.rows as PublicEvent["divisions"];
   if (divisionId && !divisions.some((d) => d.id === divisionId)) return null;
@@ -220,7 +227,10 @@ async function projectEvent(
       },
     );
   const { divisionId: _, ...event } = row;
-  for (const draw of draws) draw.state = drawEvidenceState(games.filter(g=>g.drawId===draw.id).map(g=>g.state));
+  for (const draw of draws)
+    draw.state = drawEvidenceState(
+      games.filter((g) => g.drawId === draw.id).map((g) => g.state),
+    );
   return {
     event,
     divisions,

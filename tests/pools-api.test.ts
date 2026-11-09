@@ -113,6 +113,22 @@ test("configured round-robin publication persists groups and all twelve results 
     404,
   );
   await checked(f.path, publish());
+  assert.equal(
+    (
+      await pool.query(
+        "SELECT count(*)::int n FROM audit_record WHERE resource_id=$1 AND action LIKE 'draw.%'",
+        [f.id],
+      )
+    ).rows[0].n,
+    2,
+  );
+  const eventData = await (
+    await fetch(base + `/api/v1/public/events/${event.id}?division=${f.id}`)
+  ).json();
+  assert.equal(
+    eventData.divisions.find((d: any) => d.id === f.id).drawTemplate,
+    "application-pools2x4-v1",
+  );
   const read = async () =>
     await (await fetch(base + `/api/v1/public/divisions/${f.id}/draw`)).json();
   let data = await read();
@@ -307,4 +323,190 @@ test("pool preview/publication enforce current family, full admitted field, vers
   const wrong = await post(different.path, preview(different.seeds));
   assert.equal(wrong.status, 422);
   assert.match((await wrong.json()).error, /format/);
+});
+
+test("pool writer waits at edition before taking lower rows and required unscheduled games block finalization", async () => {
+  const f = await create(),
+    barrier = await pool.connect();
+  await barrier.query("BEGIN");
+  const pid = (await barrier.query("SELECT pg_backend_pid() AS pid")).rows[0]
+    .pid;
+  await barrier.query("SELECT id FROM event_edition WHERE id=$1 FOR UPDATE", [
+    event.id,
+  ]);
+  const pending = post(f.path, preview(f.seeds));
+  try {
+    const deadline = Date.now() + 10000;
+    let blocked = false;
+    while (Date.now() < deadline) {
+      if (
+        (
+          await pool.query(
+            "SELECT 1 FROM pg_stat_activity WHERE datname=current_database() AND $1=ANY(pg_blocking_pids(pid))",
+            [pid],
+          )
+        ).rowCount
+      ) {
+        blocked = true;
+        break;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 25));
+    }
+    assert.ok(blocked, "pool command must actually reach its edition barrier");
+    await pool.query("SELECT id FROM division WHERE id=$1 FOR UPDATE NOWAIT", [
+      f.id,
+    ]);
+    await pool.query(
+      "SELECT id FROM event_entry WHERE id=$1 FOR UPDATE NOWAIT",
+      [f.seeds[0]],
+    );
+  } finally {
+    await barrier.query("COMMIT");
+    barrier.release();
+  }
+  const response = await pending;
+  assert.equal(response.status, 200, await response.clone().text());
+  await checked(f.path, publish());
+  const review = await (
+    await fetch(base + "/api/v1/division-finalizations?division=" + f.id, {
+      headers: { cookie },
+    })
+  ).json();
+  assert.equal(review.source.games.length, 12);
+  assert.ok(review.source.games.every((g: any) => g.drawId === null));
+  assert.ok(review.prerequisites.includes("Every game must be confirmed."));
+  const finalized = await post("/api/v1/division-finalizations", {
+    requestId: randomUUID(),
+    divisionId: f.id,
+    version: review.version,
+    sourceDigest: review.sourceDigest,
+    placements: review.source.entries.map((e: any, n: number) => ({
+      entryId: e.id,
+      place: n + 1,
+    })),
+    rulesReference: "Application pools2x4 profile version1",
+    note: "Attempt while all required unscheduled pool games remain",
+  });
+  assert.equal(finalized.status, 422, await finalized.clone().text());
+  assert.equal(
+    (
+      await pool.query(
+        "SELECT count(*)::int AS n FROM division_finalization WHERE division_id=$1",
+        [f.id],
+      )
+    ).rows[0].n,
+    0,
+  );
+});
+
+test("pool field candidates exclude pending/held/invited/expired entries and known duplicate teams cannot occupy two seeds", async () => {
+  const f = await create(true);
+  for (const state of ["pending", "held", "invited", "expired"]) {
+    await pool.query(
+      "UPDATE event_entry SET admission_state=$2,reservation_deadline=CASE WHEN $2='held' THEN now()+interval '1 hour' ELSE NULL END WHERE id=$1",
+      [f.seeds[0], state],
+    );
+    const workspace = await (
+      await fetch(base + f.path, { headers: { cookie } })
+    ).json();
+    assert.equal(workspace.entries.length, 7);
+    const denied = await post(f.path, preview(f.seeds));
+    assert.equal(denied.status, 422, await denied.clone().text());
+  }
+  await pool.query(
+    "UPDATE event_entry SET admission_state='accepted',reservation_deadline=NULL WHERE id=$1",
+    [f.seeds[0]],
+  );
+  const team = (
+    await pool.query(
+      "SELECT id FROM team WHERE discipline='men_four' ORDER BY id LIMIT 1",
+    )
+  ).rows[0].id;
+  await pool.query(
+    "UPDATE event_entry SET team_id=$2 WHERE id=ANY($1::text[])",
+    [f.seeds.slice(0, 2), team],
+  );
+  const duplicate = await post(f.path, preview(f.seeds));
+  assert.equal(duplicate.status, 422);
+  assert.match((await duplicate.json()).error, /same known team/);
+  const foreign = await create();
+  const crossed = await post(
+    f.path,
+    preview([foreign.seeds[0], ...f.seeds.slice(1)]),
+  );
+  assert.equal(crossed.status, 403);
+  assert.equal(
+    (
+      await pool.query(
+        "SELECT count(*)::int n FROM audit_record WHERE resource_id=$1 AND action LIKE 'draw.%'",
+        [f.id],
+      )
+    ).rows[0].n,
+    0,
+  );
+});
+
+test("pool publication audit failure rolls back games and revisions, then exact retry commits once", async () => {
+  const f = await create();
+  await checked(f.path, preview(f.seeds));
+  const command = publish();
+  const fault = "wcp022_fail_" + randomUUID().replaceAll("-", "");
+  await pool.query(
+    `CREATE FUNCTION ${fault}() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.resource_id='${f.id}' AND NEW.action='draw.publish' THEN RAISE EXCEPTION 'Owned controlled pool publication audit fault'; END IF;RETURN NEW;END $$;CREATE TRIGGER ${fault} BEFORE INSERT ON audit_record FOR EACH ROW EXECUTE FUNCTION ${fault}()`,
+  );
+  try {
+    const failed = await post(f.path, command);
+    assert.equal(failed.status, 503);
+    assert.equal(
+      (
+        await pool.query(
+          "SELECT count(*)::int n FROM game WHERE division_id=$1",
+          [f.id],
+        )
+      ).rows[0].n,
+      0,
+    );
+    const view = await (
+      await fetch(base + f.path, { headers: { cookie } })
+    ).json();
+    assert.equal(view.version, 1);
+    assert.equal(view.history.length, 1);
+    assert.equal(view.state, "preview");
+    assert.equal(
+      (await fetch(base + `/api/v1/public/divisions/${f.id}/draw`)).status,
+      404,
+    );
+  } finally {
+    await pool.query(
+      `DROP TRIGGER ${fault} ON audit_record;DROP FUNCTION ${fault}()`,
+    );
+  }
+  const saved = await checked(f.path, command);
+  assert.equal(saved.version, 2);
+  assert.deepEqual(await checked(f.path, command), saved);
+  assert.equal(
+    (
+      await pool.query(
+        "SELECT count(*)::int n FROM game WHERE division_id=$1",
+        [f.id],
+      )
+    ).rows[0].n,
+    12,
+  );
+  assert.equal(
+    (
+      await pool.query(
+        "SELECT count(*)::int n FROM audit_record WHERE resource_id=$1 AND action LIKE 'draw.%'",
+        [f.id],
+      )
+    ).rows[0].n,
+    2,
+  );
+  await assert.rejects(
+    pool.query(
+      "UPDATE draw_revision SET reason='Changed frozen pool' WHERE division_id=$1 AND version=2",
+      [f.id],
+    ),
+    /immutable/,
+  );
 });

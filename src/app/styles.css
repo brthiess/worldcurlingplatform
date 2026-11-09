@@ -1334,3 +1334,5 @@ footer {
     overflow-wrap: anywhere;
   }
 }
+
+[role="tab"][aria-selected="true"] { box-shadow: inset 0 -4px 0 #fff; text-decoration: underline; text-underline-offset: .3rem; }

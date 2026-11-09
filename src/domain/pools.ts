@@ -52,7 +52,6 @@ export type PoolResult = {
   entryA: string | null;
   entryB: string | null;
   winnerEntryId: string | null;
-  outcome?: string | null;
 };
 export function poolStandings(
   groups: PoolGroup[],
@@ -82,11 +81,7 @@ export function poolStandings(
           pending++;
           continue;
         }
-        if (g.outcome === "tie" && !g.winnerEntryId) ties++;
-        else if (
-          g.winnerEntryId &&
-          [g.entryA, g.entryB].includes(g.winnerEntryId)
-        )
+        if (g.winnerEntryId && [g.entryA, g.entryB].includes(g.winnerEntryId))
           g.winnerEntryId === s.entryId ? wins++ : losses++;
         else pending++;
       }

@@ -409,7 +409,19 @@ export function DrawWorkbench() {
                 This is the stored revision. Unsaved seed changes do not change
                 this preview.
               </p>
-              <DrawPanel data={data} view="list" />
+              {data.template === POOL_TEMPLATE ? (
+                data.graph.groups?.map((group) => (
+                  <section
+                    key={group.key}
+                    aria-label={`Pool ${group.key} preview`}
+                  >
+                    <h3>Pool {group.key}</h3>
+                    <DrawPanel data={data} view="list" pool={group.key} />
+                  </section>
+                ))
+              ) : (
+                <DrawPanel data={data} view="list" />
+              )}
               {data.state === "preview" && (
                 <div className="form-card">
                   <label htmlFor="publish-reason">Publication reason</label>
@@ -437,7 +449,9 @@ export function DrawWorkbench() {
                   <a
                     href={`/events/${data.division.eventId}/bracket?division=${encodeURIComponent(data.divisionId)}`}
                   >
-                    Open public bracket and game list →
+                    {data.template === POOL_TEMPLATE
+                      ? "Open public pools and standings →"
+                      : "Open public bracket and game list →"}
                   </a>
                 </p>
               )}

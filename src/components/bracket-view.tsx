@@ -1,11 +1,12 @@
 "use client";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import type { PublicDraw } from "@/modules/draws/draws";
 import { DrawPanel } from "./draw-panel";
 import { POOL_TEMPLATE } from "@/domain/pools";
 import { PoolTable } from "./pool-table";
-import { TRIPLE_TEMPLATE } from "@/domain/draws";
+import { SINGLE_TEMPLATE, TRIPLE_TEMPLATE } from "@/domain/draws";
 export function BracketView({ eventId }: { eventId: string }) {
+  const sequence = useRef(0);
   const [data, setData] = useState<PublicDraw | null>(null),
     [error, setError] = useState(""),
     [loading, setLoading] = useState(true),
@@ -16,6 +17,7 @@ export function BracketView({ eventId }: { eventId: string }) {
     [updated, setUpdated] = useState<Date | null>(null);
   const load = useCallback(
     async (signal?: AbortSignal) => {
+      const current = ++sequence.current;
       setLoading(true);
       try {
         const query = new URLSearchParams(window.location.search);
@@ -35,6 +37,7 @@ export function BracketView({ eventId }: { eventId: string }) {
           `/api/v1/public/divisions/${encodeURIComponent(division!)}/draw`,
           { cache: "no-store", signal },
         );
+        if (signal?.aborted || current !== sequence.current) return;
         if (r.status === 404) {
           setData(null);
           setError("No published competition draw for this division yet.");
@@ -42,15 +45,21 @@ export function BracketView({ eventId }: { eventId: string }) {
         }
         if (!r.ok) throw new Error("The draw could not be refreshed.");
         const next: PublicDraw = await r.json();
+        if (signal?.aborted || current !== sequence.current) return;
         if (next.division.eventId !== eventId)
           throw new Error("This division does not belong to this event.");
         setData(next);
         setError("");
         setUpdated(new Date());
       } catch (e) {
-        if ((e as Error).name !== "AbortError") setError((e as Error).message);
+        if (
+          !signal?.aborted &&
+          current === sequence.current &&
+          (e as Error).name !== "AbortError"
+        )
+          setError((e as Error).message);
       } finally {
-        setLoading(false);
+        if (!signal?.aborted && current === sequence.current) setLoading(false);
       }
     },
     [eventId],
@@ -95,11 +104,15 @@ export function BracketView({ eventId }: { eventId: string }) {
     <main id="main">
       <p className="eyebrow">Competition draw</p>
       <h1>
-        {data?.template === POOL_TEMPLATE
-          ? "Pools and standings"
-          : data?.template === TRIPLE_TEMPLATE
-            ? "Triple knockout bracket"
-            : "Single knockout bracket"}
+        {!data
+          ? "Competition draw"
+          : data.template === POOL_TEMPLATE
+            ? "Pools and standings"
+            : data?.template === TRIPLE_TEMPLATE
+              ? "Triple knockout bracket"
+              : data.template === SINGLE_TEMPLATE
+                ? "Single knockout bracket"
+                : "Competition draw"}
       </h1>
       <p>
         <a
@@ -232,7 +245,11 @@ export function BracketView({ eventId }: { eventId: string }) {
                     <a
                       className="team-game-route"
                       key={n.id}
-                      href={`#draw-node-${n.id}`}
+                      href={
+                        data.template === POOL_TEMPLATE
+                          ? `/games/${n.id}`
+                          : `#draw-node-${n.id}`
+                      }
                     >
                       {n.key} →{" "}
                     </a>
@@ -243,7 +260,11 @@ export function BracketView({ eventId }: { eventId: string }) {
                 aria-pressed={pathOnly}
                 onClick={() => choose("path", pathOnly ? "" : "team")}
               >
-                {pathOnly ? "Show all games" : "Only selected path"}
+                {pathOnly
+                  ? "Show all games"
+                  : data.template === POOL_TEMPLATE
+                    ? "Only selected team games"
+                    : "Only selected path"}
               </button>
             </section>
           )}
