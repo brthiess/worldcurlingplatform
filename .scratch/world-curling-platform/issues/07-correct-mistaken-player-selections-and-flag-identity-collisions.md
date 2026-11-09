@@ -4,7 +4,7 @@ number: 7
 title: "Correct mistaken player selections and flag identity collisions"
 parent: WCP-SPEC-001
 type: implementation
-status: in-progress
+status: completed
 labels: [ready-for-agent]
 blocked_by: [WCP-006]
 source_spec_sha256: 045B46988225B6C8C0020B23C8C5D4EAA8E2E1916256148A0FDA26B5DA8673FD
@@ -18,7 +18,7 @@ published: 2026-11-07
 
 **Blocked by:** [06: Manually enter teams and resolve core-composition identities](06-manually-enter-teams-and-resolve-core-composition-identities.md).
 
-**Status:** in-progress
+**Status:** completed
 
 ## Parent and scope
 
@@ -31,13 +31,13 @@ published: 2026-11-07
 
 ## Acceptance criteria
 
-- [ ] Suggest distinguishing existing records and permit a provisional person when uncertain; never merge by name alone.
-- [ ] Record factual corrections separately from genuine core transitions and retain their audit/source evidence.
-- [ ] Detect multi-record/team/entry/subject collisions, leave conflicting changes unapplied and retain a staff issue; defer cascading merge/consolidation tooling.
-- [ ] **Unit testing:** Test candidate/ambiguity classification, ordinary correction rules and collision rejection without mutating partial state.
-- [ ] **Database/API verification:** Correct a mistaken selection through staff APIs and prove atomicity/history; attempt a collision and verify canonical and published evidence stays intact.
-- [ ] **Frontend quality:** Make affected identity, proposed correction and unresolved issue clear; show successful correction or actionable conflict without a pretend merge-success screen.
-- [ ] Record actual verification commands/results and relevant browser/screenshots or API evidence. Report meaningful uncovered branches or limitations; do not claim checks that were not run.
+- [x] Suggest distinguishing existing records and permit a provisional person when uncertain; never merge by name alone.
+- [x] Record factual corrections separately from genuine core transitions and retain their audit/source evidence.
+- [x] Detect multi-record/team/entry/subject collisions, leave conflicting changes unapplied and retain a staff issue; defer cascading merge/consolidation tooling.
+- [x] **Unit testing:** Test candidate/ambiguity classification, ordinary correction rules and collision rejection without mutating partial state.
+- [x] **Database/API verification:** Correct a mistaken selection through staff APIs and prove atomicity/history; attempt a collision and verify canonical and published evidence stays intact.
+- [x] **Frontend quality:** Make affected identity, proposed correction and unresolved issue clear; show successful correction or actionable conflict without a pretend merge-success screen.
+- [x] Record actual verification commands/results and relevant browser/screenshots or API evidence. Report meaningful uncovered branches or limitations; do not claim checks that were not run.
 
 ## Slice boundary
 
