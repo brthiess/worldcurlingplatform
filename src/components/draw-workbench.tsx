@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import type { drawWorkspace } from "@/modules/draws/draws";
 import { DrawPanel } from "./draw-panel";
 import type { RetainedAuthorityCommand } from "./authority-command";
+import { SINGLE_TEMPLATE, TRIPLE_TEMPLATE } from "@/domain/draws";
 type Data = Awaited<ReturnType<typeof drawWorkspace>>;
 type Choice = { id: string; name: string; eventId: string; eventName: string };
 export function DrawWorkbench() {
@@ -12,6 +13,7 @@ export function DrawWorkbench() {
     [data, setData] = useState<Data | null>(null),
     [seeds, setSeeds] = useState<string[]>(Array(6).fill("")),
     [count, setCount] = useState(6),
+    [template, setTemplate] = useState(SINGLE_TEMPLATE),
     [reason, setReason] = useState(""),
     [error, setError] = useState(""),
     [status, setStatus] = useState(""),
@@ -19,6 +21,11 @@ export function DrawWorkbench() {
     [busy, setBusy] = useState(false),
     [pending, setPending] = useState<RetainedAuthorityCommand | null>(null),
     [stale, setStale] = useState(false);
+  function showSelection(profile: string, entryIds: string[]) {
+    setTemplate(profile);
+    setCount(entryIds.length || 6);
+    setSeeds(entryIds.length ? entryIds : Array(6).fill(""));
+  }
   async function load(id: string) {
     const current = ++sequence.current;
     setLoading(true);
@@ -32,6 +39,10 @@ export function DrawWorkbench() {
       if (!r.ok) throw new Error(next.error);
       setData(next);
       setStale(false);
+      let selection = {
+        template: next.template,
+        ids: next.seeds.map((s: { entryId: string }) => s.entryId),
+      };
       const raw = sessionStorage.getItem(
         `wcp.draw-command.${next.actorId}.${id}`,
       );
@@ -46,15 +57,25 @@ export function DrawWorkbench() {
           throw new Error(
             "Retained command could not be read. Editing stays locked until this tab’s recovery data is reviewed.",
           );
+        const retainedCommand = JSON.parse(saved.body);
+        if (retainedCommand.action === "preview") {
+          const profile = retainedCommand.template ?? SINGLE_TEMPLATE;
+          if (
+            ![SINGLE_TEMPLATE, TRIPLE_TEMPLATE].includes(profile) ||
+            !Array.isArray(retainedCommand.seedEntryIds) ||
+            !retainedCommand.seedEntryIds.every(
+              (entry: unknown) => typeof entry === "string",
+            )
+          )
+            throw new Error(
+              "Retained preview could not be read. Editing stays locked until this tab’s recovery data is reviewed.",
+            );
+          selection = { template: profile, ids: retainedCommand.seedEntryIds };
+        }
         setPending(saved);
       } else setPending(null);
       setError("");
-      setCount(next.seeds.length || 6);
-      setSeeds(
-        next.seeds.length
-          ? next.seeds.map((s: { entryId: string }) => s.entryId)
-          : Array(6).fill(""),
-      );
+      showSelection(selection.template, selection.ids);
       setReason("");
       setStatus("Loaded accepted draw revision.");
     } catch (e) {
@@ -142,6 +163,10 @@ export function DrawWorkbench() {
         throw new Error(result.error);
       }
       setData((old) => (old ? { ...old, ...result } : old));
+      showSelection(
+        result.template,
+        result.seeds.map((s: { entryId: string }) => s.entryId),
+      );
       sessionStorage.removeItem(key);
       setPending(null);
       setStatus(`Saved ${result.state} revision ${result.version}.`);
@@ -152,7 +177,14 @@ export function DrawWorkbench() {
           `/api/v1/divisions/${encodeURIComponent(divisionId)}/draw`,
           { cache: "no-store" },
         );
-        if (history.ok) setData(await history.json());
+        if (history.ok) {
+          const current = await history.json();
+          setData(current);
+          showSelection(
+            current.template,
+            current.seeds.map((s: { entryId: string }) => s.entryId),
+          );
+        }
       } catch {
         setError(
           "The draw was saved. Revision history could not refresh; reload the accepted draw to review it.",
@@ -175,7 +207,7 @@ export function DrawWorkbench() {
       expectedVersion: data.version,
       action,
       reason,
-      ...(action === "preview" ? { seedEntryIds: seeds } : {}),
+      ...(action === "preview" ? { seedEntryIds: seeds, template } : {}),
     });
   }
   const locked =
@@ -183,15 +215,14 @@ export function DrawWorkbench() {
   return (
     <main id="main" className="workspace draw-workspace">
       <p className="eyebrow">Organizer operations</p>
-      <h1>Single knockout draw</h1>
+      <h1>Competition draw</h1>
       <p>
         <a href="/admin">← Workspace</a> ·{" "}
         <a href="/admin/schedule">Draw scheduling</a>
       </p>
       <p>
-        Eight slots; choose six or eight distinct entries in seed order. With
-        six entries, seeds 1 and 2 enter the semifinals directly. No bronze
-        game. Publish the reviewed preview before scoring.
+        Choose a documented profile and distinct entries in seed order. Review
+        every stored route before publication. Schedule actual games separately.
       </p>
       {error && (
         <p className="error" role="alert">
@@ -269,6 +300,32 @@ export function DrawWorkbench() {
                   Choose entries explicitly. Lineup readiness is separate from a
                   place in this field.
                 </p>
+                <label htmlFor="competition-profile">Competition profile</label>
+                <select
+                  id="competition-profile"
+                  value={template}
+                  onChange={(e) => {
+                    const value = e.target.value,
+                      n = value === TRIPLE_TEMPLATE ? 16 : 6;
+                    setTemplate(value);
+                    setCount(n);
+                    setSeeds((old) =>
+                      Array.from({ length: n }, (_, i) => old[i] ?? ""),
+                    );
+                  }}
+                >
+                  <option value={SINGLE_TEMPLATE}>
+                    Single knockout · six or eight entries
+                  </option>
+                  <option value={TRIPLE_TEMPLATE}>
+                    Triple knockout · sixteen entries · 2 A / 3 B / 3 C
+                  </option>
+                </select>
+                <p>
+                  {template === TRIPLE_TEMPLATE
+                    ? "Exactly sixteen teams, no byes. Eight qualifiers enter seven fixed playoff games. A first loss follows B, a second follows C; C losers leave qualification. Playoff losses end championship participation."
+                    : "Eight slots. With six entries, seeds 1 and 2 enter the semifinals directly; byes create no physical game or win. No bronze game."}
+                </p>
                 <label htmlFor="field-count">Field size</label>
                 <select
                   id="field-count"
@@ -281,8 +338,16 @@ export function DrawWorkbench() {
                     );
                   }}
                 >
-                  <option value={6}>Six entries · two structural byes</option>
-                  <option value={8}>Eight entries · no byes</option>
+                  {template === TRIPLE_TEMPLATE ? (
+                    <option value={16}>Sixteen entries · no byes</option>
+                  ) : (
+                    <>
+                      <option value={6}>
+                        Six entries · two structural byes
+                      </option>
+                      <option value={8}>Eight entries · no byes</option>
+                    </>
+                  )}
                 </select>
                 {Array.from({ length: count }, (_, i) => (
                   <div key={i}>

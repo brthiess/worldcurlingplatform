@@ -36,13 +36,23 @@ For concurrent worktrees, share the isolated PostgreSQL server while using a sep
 
 ## Fictional scenario and reset
 
-`ALLOW_DEMO_SEED=true` explicitly enables the seed. It creates a 16-entry fictional men's four-player event, a small set of representative games, completed/live/scheduled/empty draws, a private second event for scope checks, and four verified demo accounts. It does not claim a complete operational triple-knockout bracket. Advancement and scoring commands belong to later tickets.
+`ALLOW_DEMO_SEED=true` explicitly enables the seed. The original Prairie scoring-review scenario retains its representative games, completed/live/scheduled/empty draws and private second edition for scope checks. A separate main demonstration now operates the complete stored16-team triple-knockout graph; it does not replace or rewrite that earlier evidence.
 
-The sign-in page offers `administrator`, `organizer`, `scorekeeper`, and `reviewer`; their emails are respectively `<role>@demo.invalid`. All use the local operator's `DEMO_PASSWORD`. The administrator has platform scope, the organizer and read-only reviewer have the Prairie Open event, and the scorekeeper has only game 2. A separate unassigned test account supports the role-grant API verification.
+The sign-in page offers `administrator`, `organizer`, `scorekeeper`, and `reviewer`; their emails are respectively `<role>@demo.invalid`. All use the local operator's `DEMO_PASSWORD`. The administrator has platform scope; the organizer has its explicitly seeded editions; the read-only reviewer retains Prairie scope. The scorekeeper has the original Prairie game2 plus one explicit main-demo B05 game assignment. A separate unassigned test account supports the role-grant API verification.
 
-Seeding is transactional and repeatable: existing scores, password hashes, sessions, and later commands are preserved. Existing non-demo events at the fixture IDs cause refusal. To reset without affecting other data, create a **new dedicated database**, change only `DATABASE_URL`, and run migrate/seed again. The prior database remains available. To change seeded passwords, use a new scenario database; rerunning seed intentionally does not silently rotate credentials.
+The original seed transaction and each main-scenario entry/graph/schedule/scoring command are atomic. An initialization audit marker preserves subsequent main-scenario operation. Seeding is repeatable: existing scores, password hashes, sessions, and later commands are preserved. Existing non-demo events at the fixture IDs cause refusal. To reset without affecting other data, create a **new dedicated database**, change only `DATABASE_URL`, and run migrate/seed again. The prior database remains available. To change seeded passwords, use a new scenario database; rerunning seed intentionally does not silently rotate credentials.
 
 ## API boundary
+
+### Main16-team review workflow
+
+Open the homepage's **Main16-team triple knockout** link or `/?event=main-triple-2026`. The separate fictional edition is `main-triple-2026`, division `main-triple-sixteen`. At first seed, the current/latest draw is B01 and the next scheduled draw contains B05, Fictional T16 against Fictional T05. The published bracket/list follows stored sources; select T16 to see its A01 loss, B01 win and actual next B05 assignment. The chosen event/draw and bracket team/view/path selections remain in their URLs.
+
+The complete graph has40 actual games, including33 qualification games and7 fixed playoff games. The initialized prefix has18 actual confirmed A/B results. Only A01, B01, B05 and C04 have explicitly assigned session times; other times remain unknown. Every fictional entry declares four fictional players. Defaulted game lineups retain their evidence label and do not claim independent verification of stone delivery.
+
+The scorekeeper can operate its assigned B05 at the game link from the workspace. The organizer can operate the remaining games and schedule them through `/admin/schedule?event=main-triple-2026`. For the independently reviewed complete literal results and expected T16 A/B/C championship path, use `docs/draws.md`; follow dependencies before starting games. The initial scenario itself does not claim that future fixture results already happened. A new isolated database provides a fresh coherent reset while retaining the old database's immutable history.
+
+Create another draw from `/admin/draws`: explicitly select the triple profile and16 admitted entries, save/review the complete preview, then publish. Replacing a published graph or repairing already-played downstream games remains outside this bounded command. See `docs/api/draws.md` for the command/replay/privacy contract.
 
 | Endpoint | Behavior |
 |---|---|

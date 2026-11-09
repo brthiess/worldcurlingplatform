@@ -117,7 +117,7 @@ test("loading, lost connection, recovery and missing event remain honest", async
     page.getByText(/This event or game is not available/),
   ).toBeVisible();
 });
-test("scorekeeper signs in, sees only assigned game, signs out", async ({
+test("scorekeeper signs in, sees only assigned Prairie and main-demo games, signs out", async ({
   page,
 }, testInfo) => {
   test.setTimeout(95000);
@@ -143,10 +143,22 @@ test("scorekeeper signs in, sees only assigned game, signs out", async ({
   ).toBeVisible();
   await expect(
     page.getByRole("link", { name: "Open game details →" }),
-  ).toHaveCount(1);
+  ).toHaveCount(2);
+  await expect(
+    page.getByRole("heading", {
+      name: "Fictional T16 vs Fictional T05",
+      exact: true,
+    }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", {
+      name: "Team North vs Team Prairie",
+      exact: true,
+    }),
+  ).toBeVisible();
   await expect(
     page.getByText("Assigned scoring scope", { exact: false }),
-  ).toBeVisible();
+  ).toHaveCount(2);
   expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
   await page.screenshot({
     path: testInfo.outputPath("phone-scorekeeper.png"),

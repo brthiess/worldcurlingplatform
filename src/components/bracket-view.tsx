@@ -2,12 +2,14 @@
 import { useEffect, useState, useCallback } from "react";
 import type { PublicDraw } from "@/modules/draws/draws";
 import { DrawPanel } from "./draw-panel";
+import { TRIPLE_TEMPLATE } from "@/domain/draws";
 export function BracketView({ eventId }: { eventId: string }) {
   const [data, setData] = useState<PublicDraw | null>(null),
     [error, setError] = useState(""),
     [loading, setLoading] = useState(true),
     [selected, setSelected] = useState(""),
     [view, setView] = useState("bracket"),
+    [pathOnly, setPathOnly] = useState(false),
     [updated, setUpdated] = useState<Date | null>(null);
   const load = useCallback(
     async (signal?: AbortSignal) => {
@@ -56,6 +58,7 @@ export function BracketView({ eventId }: { eventId: string }) {
       const p = new URLSearchParams(window.location.search);
       setSelected(p.get("entry") ?? "");
       setView(p.get("view") === "list" ? "list" : "bracket");
+      setPathOnly(p.get("path") === "team");
     };
     sync();
     void load(controller.signal);
@@ -71,7 +74,11 @@ export function BracketView({ eventId }: { eventId: string }) {
     const url = new URL(window.location.href);
     value ? url.searchParams.set(key, value) : url.searchParams.delete(key);
     window.history.pushState({}, "", url);
-    key === "entry" ? setSelected(value) : setView(value);
+    key === "entry"
+      ? setSelected(value)
+      : key === "path"
+        ? setPathOnly(value === "team")
+        : setView(value);
   }
   const next = data?.games.find(
     (g) =>
@@ -81,7 +88,11 @@ export function BracketView({ eventId }: { eventId: string }) {
   return (
     <main id="main">
       <p className="eyebrow">Competition draw</p>
-      <h1>Single knockout bracket</h1>
+      <h1>
+        {data?.template === TRIPLE_TEMPLATE
+          ? "Triple knockout bracket"
+          : "Single knockout bracket"}
+      </h1>
       <p>
         <a
           href={`/events/${encodeURIComponent(eventId)}${data ? "?division=" + encodeURIComponent(data.divisionId) : ""}`}
@@ -165,7 +176,12 @@ export function BracketView({ eventId }: { eventId: string }) {
             </div>
           </div>
           {selected && (
-            <p className="notice">
+            <section
+              className="notice"
+              role="status"
+              aria-label="Selected team progress"
+            >
+              <h3>{data.seeds.find((s) => s.entryId === selected)?.name}</h3>
               {next ? (
                 <>
                   <a href={`/games/${next.id}`}>
@@ -177,7 +193,49 @@ export function BracketView({ eventId }: { eventId: string }) {
               ) : (
                 "No further participant assignment is known for this team."
               )}
-            </p>
+              {!!data.terminals.filter((t) => t.entryId === selected)
+                .length && (
+                <ul>
+                  {data.terminals
+                    .filter((t) => t.entryId === selected)
+                    .map((t) => (
+                      <li key={t.key + "-" + t.kind}>
+                        <a href={`/games/${t.gameId}`}>
+                          {t.label}
+                          {t.kind === "qualified" ? " · Qualified" : ""}
+                          {t.place ? ` · Place ${t.place}` : ""} · {t.key}
+                        </a>
+                      </li>
+                    ))}
+                </ul>
+              )}
+              <nav aria-label="Selected team recorded games">
+                {data.graph?.games
+                  .filter((n) =>
+                    data.games.some(
+                      (g) =>
+                        g.key === n.key &&
+                        (g.entryA === selected || g.entryB === selected),
+                    ),
+                  )
+                  .map((n) => (
+                    <a
+                      className="team-game-route"
+                      key={n.id}
+                      href={`#draw-node-${n.id}`}
+                    >
+                      {n.key} →{" "}
+                    </a>
+                  ))}
+              </nav>
+              <button
+                className="secondary"
+                aria-pressed={pathOnly}
+                onClick={() => choose("path", pathOnly ? "" : "team")}
+              >
+                {pathOnly ? "Show all games" : "Only selected path"}
+              </button>
+            </section>
           )}
           <DrawPanel
             data={data}
@@ -185,6 +243,7 @@ export function BracketView({ eventId }: { eventId: string }) {
             selected={selected}
             view={view}
             timezone={data.division.timezone}
+            onlySelected={pathOnly}
           />
           <details>
             <summary>Published revision history</summary>

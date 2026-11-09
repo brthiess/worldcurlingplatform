@@ -1,5 +1,5 @@
 import type { PoolClient } from "pg";
-import { assignmentDecision } from "@/domain/draws";
+import { assignmentDecision, type DrawTerminal } from "@/domain/draws";
 /** Called inside the result transaction after its immutable result/audit rows exist.
  * The caller holds the edition lock before game rows, serializing sibling routes. */
 export async function advanceDraw(
@@ -10,6 +10,35 @@ export async function advanceDraw(
   participants: (string | null)[],
   auditId: string,
 ) {
+  const node = (
+    await c.query(
+      "SELECT r.graph->'games' AS games,n.key FROM draw_node n JOIN competition_draw d ON d.division_id=n.division_id AND d.version=n.revision AND d.state='published' JOIN draw_revision r ON r.division_id=d.division_id AND r.version=d.version WHERE n.game_id=$1",
+      [id],
+    )
+  ).rows[0];
+  const terminals = node?.games.find((g: { key: string }) => g.key === node.key)
+    ?.terminals as { winner?: DrawTerminal; loser?: DrawTerminal } | undefined;
+  for (const route of ["winner", "loser"] as const) {
+    const terminal = terminals?.[route];
+    if (!terminal) continue;
+    const entry =
+      route === "winner"
+        ? winner
+        : participants.find((e) => e && e !== winner)!;
+    await c.query(
+      "INSERT INTO draw_terminal_result(upstream_game_id,result_version,route,entry_id,kind,label,place,audit_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8)",
+      [
+        id,
+        version,
+        route,
+        entry,
+        terminal.kind,
+        terminal.label,
+        terminal.place ?? null,
+        auditId,
+      ],
+    );
+  }
   const deps = (
     await c.query(
       "SELECT dep.*,g.state,g.entry_a,g.entry_b FROM game_assignment_dependency dep JOIN game g ON g.id=dep.downstream_game_id WHERE dep.upstream_game_id=$1 AND EXISTS(SELECT 1 FROM draw_node n JOIN competition_draw d ON d.division_id=n.division_id AND d.version=n.revision AND d.state='published' WHERE n.game_id=g.id) ORDER BY g.id FOR UPDATE OF g",
