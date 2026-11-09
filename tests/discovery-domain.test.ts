@@ -93,11 +93,55 @@ test("context links preserve only safe public navigation and explicit division o
     "/events/prairie?division=women&q=Prairie",
   );
 });
-test("cross-event navigation cannot carry an unrelated division or draw",()=>{
- assert.equal(contextLink("/events/prairie-2026","?event=main-triple-2026&division=main-triple-sixteen&draw=old&q=Main"),"/events/prairie-2026?q=Main&event=prairie-2026");
+test("cross-event navigation cannot carry an unrelated division or draw", () => {
+  assert.equal(
+    contextLink(
+      "/events/prairie-2026",
+      "?event=main-triple-2026&division=main-triple-sixteen&draw=old&q=Main",
+    ),
+    "/events/prairie-2026?q=Main&event=prairie-2026",
+  );
 });
-test("a completed selected division does not inherit a sibling division's live label",()=>{
- const e={name:"Shared edition",seriesName:"Shared",location:"Regina",startsOn:"2026-11-08",endsOn:"2026-11-10",status:"live",divisions:[{id:"men",name:"Men",discipline:"men_four",status:"live"},{id:"women",name:"Women",discipline:"women_four",status:"completed"}]};
- assert.equal(filterEvents([e],{division:"women",status:"completed"})[0]?.status,"completed");
- assert.equal(filterEvents([e],{discipline:"women_four",status:"live"}).length,0);
+test("query-only draw links stay on the current event route, including separate-tab navigation", () => {
+  assert.equal(
+    contextLink(
+      "?division=prairie-men&draw=draw-3",
+      "?division=prairie-men&draw=draw-2&event=prairie-2026",
+    ),
+    "?division=prairie-men&draw=draw-3",
+  );
+  assert.equal(
+    contextLink(
+      "?event=main-triple-2026&division=main-triple-sixteen&draw=next",
+      "?event=main-triple-2026",
+    ),
+    "?event=main-triple-2026&division=main-triple-sixteen&draw=next",
+  );
+});
+test("a completed selected division does not inherit a sibling division's live label", () => {
+  const e = {
+    name: "Shared edition",
+    seriesName: "Shared",
+    location: "Regina",
+    startsOn: "2026-11-08",
+    endsOn: "2026-11-10",
+    status: "live",
+    divisions: [
+      { id: "men", name: "Men", discipline: "men_four", status: "live" },
+      {
+        id: "women",
+        name: "Women",
+        discipline: "women_four",
+        status: "completed",
+      },
+    ],
+  };
+  assert.equal(
+    filterEvents([e], { division: "women", status: "completed" })[0]?.status,
+    "completed",
+  );
+  assert.equal(
+    filterEvents([e], { discipline: "women_four", status: "live" }).length,
+    0,
+  );
 });

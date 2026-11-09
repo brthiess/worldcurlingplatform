@@ -5,7 +5,7 @@ export function publicGameSideJoin(side: "a" | "b") {
     SELECT
       CASE WHEN g.state='scheduled' THEN current_entry.team_id ELSE retained.team_id END AS team_id,
       CASE WHEN g.state='scheduled' THEN coalesce(current_entry.display_name,g.slot_${side})
-        ELSE coalesce(CASE WHEN result.result->>'entry${suffix}'=g.entry_${side} THEN result.result->>'name${suffix}' END,retained.display_name,g.slot_${side}) END AS display_name
+        ELSE coalesce(retained.display_name,CASE WHEN result.result->>'entry${suffix}'=g.entry_${side} THEN result.result->>'name${suffix}' END,g.slot_${side}) END AS display_name
     FROM (SELECT 1) singleton
     LEFT JOIN event_entry current_entry ON current_entry.id=g.entry_${side}
     LEFT JOIN LATERAL (SELECT result FROM game_result_version WHERE game_id=g.id ORDER BY version DESC LIMIT 1) result ON true

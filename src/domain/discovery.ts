@@ -99,6 +99,7 @@ export function filterEvents<
     );
 }
 export function contextLink(path: string, source: string) {
+  const queryOnly = path.startsWith("?");
   const target = new URL(path, "http://local.invalid");
   const previous = new URLSearchParams(source);
   const targetEvent = /^\/events\/([^/]+)/.exec(target.pathname)?.[1];
@@ -124,6 +125,7 @@ export function contextLink(path: string, source: string) {
     if (
       value &&
       value.length <= 200 &&
+      !(queryOnly && key === "event") &&
       !(changedDivision && key === "draw") &&
       !(changedEvent && (key === "division" || key === "draw")) &&
       !target.searchParams.has(key)
@@ -134,7 +136,7 @@ export function contextLink(path: string, source: string) {
       );
   }
   return (
-    target.pathname +
+    (queryOnly ? "" : target.pathname) +
     (target.searchParams.size ? "?" + target.searchParams.toString() : "")
   );
 }

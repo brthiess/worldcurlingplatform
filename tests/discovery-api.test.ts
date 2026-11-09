@@ -76,21 +76,17 @@ test("confirmed history stays with its frozen core after an authorized current e
     name: "History original core",
     coreKnown: true,
     corePlayerIds: players.slice(0, 4),
-    members: players
-      .slice(0, 4)
-      .map((playerId) => ({
-        playerId,
-        role: "core",
-        position: "",
-        participation: "declared",
-      })),
-    newPlayers: players
-      .slice(0, 4)
-      .map((id, i) => ({
-        id,
-        name: `History fixture player ${i + 1}`,
-        provisional: false,
-      })),
+    members: players.slice(0, 4).map((playerId) => ({
+      playerId,
+      role: "core",
+      position: "",
+      participation: "declared",
+    })),
+    newPlayers: players.slice(0, 4).map((id, i) => ({
+      id,
+      name: `History fixture player ${i + 1}`,
+      provisional: false,
+    })),
   };
   const firstResponse = await post("/api/v1/entries", {
     id,
@@ -150,14 +146,12 @@ test("confirmed history stays with its frozen core after an authorized current e
     ...entry,
     name: "History replacement core",
     corePlayerIds: players.slice(1),
-    members: players
-      .slice(1)
-      .map((playerId) => ({
-        playerId,
-        role: "core",
-        position: "",
-        participation: "declared",
-      })),
+    members: players.slice(1).map((playerId) => ({
+      playerId,
+      role: "core",
+      position: "",
+      participation: "declared",
+    })),
     newPlayers: [
       { id: players[4], name: "History fixture player 5", provisional: false },
     ],
@@ -204,6 +198,37 @@ test("confirmed history stays with its frozen core after an authorized current e
     await fetch(base + `/api/v1/public/games/${unknown}`)
   ).json();
   assert.equal(legacy.games[0].teamA, null);
+  r = await post(`/api/v1/games/${game}/scoring`, {
+    requestId: randomUUID(),
+    expectedVersion: 3,
+    action: "correct",
+    outcome: "conceded",
+    winnerEntryId: id,
+    reason: "Fictional ordinary score correction after entry amendment",
+    ends: [{ state: "played", a: 3, b: 0 }],
+    hammer: null,
+  });
+  assert.equal(r.status, 200);
+  const corrected = await (
+    await fetch(base + `/api/v1/public/games/${game}`)
+  ).json();
+  assert.equal(corrected.games[0].teamA, first.teamId);
+  assert.equal(corrected.games[0].nameA, "History original core");
+  assert.equal(corrected.games[0].totalA, 3);
+  assert.deepEqual(
+    corrected.games[0].results.map(
+      (v: { result: { nameA: string } }) => v.result.nameA,
+    ),
+    ["History original core", "History original core"],
+  );
+  assert.deepEqual(corrected.games[0].results[1], score.games[0].results[0]);
+  const correctedActivity = await (
+    await fetch(base + `/api/v1/public/activity?kind=team&id=${first.teamId}`)
+  ).json();
+  assert.equal(
+    correctedActivity.games.find((g: { id: string }) => g.id === game).nameA,
+    "History original core",
+  );
 });
 test("public current names and season history keep exact cores; private entry labels and games stay private", async () => {
   const suffix = randomUUID(),

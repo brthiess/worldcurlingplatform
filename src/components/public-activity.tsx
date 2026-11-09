@@ -156,39 +156,43 @@ export function PublicActivity({
               )}
             </>
           )}
-          <h3>
-            {kind === "player" ? "Declared event lineups" : "Event entries"}
-          </h3>
-          <ul className="workspace-list">
-            {data.entries.map((e) => (
-              <li key={e.id}>
-                <PublicLink href={`/entries/${e.id}?division=${e.divisionId}`}>
-                  {e.name}
-                </PublicLink>{" "}
-                · {e.evidence}
-                <p>
-                  <PublicLink
-                    href={`/events/${e.eventId}?division=${e.divisionId}`}
-                  >
-                    {e.eventName}
-                  </PublicLink>{" "}
-                  · {e.divisionName}
+          {kind === "player" && (
+            <>
+              <h3>Declared event lineups</h3>
+              <ul className="workspace-list">
+                {data.entries.map((e) => (
+                  <li key={e.id}>
+                    <PublicLink
+                      href={`/entries/${e.id}?division=${e.divisionId}`}
+                    >
+                      {e.name}
+                    </PublicLink>{" "}
+                    · {e.evidence}
+                    <p>
+                      <PublicLink
+                        href={`/events/${e.eventId}?division=${e.divisionId}`}
+                      >
+                        {e.eventName}
+                      </PublicLink>{" "}
+                      · {e.divisionName}
+                    </p>
+                    <p className="muted">
+                      {e.startsOn} – {e.endsOn} ·{" "}
+                      {e.origin === "fictional_demo"
+                        ? "Fictional demonstration"
+                        : e.origin === "historical_import"
+                          ? "Imported historical record"
+                          : "Newly operated event"}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+              {!data.entries.length && (
+                <p className="empty">
+                  No public event lineup records are available.
                 </p>
-                <p className="muted">
-                  {e.startsOn} – {e.endsOn} ·{" "}
-                  {e.origin === "fictional_demo"
-                    ? "Fictional demonstration"
-                    : e.origin === "historical_import"
-                      ? "Imported historical record"
-                      : "Newly operated event"}
-                </p>
-              </li>
-            ))}
-          </ul>
-          {!data.entries.length && (
-            <p className="empty">
-              No public event lineup records are available.
-            </p>
+              )}
+            </>
           )}
         </>
       )}

@@ -178,7 +178,7 @@ async function projectEvent(
     endsB: ends(g.id, "b", String(g.state)),
   })) as unknown as PublicGame[];
   const results = await connection.execute(
-    sql`SELECT r.game_id,r.version,r.confirmed_by AS "confirmedBy",r.created_at AS "createdAt",r.result FROM game_result_version r JOIN game g ON g.id=r.game_id WHERE g.division_id=${row.divisionId} ORDER BY r.version DESC`,
+    sql`SELECT r.game_id,r.version,r.confirmed_by AS "confirmedBy",r.created_at AS "createdAt",r.result || jsonb_build_object('nameA',coalesce(a.display_name,r.result->>'nameA'),'nameB',coalesce(b.display_name,r.result->>'nameB')) AS result FROM game_result_version r JOIN game g ON g.id=r.game_id LEFT JOIN event_lineup_version a ON a.entry_id=r.result->>'entryA' AND a.entry_id=r.result->'lineupA'->>'entryId' AND a.version=(r.result->'lineupA'->>'eventLineupVersion')::integer LEFT JOIN event_lineup_version b ON b.entry_id=r.result->>'entryB' AND b.entry_id=r.result->'lineupB'->>'entryId' AND b.version=(r.result->'lineupB'->>'eventLineupVersion')::integer WHERE g.division_id=${row.divisionId} ORDER BY r.version DESC`,
   );
   const lineups = await connection.execute(
     sql`SELECT DISTINCT ON(l.game_id,l.side) l.game_id,l.side,l.entry_id AS "entryId",l.event_lineup_version AS "eventLineupVersion",l.mode,l.members FROM game_lineup_version l JOIN game g ON g.id=l.game_id WHERE g.division_id=${row.divisionId} AND l.entry_id=CASE l.side WHEN 'a' THEN g.entry_a ELSE g.entry_b END ORDER BY l.game_id,l.side,l.version DESC`,
