@@ -86,7 +86,9 @@ export function poolStandings(
         else pending++;
       }
       return {
-        ...s,
+        seed: s.seed,
+        entryId: s.entryId,
+        name: s.name,
         wins,
         losses,
         ties,

@@ -118,3 +118,18 @@ test("independent pool outcomes produce scoped records, ignore repeated rows and
     ],
   );
 });
+
+test("pool standings return public fields without forwarding private entry properties", () => {
+  const entries = [
+    {
+      seed: 1,
+      entryId: "one",
+      name: "One",
+      privateNote: "Confidential participant note",
+    },
+    { seed: 4, entryId: "four", name: "Four", privateNote: "Do not publish" },
+  ];
+  const result = poolStandings([{ key: "A", seeds: [1, 4] }], entries, [], []);
+  assert.equal("privateNote" in result[0].rows[0], false);
+  assert.equal("privateNote" in result[0].rows[1], false);
+});
