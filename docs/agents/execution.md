@@ -2,7 +2,7 @@
 
 Started 2026-11-08 under the user's explicit implementation authorization.
 
-Resumed at the user's explicit request on2026-11-09 (America/Edmonton), from [the preserved pause checkpoint](paused-2026-11-09.md). Continue autonomous unblocked work, required verification and authorized commits/pushes; hosting/domain remain pending. The primary includes provisional007 source that is not accepted merely because it is merged. The execution-state resume event records exact source boundaries.
+Resumed at the user's explicit request on2026-11-09 (America/Edmonton), from [the preserved pause checkpoint](paused-2026-11-09.md). Continue autonomous unblocked work, required verification and authorized commits/pushes; hosting/domain remain pending. The provisional007 source present at resume has now passed [independent acceptance](../verification/WCP-007-merge.md); published tracker state and coordinator notifications govern later acceptance boundaries. The execution-state resume event records exact source boundaries.
 
 - Workflow: `C:/Users/brthi/.codex/skills/implement-spec/SKILL.md`.
 - Authoritative requirements: `.scratch/world-curling-platform/spec.md`.
@@ -11,7 +11,7 @@ Resumed at the user's explicit request on2026-11-09 (America/Edmonton), from [th
 - Remote (supplied by user during implementation): `https://github.com/brthiess/worldcurlingplatform.git`. Commit and push work as it progresses; verify remote ref SHAs. The initially empty remote now has the planning baseline on `main` and the integration branch. Local published issues remain the execution tracker.
 - Concurrency: at most three implementers, each a fresh-context agent on a separate branch/worktree based on the current integration tip. A separate merger verifies and integrates each completed slice.
 - Closure: mark a published issue and graph entry completed only after acceptance evidence is reviewed and its commit integrated. Unverified implementations remain in progress. External-input blockers affect only dependent work.
-- Evidence: `docs/verification/WCP-NNN.md`, plus machine-readable execution state. Preserve commands, outcomes, failures, limitations and browser artifact paths. Never commit credentials.
+- Evidence: `docs/verification/WCP-NNN.md`, plus machine-readable execution state. Preserve commands, outcomes, failures, limitations and browser artifact paths. Never commit credentials. Whole-integration frontend review must also inspect [retained review follow-ups](review-followups.md).
 - Curling Crawler: read-only initial import source; no source changes or crawler runtime dependency.
 - Hosting direction (2026-11-08): user answered “Leave hosting pending” and domain “pending.” Keep WCP-045 blocked on those external inputs, make no Render workspace selection/provisioning, and continue local/unblocked work. Do not ask routine hosting questions again.
 - Disk management: after independent acceptance, reproducible `node_modules` and `.next` directories may be reclaimed from inactive ticket worktrees. Source branches, verification records/screenshots, retained reports and runtime configuration remain available. Reinstall/build before attempting another runtime check there; a historical pass does not mean a server is still running. These generated artifacts were reclaimed from WCP-001, WCP-002, WCP-004, WCP-012 and WCP-013 on 2026-11-08.

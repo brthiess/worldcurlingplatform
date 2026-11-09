@@ -42,6 +42,7 @@
     "WCP-004",
     "WCP-005",
     "WCP-006",
+    "WCP-007",
     "WCP-008",
     "WCP-009",
     "WCP-010",
@@ -65,7 +66,7 @@
   "git": {
     "remote": "https://github.com/brthiess/worldcurlingplatform.git",
     "push_as_work_progresses": true,
-    "last_verified_remote_integration_commit": "d667c4f717d7a5045ed1313e41e5502169135e60",
+    "last_verified_remote_integration_commit": "af4e9302cbe3ead63fa6582f33caf6a8e49fb1de",
     "integration_branch": "integration/world-curling-platform",
     "worktrees_created": [
       ".worktrees/WCP-001",
@@ -121,6 +122,10 @@
       "WCP-006": {
         "commit": "4f50650c849021c5d764c71fe73409a56971997e",
         "evidence": "docs/verification/WCP-006.md"
+      },
+      "WCP-007": {
+        "commit": "af4e9302cbe3ead63fa6582f33caf6a8e49fb1de",
+        "evidence": "docs/verification/WCP-007-merge.md"
       },
       "WCP-008": {
         "commit": "0536bf73714490b2526888daf0569d7c35de140c",
@@ -195,17 +200,18 @@
     "from_checkpoint": "d667c4f717d7a5045ed1313e41e5502169135e60",
     "from_note": "docs/agents/paused-2026-11-09.md",
     "formally_accepted_integration": "11d9e6ce0c4b3bdf9188dc75f74987e4b628b886",
-    "pending_source_on_primary": "WCP-007; acceptance remains unfinished",
-    "max_parallel_children": 3
+    "pending_source_on_primary": null,
+    "max_parallel_children": 3,
+    "accepted_integration_after_resume": "af4e9302cbe3ead63fa6582f33caf6a8e49fb1de"
   },
-  "updated_at": "2026-11-09T22:08:38.860381+00:00",
+  "updated_at": "2026-11-09T22:50:18.749075+00:00",
   "active_tickets": [
-    "WCP-007",
     "WCP-017",
     "WCP-034"
   ],
   "frontier": [
     "WCP-011",
+    "WCP-014",
     "WCP-021",
     "WCP-023",
     "WCP-024",
@@ -565,6 +571,14 @@
       "reason": "User explicitly resumed implementation. Hosting/domain remain pending; no unfinished ticket accepted.",
       "commit": "d667c4f717d7a5045ed1313e41e5502169135e60",
       "evidence": "docs/agents/execution.md"
+    },
+    {
+      "time": "2026-11-09T22:50:18.749075+00:00",
+      "ticket": "WCP-007",
+      "status": "completed",
+      "reason": null,
+      "commit": "af4e9302cbe3ead63fa6582f33caf6a8e49fb1de",
+      "evidence": "docs/verification/WCP-007-merge.md"
     }
   ],
   "research": {

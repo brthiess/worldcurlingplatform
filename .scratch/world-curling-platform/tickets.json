@@ -370,13 +370,17 @@
       "file": "07-correct-mistaken-player-selections-and-flag-identity-collisions.md",
       "id": "WCP-007",
       "path": "issues/07-correct-mistaken-player-selections-and-flag-identity-collisions.md",
-      "status": "in-progress",
+      "status": "completed",
       "labels": [
         "ready-for-agent"
       ],
       "blocked_by": [
         "WCP-006"
-      ]
+      ],
+      "completion": {
+        "commit": "af4e9302cbe3ead63fa6582f33caf6a8e49fb1de",
+        "evidence": "docs/verification/WCP-007-merge.md"
+      }
     },
     {
       "n": 8,
