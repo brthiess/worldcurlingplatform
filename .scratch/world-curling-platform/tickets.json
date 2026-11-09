@@ -1721,14 +1721,18 @@
       "file": "33-calculate-four-player-event-assessments-and-point-awards.md",
       "id": "WCP-033",
       "path": "issues/33-calculate-four-player-event-assessments-and-point-awards.md",
-      "status": "in-progress",
+      "status": "completed",
       "labels": [
         "ready-for-agent"
       ],
       "blocked_by": [
         "WCP-027",
         "WCP-032"
-      ]
+      ],
+      "completion": {
+        "commit": "693772106297caf4409fb004d2de511deb927383",
+        "evidence": "docs/verification/WCP-033-merge.md"
+      }
     },
     {
       "n": 34,
