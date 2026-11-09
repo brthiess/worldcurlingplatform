@@ -35,7 +35,20 @@ export async function publicCalendar(filters: EventFilters = {}) {
         ),
         divisions: divisions.rows
           .filter((d) => d.eventId === e.id)
-          .map(({ eventId: _, states, ...d }) => ({...d,status:eventStatus(states,e.startsOn,e.endsOn,new Intl.DateTimeFormat("en-CA",{timeZone:e.timezone,year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date()))})),
+          .map(({ eventId: _, states, ...d }) => ({
+            ...d,
+            status: eventStatus(
+              states,
+              e.startsOn,
+              e.endsOn,
+              new Intl.DateTimeFormat("en-CA", {
+                timeZone: e.timezone,
+                year: "numeric",
+                month: "2-digit",
+                day: "2-digit",
+              }).format(new Date()),
+            ),
+          })),
       })),
       filters,
     ),

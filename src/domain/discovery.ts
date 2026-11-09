@@ -52,38 +52,60 @@ export function filterEvents<
     startsOn: string;
     endsOn: string;
     status: string;
-    divisions: { id: string; name: string; discipline: string; status?:string }[];
+    divisions: {
+      id: string;
+      name: string;
+      discipline: string;
+      status?: string;
+    }[];
   },
 >(events: T[], f: EventFilters): T[] {
   if (f.from && f.to && f.from > f.to) return [];
   const q = (f.q ?? "").trim().toLowerCase();
-  return events.map(e=>{
-    if(!f.division&&!f.discipline) return e;
-    const selected=e.divisions.filter(d=>(!f.division||d.id===f.division)&&(!f.discipline||d.discipline===f.discipline));
-    if(!selected.length||selected.some(d=>!d.status)) return e;
-    const status=selected.some(d=>d.status==="live")?"live":selected.every(d=>d.status==="completed")?"completed":selected.every(d=>d.status==="upcoming")?"upcoming":"unknown";
-    return {...e,status};
-  }).filter(
-    (e) =>
-      (!q ||
-        `${e.name} ${e.seriesName} ${e.location}`.toLowerCase().includes(q)) &&
-      (!f.location || e.location === f.location) &&
-      (!f.from || e.endsOn >= f.from) &&
-      (!f.to || e.startsOn <= f.to) &&
-      (!f.status || e.status === f.status) &&
-      ((!f.division && !f.discipline) ||
-        e.divisions.some(
-          (d) =>
-            (!f.division || d.id === f.division) &&
-            (!f.discipline || d.discipline === f.discipline),
-        )),
-  );
+  return events
+    .map((e) => {
+      if (!f.division && !f.discipline) return e;
+      const selected = e.divisions.filter(
+        (d) =>
+          (!f.division || d.id === f.division) &&
+          (!f.discipline || d.discipline === f.discipline),
+      );
+      if (!selected.length || selected.some((d) => !d.status)) return e;
+      const status = selected.some((d) => d.status === "live")
+        ? "live"
+        : selected.every((d) => d.status === "completed")
+          ? "completed"
+          : selected.every((d) => d.status === "upcoming")
+            ? "upcoming"
+            : "unknown";
+      return { ...e, status };
+    })
+    .filter(
+      (e) =>
+        (!q ||
+          `${e.name} ${e.seriesName} ${e.location}`
+            .toLowerCase()
+            .includes(q)) &&
+        (!f.location || e.location === f.location) &&
+        (!f.from || e.endsOn >= f.from) &&
+        (!f.to || e.startsOn <= f.to) &&
+        (!f.status || e.status === f.status) &&
+        ((!f.division && !f.discipline) ||
+          e.divisions.some(
+            (d) =>
+              (!f.division || d.id === f.division) &&
+              (!f.discipline || d.discipline === f.discipline),
+          )),
+    );
 }
 export function contextLink(path: string, source: string) {
   const target = new URL(path, "http://local.invalid");
   const previous = new URLSearchParams(source);
   const targetEvent = /^\/events\/([^/]+)/.exec(target.pathname)?.[1];
-  const changedEvent = !!targetEvent && !!previous.get("event") && previous.get("event") !== targetEvent;
+  const changedEvent =
+    !!targetEvent &&
+    !!previous.get("event") &&
+    previous.get("event") !== targetEvent;
   const changedDivision =
     target.searchParams.has("division") &&
     target.searchParams.get("division") !== previous.get("division");
@@ -106,7 +128,10 @@ export function contextLink(path: string, source: string) {
       !(changedEvent && (key === "division" || key === "draw")) &&
       !target.searchParams.has(key)
     )
-      target.searchParams.set(key, changedEvent && key === "event" ? targetEvent! : value);
+      target.searchParams.set(
+        key,
+        changedEvent && key === "event" ? targetEvent! : value,
+      );
   }
   return (
     target.pathname +

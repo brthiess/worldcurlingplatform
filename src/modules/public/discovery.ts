@@ -1,4 +1,5 @@
 import { pool } from "@/db";
+import { publicGameIdentityJoins } from "./game-identity";
 export async function publicActivity(kind: "team" | "player", id: string) {
   const c = await pool.connect();
   try {
@@ -26,7 +27,7 @@ export async function publicActivity(kind: "team" | "player", id: string) {
       return { teams: teams.rows, entries: entries.rows };
     }
     const games = await c.query(
-      `SELECT g.id,g.state,g.phase,g.sheet,CASE WHEN g.state='live' AND EXISTS(SELECT 1 FROM game_end_score s WHERE s.game_id=g.id AND s.state='unknown') THEN null ELSE g.total_a END AS "totalA",CASE WHEN g.state='live' AND EXISTS(SELECT 1 FROM game_end_score s WHERE s.game_id=g.id AND s.state='unknown') THEN null ELSE g.total_b END AS "totalB",g.entry_a AS "entryA",g.entry_b AS "entryB",a.team_id AS "teamA",b.team_id AS "teamB",coalesce(a.display_name,g.slot_a) AS "nameA",coalesce(b.display_name,g.slot_b) AS "nameB",g.updated_at AS "updatedAt",ds.starts_at AS "startsAt",d.id AS "divisionId",d.name AS "divisionName",e.id AS "eventId",e.name AS "eventName",e.timezone,e.origin FROM game g LEFT JOIN draw_session ds ON ds.id=g.draw_id JOIN division d ON d.id=g.division_id JOIN event_edition e ON e.id=d.event_id LEFT JOIN event_entry a ON a.id=g.entry_a LEFT JOIN event_entry b ON b.id=g.entry_b WHERE e.published AND e.admission_status='approved' AND (a.team_id=$1 OR b.team_id=$1) ORDER BY ds.starts_at NULLS LAST,g.id`,
+      `SELECT g.id,g.state,g.phase,g.sheet,CASE WHEN g.state='live' AND EXISTS(SELECT 1 FROM game_end_score s WHERE s.game_id=g.id AND s.state='unknown') THEN null ELSE g.total_a END AS "totalA",CASE WHEN g.state='live' AND EXISTS(SELECT 1 FROM game_end_score s WHERE s.game_id=g.id AND s.state='unknown') THEN null ELSE g.total_b END AS "totalB",g.entry_a AS "entryA",g.entry_b AS "entryB",public_a.team_id AS "teamA",public_b.team_id AS "teamB",public_a.display_name AS "nameA",public_b.display_name AS "nameB",g.updated_at AS "updatedAt",ds.starts_at AS "startsAt",d.id AS "divisionId",d.name AS "divisionName",e.id AS "eventId",e.name AS "eventName",e.timezone,e.origin FROM game g LEFT JOIN draw_session ds ON ds.id=g.draw_id JOIN division d ON d.id=g.division_id JOIN event_edition e ON e.id=d.event_id ${publicGameIdentityJoins} WHERE e.published AND e.admission_status='approved' AND (public_a.team_id=$1 OR public_b.team_id=$1) ORDER BY ds.starts_at NULLS LAST,g.id`,
       [id],
     );
     await c.query("COMMIT");

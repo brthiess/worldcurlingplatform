@@ -33,6 +33,12 @@ export function useFavorites() {
       const next = current.some((x) => x.kind === item.kind && x.id === item.id)
         ? current.filter((x) => !(x.kind === item.kind && x.id === item.id))
         : [...current, item];
+      if (next.length > 500) {
+        setWarning(
+          "This browser already has 500 favorites. Remove one before saving another.",
+        );
+        return;
+      }
       localStorage.setItem(FAVORITES_KEY, writeFavorites(next));
       setFavorites(next);
       setWarning("");

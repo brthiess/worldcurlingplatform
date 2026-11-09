@@ -7,7 +7,7 @@ export function usePublicContext() {
     const read = () => {
       const params = new URLSearchParams(window.location.search);
       const eventId = /^\/events\/([^/]+)/.exec(window.location.pathname)?.[1];
-      if(eventId) params.set("event",eventId);
+      if (eventId) params.set("event", eventId);
       setQuery(params.toString());
     };
     read();

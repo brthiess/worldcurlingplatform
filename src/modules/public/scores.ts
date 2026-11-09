@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import { db } from "@/db";
 import { selectDraws, type Score } from "@/domain/scores";
 import { drawEvidenceState } from "@/domain/scheduling";
+import { publicGameIdentityJoins } from "./game-identity";
 export type PublicGame = {
   lineupA: import("@/modules/scoring/lineups").GameLineup | null;
   lineupB: import("@/modules/scoring/lineups").GameLineup | null;
@@ -136,7 +137,7 @@ async function projectEvent(
     state: String(d.state),
   }));
   const gamesResult = await connection.execute(
-    sql`SELECT g.id,g.draw_id AS "drawId",g.sheet,g.phase,g.state,g.entry_a AS "entryA",g.entry_b AS "entryB",a.team_id AS "teamA",b.team_id AS "teamB",coalesce(a.display_name,g.slot_a) AS "nameA",coalesce(b.display_name,g.slot_b) AS "nameB",g.total_a AS "totalA",g.total_b AS "totalB",g.hammer,g.hammer_end AS "hammerEnd",g.updated_at AS "updatedAt" FROM game g LEFT JOIN draw_session ds ON ds.id=g.draw_id LEFT JOIN event_entry a ON a.id=g.entry_a LEFT JOIN event_entry b ON b.id=g.entry_b WHERE g.division_id=${row.divisionId} ORDER BY ds.starts_at,g.sheet,g.id`,
+    sql`SELECT g.id,g.draw_id AS "drawId",g.sheet,g.phase,g.state,g.entry_a AS "entryA",g.entry_b AS "entryB",public_a.team_id AS "teamA",public_b.team_id AS "teamB",public_a.display_name AS "nameA",public_b.display_name AS "nameB",g.total_a AS "totalA",g.total_b AS "totalB",g.hammer,g.hammer_end AS "hammerEnd",g.updated_at AS "updatedAt" FROM game g LEFT JOIN draw_session ds ON ds.id=g.draw_id ${sql.raw(publicGameIdentityJoins)} WHERE g.division_id=${row.divisionId} ORDER BY ds.starts_at,g.sheet,g.id`,
   );
   const endsResult = await connection.execute(
     sql`SELECT s.game_id,s.side,s.end_number,s.state,s.points FROM game_end_score s JOIN game g ON g.id=s.game_id WHERE g.division_id=${row.divisionId} ORDER BY s.end_number`,

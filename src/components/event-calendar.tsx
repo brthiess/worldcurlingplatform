@@ -19,7 +19,7 @@ type CalendarEvent = {
     name: string;
     discipline: string;
     rankingStatus: string;
-    status:string;
+    status: string;
   }[];
 };
 export function EventCalendar() {
