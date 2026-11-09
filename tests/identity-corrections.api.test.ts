@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { authRequest } from "./auth-request";
 import pg from "pg";
+import { assessmentFixture } from "./event-assessments-fixture";
 const base = process.env.BETTER_AUTH_URL!;
 const sessions = new Map<string, string>();
 async function login(role = "administrator") {
@@ -47,14 +48,12 @@ async function fixture() {
       name: `Factual fixture ${id}`,
       coreKnown: true,
       corePlayerIds: ids.slice(0, 4),
-      members: ids
-        .slice(0, 4)
-        .map((playerId) => ({
-          playerId,
-          role: "core",
-          position: "",
-          participation: "declared",
-        })),
+      members: ids.slice(0, 4).map((playerId) => ({
+        playerId,
+        role: "core",
+        position: "",
+        participation: "declared",
+      })),
       newPlayers: ids
         .map((id, i) => ({
           id,
@@ -300,4 +299,270 @@ test("current authority is checked before an existing receipt; exact raw bytes a
     body: JSON.stringify(command),
   });
   assert.equal(wrongActor.status, 403);
+});
+
+test("revoked staff cannot recover a previously recorded receipt", async () => {
+  const db = new pg.Pool({ connectionString: process.env.DATABASE_URL });
+  const grant = randomUUID(),
+    f = await fixture();
+  const body = {
+    requestId: randomUUID(),
+    entryId: f.id,
+    version: 1,
+    fromPlayerId: f.ids[0],
+    toPlayerId: f.ids[1],
+    reason: "Evidence retained for authorized staff only",
+    source: "Original signed entry form",
+  };
+  try {
+    await db.query(
+      "INSERT INTO role_grant(id,user_id,role) VALUES($1,'demo-ungranted','administrator')",
+      [grant],
+    );
+    assert.equal(
+      (await req("/api/v1/identity-corrections", body, "ungranted")).status,
+      200,
+    );
+    await db.query("DELETE FROM role_grant WHERE id=$1", [grant]);
+    assert.equal(
+      (await req("/api/v1/identity-corrections", body, "ungranted")).status,
+      403,
+    );
+    assert.equal(
+      (
+        await req(
+          `/api/v1/identity-corrections?requestId=${body.requestId}`,
+          undefined,
+          "ungranted",
+        )
+      ).status,
+      403,
+    );
+  } finally {
+    await db.query("DELETE FROM role_grant WHERE id=$1", [grant]);
+    await db.end();
+  }
+});
+
+test("a persistence failure rolls back the entry, new core and audit together", async () => {
+  const db = new pg.Pool({ connectionString: process.env.DATABASE_URL });
+  const f = await fixture(),
+    requestId = randomUUID(),
+    constraint = `fixture_${requestId.replaceAll("-", "")}`;
+  const body = {
+    requestId,
+    entryId: f.id,
+    version: 1,
+    fromPlayerId: f.ids[0],
+    toPlayerId: f.ids[4],
+    reason: "Atomic failure fixture",
+    source: "Original organizer lineup",
+  };
+  try {
+    await db.query(
+      `ALTER TABLE identity_correction ADD CONSTRAINT ${constraint} CHECK(request_id<>'${requestId}') NOT VALID`,
+    );
+    const before = await db.query(
+      "SELECT (SELECT count(*)::int FROM team) AS teams,(SELECT count(*)::int FROM audit_record WHERE resource_id=$1) AS audits",
+      [f.id],
+    );
+    assert.equal((await req("/api/v1/identity-corrections", body)).status, 503);
+    assert.deepEqual(
+      (await (await req(`/api/v1/entries/${f.id}`)).json()).lineup,
+      f.entry.lineup,
+    );
+    assert.deepEqual(
+      (
+        await db.query(
+          "SELECT (SELECT count(*)::int FROM team) AS teams,(SELECT count(*)::int FROM audit_record WHERE resource_id=$1) AS audits",
+          [f.id],
+        )
+      ).rows,
+      before.rows,
+    );
+    assert.equal(
+      (await req(`/api/v1/identity-corrections?requestId=${requestId}`)).status,
+      404,
+    );
+  } finally {
+    await db.query(
+      `ALTER TABLE identity_correction DROP CONSTRAINT IF EXISTS ${constraint}`,
+    );
+    await db.end();
+  }
+});
+
+test("factual correction preserves frozen results, season inputs and assessment bytes; finalization and scheduler obey real lock barriers", async () => {
+  const db = new pg.Pool({
+    connectionString: process.env.DATABASE_URL,
+    max: 4,
+  });
+  const c = await db.connect();
+  let correcting: Promise<Response> | undefined,
+    finalizing: Promise<Response> | undefined,
+    scheduling: Promise<Response> | undefined;
+  async function blockedBy(pid: number) {
+    const end = Date.now() + 10000;
+    while (Date.now() < end) {
+      const r = await db.query(
+        "SELECT pid FROM pg_stat_activity WHERE datname=current_database() AND $1=ANY(pg_blocking_pids(pid)) ORDER BY query_start",
+        [pid],
+      );
+      if (r.rowCount) return Number(r.rows[0].pid);
+      await new Promise((r) => setTimeout(r, 25));
+    }
+    throw new Error(
+      "Real correction writer did not reach the expected lock barrier",
+    );
+  }
+  try {
+    const f = await assessmentFixture(db, req);
+    const candidate = await fixture();
+    const readAssessment = async () =>
+      (
+        await req(
+          `/api/v1/event-assessments?division=${f.divisionId}&rules=${f.rulesId}`,
+        )
+      ).json();
+    const initial = await readAssessment();
+    let r = await req("/api/v1/event-assessments", {
+      action: "calculate",
+      divisionId: f.divisionId,
+      version: 0,
+      requestId: randomUUID(),
+      sourceDigest: initial.review.sourceDigest,
+      evidence: f.evidence,
+    });
+    assert.equal(r.status, 200);
+    let assessed: any;
+    const end = Date.now() + 20000;
+    while (Date.now() < end) {
+      assessed = await readAssessment();
+      if (assessed.selected?.state === "completed") break;
+      await new Promise((r) => setTimeout(r, 100));
+    }
+    assert.equal(assessed.selected?.state, "completed");
+    assert.equal(
+      JSON.parse(assessed.selected.resultContents).result.awards.find(
+        (a: any) => a.entryId === f.entries[0],
+      ).points,
+      "27",
+    );
+    const finalization = await (
+      await req(`/api/v1/division-finalizations?division=${f.divisionId}`)
+    ).json();
+    const frozen = await db.query(
+      "SELECT (SELECT jsonb_agg(to_jsonb(r) ORDER BY game_id,version) FROM game_result_version r WHERE game_id=ANY($1::text[])) AS results,(SELECT jsonb_agg(to_jsonb(r) ORDER BY version) FROM division_finalization r WHERE division_id=$2) AS finals,(SELECT jsonb_agg(to_jsonb(r) ORDER BY record_id,version) FROM ranking_revision r WHERE record_id=ANY($3::text[])) AS inputs,(SELECT jsonb_agg(to_jsonb(r) ORDER BY assessment_id) FROM event_assessment_result r WHERE assessment_id=$4) AS assessments",
+      [
+        f.games.map((g) => g.id),
+        f.divisionId,
+        f.reviewIds,
+        assessed.selected.id,
+      ],
+    );
+    assert.ok(frozen.rows[0].results?.length);
+    assert.ok(frozen.rows[0].finals?.length);
+    assert.equal(frozen.rows[0].inputs.length, 8);
+    assert.equal(frozen.rows[0].assessments.length, 1);
+    const command = {
+      requestId: randomUUID(),
+      entryId: f.entries[0],
+      version: 1,
+      fromPlayerId: f.playerLists[0][0],
+      toPlayerId: candidate.ids[4],
+      reason: "Factual mistaken selection supported by signed source",
+      source: "Fictional corrected original event entry form",
+    };
+    // Hold division: correction must take entry UPDATE before waiting on division SHARE.
+    await c.query("BEGIN");
+    const pid = Number(
+      (await c.query("SELECT pg_backend_pid() AS pid")).rows[0].pid,
+    );
+    await c.query("SELECT id FROM division WHERE id=$1 FOR UPDATE", [
+      f.divisionId,
+    ]);
+    correcting = req("/api/v1/identity-corrections", command);
+    const correctionPid = await blockedBy(pid);
+    finalizing = req("/api/v1/division-finalizations", {
+      divisionId: f.divisionId,
+      version: 1,
+      requestId: randomUUID(),
+      sourceDigest: finalization.sourceDigest,
+      placements: f.entries.map((entryId, i) => ({
+        entryId,
+        place: i < 4 ? i + 1 : 5,
+      })),
+      note: "Concurrent organizer revision",
+      rulesReference: "Fictional event rules",
+    });
+    await blockedBy(correctionPid);
+    await c.query("ROLLBACK");
+    assert.equal((await correcting).status, 200);
+    assert.equal((await finalizing).status, 409);
+    const after = await readAssessment();
+    assert.equal(
+      after.selected.resultContents,
+      assessed.selected.resultContents,
+    );
+    assert.notEqual(after.review.sourceDigest, assessed.review.sourceDigest);
+    const frozenAfter = await db.query(
+      "SELECT (SELECT jsonb_agg(to_jsonb(r) ORDER BY game_id,version) FROM game_result_version r WHERE game_id=ANY($1::text[])) AS results,(SELECT jsonb_agg(to_jsonb(r) ORDER BY version) FROM division_finalization r WHERE division_id=$2) AS finals,(SELECT jsonb_agg(to_jsonb(r) ORDER BY record_id,version) FROM ranking_revision r WHERE record_id=ANY($3::text[])) AS inputs,(SELECT jsonb_agg(to_jsonb(r) ORDER BY assessment_id) FROM event_assessment_result r WHERE assessment_id=$4) AS assessments",
+      [
+        f.games.map((g) => g.id),
+        f.divisionId,
+        f.reviewIds,
+        assessed.selected.id,
+      ],
+    );
+    assert.deepEqual(frozenAfter.rows, frozen.rows);
+    const corrected = await (
+      await req(`/api/v1/entries/${f.entries[0]}`)
+    ).json();
+    assert.equal(corrected.registration, null);
+    assert.equal(
+      (await (await req(`/api/v1/entries/${f.entries[0]}?version=1`)).json())
+        .registration.id,
+      f.seasonIds[0],
+    );
+    const schedule = await (
+      await req(`/api/v1/events/${f.eventId}/schedule`)
+    ).json();
+    await c.query("BEGIN");
+    await c.query("SELECT id FROM division WHERE id=$1 FOR UPDATE", [
+      f.divisionId,
+    ]);
+    correcting = req("/api/v1/identity-corrections", {
+      ...command,
+      requestId: randomUUID(),
+      version: 2,
+      fromPlayerId: f.playerLists[0][1],
+      toPlayerId: f.playerLists[1][0],
+    });
+    const correction2Pid = await blockedBy(pid);
+    scheduling = req(`/api/v1/events/${f.eventId}/schedule`, {
+      action: "session",
+      requestId: randomUUID(),
+      expectedVersion: schedule.version,
+      reason: "Real event-first lock regression",
+      session: {
+        id: randomUUID(),
+        divisionId: f.divisionId,
+        number: 99,
+        localStart: "2026-11-22T20:00",
+        utcOffset: "+00:00",
+        durationMinutes: 120,
+      },
+    });
+    await blockedBy(correction2Pid);
+    await c.query("ROLLBACK");
+    assert.equal((await correcting).status, 200);
+    assert.equal((await scheduling).status, 200);
+  } finally {
+    await c.query("ROLLBACK");
+    await Promise.allSettled(
+      [correcting, finalizing, scheduling].filter(Boolean),
+    );
+    c.release();
+    await db.end();
+  }
 });

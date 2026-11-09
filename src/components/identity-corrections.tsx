@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   AuthorityRecovery,
   useAuthorityCommand,
@@ -57,6 +57,7 @@ async function get<T>(path: string): Promise<T> {
   return data;
 }
 export function IdentityCorrections() {
+  const outcomeRef = useRef<HTMLElement>(null);
   const [workspace, setWorkspace] = useState<Workspace | null>(null),
     [players, setPlayers] = useState<Player[]>([]),
     [loading, setLoading] = useState(true),
@@ -95,6 +96,7 @@ export function IdentityCorrections() {
     if (r.actorId !== saved.actorId || r.commandDigest !== digest)
       throw new Error("The receipt does not match this original command.");
     setResult(r);
+    setSelectedId(r.entryId);
     await load();
     if (r.outcome === "applied") {
       setEntry(await get<Entry>(`/api/v1/entries/${r.entryId}`));
@@ -121,6 +123,11 @@ export function IdentityCorrections() {
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
   }, []);
+  useEffect(() => {
+    if (result) {
+      outcomeRef.current?.focus();
+    }
+  }, [result]);
   async function select(id: string) {
     setSelectedId(id);
     setEntry(null);
@@ -189,7 +196,12 @@ export function IdentityCorrections() {
             <>
               <AuthorityRecovery state={recovery} label="identity correction" />
               {result && (
-                <section className="notice" aria-label="Correction outcome">
+                <section
+                  className="notice"
+                  aria-label="Correction outcome"
+                  ref={outcomeRef}
+                  tabIndex={-1}
+                >
                   <h2>
                     {result.outcome === "issue"
                       ? "Unresolved identity issue"
