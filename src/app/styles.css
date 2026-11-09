@@ -1278,4 +1278,3 @@ footer {
 .draw-list .draw-round { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr)); margin-bottom:1.5rem; }
 .draw-list .draw-round h3 { grid-column:1/-1; }
 .draw-graph:focus-visible { outline:3px solid #12634e; outline-offset:2px; }
-
