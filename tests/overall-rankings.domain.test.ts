@@ -451,3 +451,103 @@ test("historical ordinary transfer proof must match reviewed individual rights a
     /October31/,
   );
 });
+
+test("simultaneously included positive individual starting rights cannot be duplicated across subjects", () => {
+  const f = complete(),
+    second = structuredClone(f.source.subjects[0]);
+  second.registrationId = "second";
+  second.teamId = "different-core";
+  second.name = "Second";
+  second.starting!.data.registrationId = "second";
+  second.starting!.id = "second-start";
+  f.source.subjects.push(second);
+  f.evidence.subjects.push({
+    ...structuredClone(f.evidence.subjects[0]),
+    registrationId: "second",
+  });
+  const result = calculateOverall(f.source, f.evidence);
+  assert.equal(result.state, "blocked");
+  assert.match(
+    result.issues.join(" "),
+    /positive starting ownership overlaps/i,
+  );
+  assert.equal(
+    result.rows.find((r) => r.id === "subject")!.counted[0].points,
+    "27",
+    "Ambiguous rights do not erase a genuine historical event award",
+  );
+});
+test("separately sourced nonoverlapping temporal registration rights do not create an overlap blocker or erase original award bytes", () => {
+  const f = complete(),
+    oldBytes = f.source.events[0].assessment!.resultContents,
+    second = structuredClone(f.source.subjects[0]);
+  second.registrationId = "second";
+  second.teamId = "different-core";
+  second.name = "Second";
+  second.starting!.data.registrationId = "second";
+  second.starting!.data.effectiveFrom = "2026-10-01";
+  second.starting!.id = "second-start";
+  f.source.subjects[0].starting!.data.effectiveTo = "2026-10-01";
+  f.source.subjects.push(second);
+  f.evidence.subjects[0].eligibility = "excluded";
+  f.evidence.subjects[0].note =
+    "Sourced former registration exclusion effective2026-10-01; actual historical awards remain frozen";
+  f.evidence.subjects.push({
+    ...structuredClone(f.evidence.subjects[0]),
+    registrationId: "second",
+    eligibility: "eligible",
+    note: "Sourced new current registration starting ownership after2026-10-01",
+  });
+  const result = calculateOverall(f.source, f.evidence);
+  assert.equal(result.state, "ready");
+  assert.equal(result.rows[0].total, "75");
+  assert.equal(
+    result.issues.some((i) => /overlaps/i.test(i)),
+    false,
+  );
+  assert.equal(f.source.events[0].assessment!.resultContents, oldBytes);
+});
+test("continuity rejects a fabricated four-player allocation and supports exact four-of-five default continuity", () => {
+  assert.throws(
+    () =>
+      continuityStarting(
+        [
+          { playerId: "a", amount: "0" },
+          { playerId: "b", amount: "0" },
+          { playerId: "c", amount: "0" },
+          { playerId: "x", amount: "0" },
+        ],
+        {
+          total: "200",
+          members: [
+            { playerId: "a", share: "0" },
+            { playerId: "b", share: "0" },
+            { playerId: "c", share: "0" },
+            { playerId: "d", share: "1" },
+          ],
+        },
+      ),
+    /allocation|shares|four/i,
+  );
+  const prior = {
+      total: "200",
+      members: ["a", "b", "c", "d", "e"].map((playerId) => ({
+        playerId,
+        share: "1/5",
+      })),
+    },
+    current = ["a", "b", "c", "d"].map((playerId) => ({
+      playerId,
+      amount: "40",
+    }));
+  assert.equal(
+    continuityStarting([...current, { playerId: "x", amount: "60" }], prior)
+      .starting,
+    "220",
+  );
+  assert.equal(
+    continuityStarting([...current, { playerId: "x", amount: "20" }], prior)
+      .starting,
+    "200",
+  );
+});

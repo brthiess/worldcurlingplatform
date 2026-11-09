@@ -9,7 +9,7 @@ export function OverallTransferEditor({
   onChange,
 }: {
   value: HistoricalTransfer[];
-  players: string[];
+  players: { id: string; name: string }[];
   sources: Source[];
   onChange: (v: HistoricalTransfer[]) => void;
 }) {
@@ -36,8 +36,10 @@ export function OverallTransferEditor({
                 onChange={(e) => patch(i, { playerId: e.target.value })}
               >
                 <option value="">Choose official regular</option>
-                {players.map((id) => (
-                  <option key={id}>{id}</option>
+                {players.map(({ id, name }) => (
+                  <option key={id} value={id}>
+                    {name}
+                  </option>
                 ))}
               </select>
             </OverallField>
@@ -143,7 +145,7 @@ export function OverallTransferEditor({
           onChange([
             ...value,
             {
-              playerId: players[0] ?? "",
+              playerId: players[0]?.id ?? "",
               season: "2025-26",
               branch: "pre-none",
               leftOn: "",

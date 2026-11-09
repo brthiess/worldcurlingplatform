@@ -421,4 +421,51 @@ test("real persisted awards produce immutable overall contributions, command ret
     ) - Number(beforeFailure),
     1,
   );
+  const restore = await json(`/api/v1/ranking-inputs?id=${f.reviewIds[0]}`);
+  await json("/api/v1/ranking-inputs", {
+    id: restore.id,
+    kind: "season",
+    version: restore.version,
+    requestId: randomUUID(),
+    state: "reviewed",
+    data: restore.data,
+  });
+  const duplicate = await json(`/api/v1/ranking-inputs?id=${f.reviewIds[1]}`),
+    owner = f.playerLists[0][0],
+    replaced = duplicate.data.rankingPlayerIds[0];
+  duplicate.data.rankingPlayerIds[0] = owner;
+  duplicate.data.allocations.find(
+    (a: any) => a.playerId === replaced,
+  ).playerId = owner;
+  duplicate.data.contributions.find(
+    (c: any) => c.playerId === replaced,
+  ).playerId = owner;
+  await json("/api/v1/ranking-inputs", {
+    id: duplicate.id,
+    kind: "season",
+    version: duplicate.version,
+    requestId: randomUUID(),
+    state: "reviewed",
+    data: duplicate.data,
+  });
+  const overlap = await json(path),
+    overlapRun = await json("/api/v1/overall-rankings", {
+      ...cmd,
+      version: overlap.version,
+      sourceDigest: overlap.review.sourceDigest,
+      requestId: randomUUID(),
+      evidence: {
+        ...evidence,
+        events: evidence.events.map((e: any) => ({ ...e, state: "excluded" })),
+      },
+    });
+  assert.equal(overlapRun.result.state, "blocked");
+  assert.match(
+    overlapRun.result.issues.join(" "),
+    /positive starting ownership overlaps/i,
+  );
+  assert.equal(
+    (await json(`/api/v1/overall-rankings?id=${done.id}`)).resultDigest,
+    done.resultDigest,
+  );
 });

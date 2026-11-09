@@ -193,6 +193,24 @@ test("staff review ordinary sources and full ownership, inspect exact persistent
     await page.screenshot({
       path: `docs/verification/assets/WCP-034/${name}-draft-viewport.png`,
     });
+    const table = page.getByLabel("Overall draft table", { exact: true });
+    await table.scrollIntoViewIfNeeded();
+    await page.screenshot({
+      path: `docs/verification/assets/WCP-034/${name}-table-viewport.png`,
+    });
+    if (name === "phone") {
+      await table.focus();
+      await page.keyboard.press("ArrowRight");
+      await expect
+        .poll(() => table.evaluate((e) => e.scrollLeft))
+        .toBeGreaterThan(0);
+      await table.evaluate(
+        (e) => (e.scrollLeft = e.scrollWidth - e.clientWidth),
+      );
+      await page.screenshot({
+        path: "docs/verification/assets/WCP-034/phone-table-actions.png",
+      });
+    }
     await expect(page.locator("body")).toHaveJSProperty(
       "scrollWidth",
       await page.locator("body").evaluate((e) => e.clientWidth),

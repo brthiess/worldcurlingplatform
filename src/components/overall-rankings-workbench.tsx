@@ -83,7 +83,8 @@ function amount(v: string) {
     fraction = String(scaled % 1000000n)
       .padStart(6, "0")
       .replace(/0+$/, "");
-  return `${whole}${fraction ? "." + fraction : ""}${BigInt(n) > 0n && scaled === 0n ? " (<0.000001)" : ""}${d !== "1" ? ` · exact ${v}` : ""}`;
+  if (BigInt(n) > 0n && scaled === 0n) return `<0.000001 · exact ${v}`;
+  return `${whole}${fraction ? "." + fraction : ""}${d !== "1" ? ` · exact ${v}` : ""}`;
 }
 export function OverallRankingsWorkbench() {
   const [workspace, setWorkspace] = useState<Workspace | null>(null),
@@ -912,7 +913,15 @@ export function OverallRankingsWorkbench() {
                   </button>
                   <OverallTransferEditor
                     value={subject.adjustments.historicalTransfers ?? []}
-                    players={current.starting?.data.rankingPlayerIds ?? []}
+                    players={(
+                      current.starting?.data.rankingPlayerIds ?? []
+                    ).map((id) => ({
+                      id,
+                      name:
+                        current.starting?.rankingPlayers?.find(
+                          (p) => p.playerId === id,
+                        )?.name ?? id,
+                    }))}
                     sources={evidence.sources}
                     onChange={(historicalTransfers) =>
                       change({

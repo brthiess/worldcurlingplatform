@@ -1,5 +1,11 @@
 import { EntryError } from "./entries";
-import { exact, checkpointAt, type RulesInput } from "./ranking-inputs";
+import {
+  exact,
+  checkpointAt,
+  validateAllocation,
+  allocationOptions,
+  type RulesInput,
+} from "./ranking-inputs";
 export const overallEngine = "wcp.four-overall.2026-27.v1";
 export const overallPolicy = {
   id: "wcp.four-overall-policy.2026-27.v1",
@@ -179,6 +185,32 @@ export function continuityStarting(
   )
     throw new EntryError(
       "Prior ownership must be unique and sum exactly to one.",
+    );
+  if (prior.members.length === 4)
+    validateAllocation(
+      prior.members.map((m) => m.playerId),
+      prior.members,
+      "four-equal",
+    );
+  else if (
+    !allocationOptions
+      .filter((option) => option !== "unresolved" && option !== "four-equal")
+      .some((option) => {
+        try {
+          validateAllocation(
+            prior.members.map((m) => m.playerId),
+            prior.members,
+            option,
+          );
+          return true;
+        } catch {
+          return false;
+        }
+      })
+  )
+    throw new EntryError(
+      "Prior five-player shares do not match a supported sourced allocation.",
+      422,
     );
   for (const p of retained)
     if (

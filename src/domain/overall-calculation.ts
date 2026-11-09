@@ -21,6 +21,7 @@ export type OverallSource = {
       version: number;
       state: string;
       data: SeasonInput;
+      rankingPlayers?: { playerId: string; name: string }[];
       currentReadiness: {
         complete: boolean;
         startingInput: string | null;
@@ -62,6 +63,10 @@ export function calculateOverall(
       adjustments: unknown;
     })[] = [],
     excludedSubjects: { id: string; name: string; reason: string }[] = [];
+  const startingOwners = new Map<
+    string,
+    { registrationId: string; name: string }
+  >();
   if (source.rules.state !== "reviewed")
     issues.push("Review the exact rules/source revision.");
   try {
@@ -224,6 +229,19 @@ export function calculateOverall(
       );
       continue;
     }
+    for (const contribution of input.data.contributions) {
+      if (contribution.amount === null || contribution.amount === "0") continue;
+      const existing = startingOwners.get(contribution.playerId);
+      if (existing && existing.registrationId !== s.registrationId)
+        issues.push(
+          `${contribution.playerId}: positive starting ownership overlaps simultaneously included ${existing.name} and ${s.name}. Resolve dated entitlement/transfer applicability; existing event awards remain frozen.`,
+        );
+      else
+        startingOwners.set(contribution.playerId, {
+          registrationId: s.registrationId,
+          name: s.name,
+        });
+    }
     if (
       r.continuity.state === "unknown" ||
       !r.continuity.sourceId ||
@@ -245,6 +263,18 @@ export function calculateOverall(
       );
       continue;
     }
+    if (
+      r.continuity.prior?.members
+        .map((m) => m.share)
+        .sort()
+        .join(",") === ["1/4", "1/4", "1/6", "1/6", "1/6"].sort().join(",") &&
+      !source.rules.data.interpretations.some(
+        (i) => i.code === "front-rotation" && i.state === "supported",
+      )
+    )
+      issues.push(
+        `${s.name}: prior front-rotation shares require the explicit supported exact-share application interpretation.`,
+      );
     const owned = awards.filter((a) => a.registrationId === s.registrationId);
     for (const t of r.adjustments.historicalTransfers ?? []) {
       // Documentary prior-season subtotals verify032 individual rights only.
