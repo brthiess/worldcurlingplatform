@@ -63,7 +63,7 @@ type Workspace = {
 export function EntriesWorkbench() {
   const [workspace, setWorkspace] = useState<Workspace | null>(null),
     [players, setPlayers] = useState<
-      { id: string; name: string; identityStatus?: string }[]
+      { id: string; name: string; identityStatus?: string; origin?: string; contexts?: string[] }[]
     >([]),
     [teams, setTeams] = useState<Team[]>([]),
     [loading, setLoading] = useState(true),
@@ -763,7 +763,7 @@ export function EntriesWorkbench() {
                         <li key={p.id}>
                           <span>
                             {p.name} · {p.identityStatus ?? "identified"} ·{" "}
-                            {p.id.slice(0, 8)}
+                            {p.id} · {p.origin ?? "Origin unknown"} · {p.contexts?.join("; ") || "No public event context recorded"}
                           </span>
                           <button
                             type="button"

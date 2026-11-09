@@ -124,6 +124,7 @@ export default function Admin() {
           <p>
             <a href="/admin/entries">Team entries</a>
           </p>
+          <p><a href="/admin/identity-corrections">Factual player selection corrections</a></p>
           <p>
             <a href="/admin/registration">Division entry places & terms</a>
           </p>
