@@ -35,7 +35,9 @@ export function EventCalendar() {
       if (!r.ok) throw new Error("The event calendar could not be refreshed.");
       setEvents((await r.json()).events);
       setError("");
-      setUpdated(new Date().toLocaleTimeString());
+      setUpdated(
+        new Date().toISOString().replace("T", " ").slice(0, 19) + " UTC",
+      );
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -259,7 +261,7 @@ export function EventCalendar() {
           )}
           <div className="refresh">
             <span role="status">
-              {error ? "Stale calendar" : `Last successful update: ${updated}`}
+              {error ? "Stale calendar" : `Last refreshed ${updated}`}
             </span>
             <button
               className="secondary"
