@@ -129,6 +129,9 @@ export default function Admin() {
             <a href="/admin/registration">Division entry places & terms</a>
           </p>
           <p>
+            <a href="/admin/entry-charges">Entry charges & external receipts</a>
+          </p>
+          <p>
             <a href="/admin/representatives">Team-season representatives</a>
           </p>
           <p>

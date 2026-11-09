@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { randomUUID, createHash } from "node:crypto";
 import type { PoolClient } from "pg";
 import { pool } from "@/db";
 import {
@@ -13,6 +13,8 @@ import {
 } from "@/domain/registration";
 import { representationFor } from "@/modules/identity/representation";
 import { assertAdmissionTeamAvailable } from "./admission-identity";
+import { feeTerms } from "@/domain/payments";
+import { freezeEntryCharge, chargeBalance } from "@/modules/payments/charges";
 
 async function staff(
   c: Pick<PoolClient, "query">,
@@ -26,7 +28,7 @@ async function staff(
     )
   ).rowCount;
 }
-const configColumns = `r.version,r.mode,r.capacity,r.requirements,r.fee_minor AS "feeMinor",r.currency,r.payment_terms AS "paymentTerms",r.payment_window_minutes AS "paymentWindowMinutes",r.format,r.format_notes AS "formatNotes",r.opened_at AS "openedAt"`;
+const configColumns = `r.version,r.mode,r.capacity,r.requirements,coalesce(f.fee_minor,r.fee_minor) AS "feeMinor",coalesce(f.currency,r.currency) AS currency,coalesce(f.payment_terms,r.payment_terms) AS "paymentTerms",f.version AS "feeVersion",r.payment_window_minutes AS "paymentWindowMinutes",r.format,r.format_notes AS "formatNotes",r.opened_at AS "openedAt"`;
 
 export async function registrationWorkspace(userId: string) {
   const c = await pool.connect();
@@ -36,13 +38,13 @@ export async function registrationWorkspace(userId: string) {
       .now as Date;
     const divisions = (
       await c.query(
-        `SELECT d.id,d.name,d.event_id AS "eventId",e.name AS "eventName",${configColumns},EXISTS(SELECT 1 FROM role_grant g WHERE g.user_id=$1 AND ((g.role='administrator' AND g.event_id IS NULL AND g.game_id IS NULL) OR (g.role='organizer' AND g.event_id=e.id AND g.game_id IS NULL))) AS manual FROM division d JOIN event_edition e ON e.id=d.event_id LEFT JOIN division_registration r ON r.division_id=d.id WHERE EXISTS(SELECT 1 FROM role_grant g WHERE g.user_id=$1 AND ((g.role='administrator' AND g.event_id IS NULL AND g.game_id IS NULL) OR (g.role='organizer' AND g.event_id=e.id AND g.game_id IS NULL))) OR (e.published AND e.admission_status='approved' AND EXISTS(SELECT 1 FROM team_representation g JOIN season_registration sr ON sr.id=g.registration_id JOIN team t ON t.id=sr.team_id WHERE g.user_id=$1 AND g.revoked_at IS NULL AND sr.season=d.entry_season AND t.discipline=d.discipline)) ORDER BY e.starts_on DESC,d.name,d.id`,
+        `SELECT d.id,d.name,d.event_id AS "eventId",e.name AS "eventName",${configColumns},EXISTS(SELECT 1 FROM role_grant g WHERE g.user_id=$1 AND ((g.role='administrator' AND g.event_id IS NULL AND g.game_id IS NULL) OR (g.role='organizer' AND g.event_id=e.id AND g.game_id IS NULL))) AS manual FROM division d JOIN event_edition e ON e.id=d.event_id LEFT JOIN division_registration r ON r.division_id=d.id LEFT JOIN LATERAL (SELECT * FROM division_fee_version f WHERE f.division_id=d.id ORDER BY version DESC LIMIT 1) f ON true WHERE EXISTS(SELECT 1 FROM role_grant g WHERE g.user_id=$1 AND ((g.role='administrator' AND g.event_id IS NULL AND g.game_id IS NULL) OR (g.role='organizer' AND g.event_id=e.id AND g.game_id IS NULL))) OR (e.published AND e.admission_status='approved' AND EXISTS(SELECT 1 FROM team_representation g JOIN season_registration sr ON sr.id=g.registration_id JOIN team t ON t.id=sr.team_id WHERE g.user_id=$1 AND g.revoked_at IS NULL AND sr.season=d.entry_season AND t.discipline=d.discipline)) ORDER BY e.starts_on DESC,d.name,d.id`,
         [userId],
       )
     ).rows;
     const entries = (
       await c.query(
-        `SELECT en.id,en.division_id AS "divisionId",en.display_name AS name,en.admission_state AS state,en.admission_version AS version,en.reservation_deadline AS deadline,coalesce(v.status,'provisional') AS "rosterStatus" FROM event_entry en JOIN division d ON d.id=en.division_id LEFT JOIN event_lineup_version v ON v.entry_id=en.id AND v.version=en.version WHERE en.division_id=ANY($1::text[]) AND (en.division_id=ANY($2::text[]) OR EXISTS(SELECT 1 FROM team_representation g JOIN season_registration sr ON sr.id=g.registration_id WHERE g.user_id=$3 AND g.revoked_at IS NULL AND sr.id=en.season_registration_id AND sr.team_id=en.team_id AND sr.season=d.entry_season)) ORDER BY en.display_name,en.id`,
+        `SELECT en.id,en.division_id AS "divisionId",en.display_name AS name,en.admission_state AS state,en.admission_version AS version,en.reservation_deadline AS deadline,coalesce(v.status,'provisional') AS "rosterStatus",(en.division_id=ANY($2::text[]) OR EXISTS(SELECT 1 FROM team_representation pg JOIN season_registration ps ON ps.id=pg.registration_id WHERE pg.user_id=$3 AND pg.revoked_at IS NULL AND 'payment'=ANY(pg.actions) AND ps.id=en.season_registration_id AND ps.team_id=en.team_id AND ps.season=d.entry_season)) AS "canReadPayment" FROM event_entry en JOIN division d ON d.id=en.division_id LEFT JOIN event_lineup_version v ON v.entry_id=en.id AND v.version=en.version WHERE en.division_id=ANY($1::text[]) AND (en.division_id=ANY($2::text[]) OR EXISTS(SELECT 1 FROM team_representation g JOIN season_registration sr ON sr.id=g.registration_id WHERE g.user_id=$3 AND g.revoked_at IS NULL AND sr.id=en.season_registration_id AND sr.team_id=en.team_id AND sr.season=d.entry_season)) ORDER BY en.display_name,en.id`,
         [
           divisions.map((d) => d.id),
           divisions.filter((d) => d.manual).map((d) => d.id),
@@ -53,6 +55,23 @@ export async function registrationWorkspace(userId: string) {
       ...e,
       state: effectiveAdmission(e.state, e.deadline, clock),
     }));
+    for (const en of entries) {
+      en.payment = null;
+      if (en.canReadPayment) {
+        const charge = (
+          await c.query(
+            'SELECT fee_version AS "feeVersion",fee_minor AS "feeMinor",currency,payment_terms AS "paymentTerms" FROM entry_charge WHERE entry_id=$1',
+            [en.id],
+          )
+        ).rows[0];
+        if (charge)
+          en.payment = {
+            feeVersion: charge.feeVersion,
+            currency: charge.currency,
+            ...(await chargeBalance(c, en.id, charge)).balance,
+          };
+      }
+    }
     const occupied = (
       await c.query(
         "SELECT division_id,count(*)::int AS count FROM event_entry WHERE division_id=ANY($1::text[]) AND (admission_state='accepted' OR (admission_state='held' AND reservation_deadline>$2)) GROUP BY division_id",
@@ -61,7 +80,7 @@ export async function registrationWorkspace(userId: string) {
     ).rows;
     const receipts = (
       await c.query(
-        'SELECT request_id AS "requestId",command,result FROM registration_command WHERE actor_id=$1 ORDER BY created_at DESC LIMIT 200',
+        `SELECT rc.request_id AS "requestId",rc.division_id AS "divisionId",rc.entry_id AS "entryId",rc.command FROM registration_command rc JOIN division rd ON rd.id=rc.division_id JOIN event_edition rev ON rev.id=rd.event_id LEFT JOIN event_entry ren ON ren.id=rc.entry_id AND ren.division_id=rd.id WHERE rc.actor_id=$1 AND (EXISTS(SELECT 1 FROM role_grant rg WHERE rg.user_id=$1 AND ((rg.role='administrator' AND rg.event_id IS NULL AND rg.game_id IS NULL) OR (rg.role='organizer' AND rg.event_id=rd.event_id AND rg.game_id IS NULL))) OR (rc.command->>'action'='request' AND rev.published AND rev.admission_status='approved' AND EXISTS(SELECT 1 FROM team_representation pg JOIN season_registration ps ON ps.id=pg.registration_id WHERE pg.user_id=$1 AND pg.revoked_at IS NULL AND 'submit'=ANY(pg.actions) AND ps.id=ren.season_registration_id AND ps.team_id=ren.team_id AND ps.season=rd.entry_season))) ORDER BY rc.created_at DESC LIMIT 200`,
         [userId],
       )
     ).rows;
@@ -82,7 +101,13 @@ export async function registrationWorkspace(userId: string) {
               ),
       })),
       entries,
-      receipts,
+      receipts: receipts.map(({ command, ...association }) => ({
+        ...association,
+        action: command.action,
+        commandDigest: createHash("sha256")
+          .update(canonicalEntryCommand(command))
+          .digest("hex"),
+      })),
     };
   } catch (e) {
     await c.query("ROLLBACK");
@@ -92,6 +117,17 @@ export async function registrationWorkspace(userId: string) {
   }
 }
 
+function registrationReply(
+  result: Record<string, unknown>,
+  canReadPayment: boolean,
+) {
+  if (canReadPayment) return result;
+  return Object.fromEntries(
+    ["divisionId", "entryId", "version", "state", "deadline", "expired"]
+      .filter((key) => Object.hasOwn(result, key))
+      .map((key) => [key, result[key]]),
+  );
+}
 export async function registrationCommand(userId: string, raw: unknown) {
   if (!raw || typeof raw !== "object")
     throw new EntryError("Provide a registration command.");
@@ -156,6 +192,19 @@ export async function registrationCommand(userId: string, raw: unknown) {
         "submit",
       );
     }
+    const canReadPayment =
+      manual ||
+      !!(
+        await c.query(
+          "SELECT pg.id FROM team_representation pg JOIN season_registration ps ON ps.id=pg.registration_id WHERE pg.user_id=$1 AND pg.revoked_at IS NULL AND 'payment'=ANY(pg.actions) AND ps.id=$2 AND ps.team_id=$3 AND ps.season=$4 FOR SHARE OF pg,ps",
+          [
+            userId,
+            entry?.season_registration_id,
+            entry?.team_id,
+            d.entry_season,
+          ],
+        )
+      ).rowCount;
     const old = (
       await c.query(
         "SELECT command,result FROM registration_command WHERE actor_id=$1 AND request_id=$2",
@@ -169,7 +218,10 @@ export async function registrationCommand(userId: string, raw: unknown) {
           409,
         );
       await c.query("COMMIT");
-      return { ...old.result, replayed: true };
+      return {
+        ...registrationReply(old.result, canReadPayment),
+        replayed: true,
+      };
     }
     // Capture time after any lock wait, not transaction-start now().
     const now = (await c.query("SELECT clock_timestamp() AS now")).rows[0]
@@ -209,6 +261,7 @@ export async function registrationCommand(userId: string, raw: unknown) {
           409,
         );
       const t = registrationTerms(v.terms);
+      feeTerms(t);
       await c.query(
         "INSERT INTO division_registration(division_id,version,mode,capacity,requirements,fee_minor,currency,payment_terms,payment_window_minutes,format,format_notes,opened_at) VALUES($1,1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)",
         [
@@ -223,6 +276,17 @@ export async function registrationCommand(userId: string, raw: unknown) {
           t.format,
           t.formatNotes,
           now,
+        ],
+      );
+      await c.query(
+        "INSERT INTO division_fee_version(division_id,version,fee_minor,currency,payment_terms,reason,actor_id) VALUES($1,1,$2,$3,$4,$5,$6)",
+        [
+          divisionId,
+          t.feeMinor,
+          t.currency,
+          t.paymentTerms,
+          "Original immutable opened fee terms",
+          userId,
         ],
       );
       await c.query("UPDATE division SET format=$2 WHERE id=$1", [
@@ -264,6 +328,13 @@ export async function registrationCommand(userId: string, raw: unknown) {
             [divisionId],
           )
         ).rows[0].count;
+        const charge = await freezeEntryCharge(
+          c,
+          entryId!,
+          divisionId,
+          v.expectedFeeVersion,
+        );
+        const financial = await chargeBalance(c, entryId!, charge);
         let next;
         if (action === "invite") {
           if (config.mode !== "invited" || state !== "pending")
@@ -276,7 +347,7 @@ export async function registrationCommand(userId: string, raw: unknown) {
           next = requestAdmission(
             config.mode,
             state,
-            config.fee_minor,
+            financial.balance.dueMinor,
             config.payment_window_minutes,
             config.capacity - count,
             now,
@@ -302,9 +373,14 @@ export async function registrationCommand(userId: string, raw: unknown) {
           version,
           ...next,
           expired,
-          feeMinor: config.fee_minor,
-          currency: config.currency,
-          paymentState: config.fee_minor === 0 ? "not_required" : "unpaid",
+          feeMinor: charge.feeMinor,
+          currency: charge.currency,
+          paymentState:
+            financial.balance.dueMinor > 0
+              ? "unpaid"
+              : charge.feeMinor === 0
+                ? "not_required"
+                : "settled_by_records",
         };
       }
     }
@@ -326,7 +402,7 @@ export async function registrationCommand(userId: string, raw: unknown) {
       ],
     );
     await c.query("COMMIT");
-    return result;
+    return registrationReply(result, canReadPayment);
   } catch (e) {
     await c.query("ROLLBACK");
     if ((e as { code?: string }).code === "23505")
