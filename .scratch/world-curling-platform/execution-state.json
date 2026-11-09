@@ -203,11 +203,12 @@
     "from_checkpoint": "d667c4f717d7a5045ed1313e41e5502169135e60",
     "from_note": "docs/agents/paused-2026-11-09.md",
     "formally_accepted_integration": "11d9e6ce0c4b3bdf9188dc75f74987e4b628b886",
-    "pending_source_on_primary": "WCP-034 provisional; combined API failed due malformed identity fixture; correction in progress",
+    "pending_source_on_primary": "WCP-034 provisional; isolated valid ranking collision fixture patch reviewed; complete combined API/browser acceptance pending",
     "max_parallel_children": 3,
-    "accepted_integration_after_resume": "af4e9302cbe3ead63fa6582f33caf6a8e49fb1de"
+    "accepted_integration_after_resume": "af4e9302cbe3ead63fa6582f33caf6a8e49fb1de",
+    "last_formally_accepted_boundary": "0fa404e488861cc64a42435946b952cf8b34fd70"
   },
-  "updated_at": "2026-11-09T23:18:21.497301+00:00",
+  "updated_at": "2026-11-09T23:37:15.360262+00:00",
   "active_tickets": [
     "WCP-014",
     "WCP-017",
@@ -716,7 +717,8 @@
         "web_port": 3154,
         "news_fixture_port": 3254,
         "scope": "Correct malformed identity ranking collision fixture via actual staff API; no product schema change expected",
-        "base": "337ca11a9423131f4cdedd0fb99c821ec9720264"
+        "base": "337ca11a9423131f4cdedd0fb99c821ec9720264",
+        "reviewed_patch": "9431190fe5ea6ccb85871a7d7bcae5190ffcf2ed"
       }
     },
     "WCP-007": {
@@ -776,5 +778,20 @@
       "WCP-034": "164616aacf3c866a5504be1902a1d3c2b079c9fa"
     },
     "resumed_at": "2026-11-09T22:08:38.860381+00:00"
-  }
+  },
+  "accepted_fixture_patches": [
+    {
+      "commit": "9431190fe5ea6ccb85871a7d7bcae5190ffcf2ed",
+      "branch": "fix/WCP-034-ranking-fixture",
+      "reviewed_at": "2026-11-09T23:37:15.360262+00:00",
+      "scope": "Only tests/identity-corrections.api.test.ts and focused verification documentation; no product/schema acceptance",
+      "evidence": "docs/verification/WCP-034-fixture-fix.md",
+      "allowed_consumers": [
+        "WCP-034",
+        "WCP-017",
+        "WCP-014"
+      ],
+      "full_combined_verification": "pending; preserve failed databases and rerun complete required scope on separate owned clean databases"
+    }
+  ]
 }
