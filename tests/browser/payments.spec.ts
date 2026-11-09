@@ -640,3 +640,98 @@ test("unversioned legacy zero or unsupported fee amounts are unresolved rather t
   }
   expect(errors).toEqual([]);
 });
+test("registration reconciles the exact retained command through a scoped digest without raw financial receipts", async ({
+  page,
+}) => {
+  test.setTimeout(180000);
+  const f = await fixture(page.request),
+    entry = randomUUID(),
+    main = page.getByRole("main");
+  await pool.query(
+    "INSERT INTO event_entry(id,division_id,display_name) VALUES($1,$2,$3)",
+    [entry, f.division, `Fictional digest team ${f.suffix}`],
+  );
+  await page.goto("/admin/registration");
+  await main.getByLabel("Division", { exact: true }).selectOption(f.division);
+  const row = main
+    .getByRole("listitem")
+    .filter({
+      has: page.getByRole("heading", {
+        name: `Fictional digest team ${f.suffix}`,
+        exact: true,
+      }),
+    });
+  const requests: string[] = [];
+  let dropped = false;
+  await page.route("**/api/v1/registration", async (route) => {
+    if (route.request().method() === "POST") {
+      requests.push(route.request().postData()!);
+      if (!dropped) {
+        dropped = true;
+        await route.fetch();
+        await route.abort("failed");
+        return;
+      }
+    }
+    await route.continue();
+  });
+  await row
+    .getByRole("button", { name: "Request entry place", exact: true })
+    .click();
+  await expect(main.getByText(/command result is not confirmed/)).toBeVisible();
+  const original = await page.evaluate(() =>
+    sessionStorage.getItem("wcp-registration:demo-organizer"),
+  );
+  expect(original).not.toBeNull();
+  await page.evaluate((saved) => {
+    const command = JSON.parse(saved!);
+    const body = JSON.parse(command.body);
+    body.expectedFeeVersion = 99;
+    command.body = JSON.stringify(body);
+    sessionStorage.setItem(
+      "wcp-registration:demo-organizer",
+      JSON.stringify(command),
+    );
+  }, original);
+  await page.reload();
+  await main
+    .getByRole("button", {
+      name: "Reconcile recorded registration command",
+      exact: true,
+    })
+    .click();
+  await expect(
+    main.getByText(/Recorded state could not confirm the original command/),
+  ).toBeVisible();
+  await page.evaluate(
+    (saved) =>
+      sessionStorage.setItem("wcp-registration:demo-organizer", saved!),
+    original,
+  );
+  await page.reload();
+  await main
+    .getByRole("button", {
+      name: "Reconcile recorded registration command",
+      exact: true,
+    })
+    .click();
+  await expect(
+    main.getByText(/original command was reconciled with recorded history/),
+  ).toBeVisible();
+  expect(requests).toHaveLength(1);
+  await page.unrouteAll({ behavior: "wait" });
+  await expect(
+    main
+      .getByRole("listitem")
+      .filter({
+        has: page.getByRole("heading", {
+          name: `Fictional digest team ${f.suffix}`,
+          exact: true,
+        }),
+      }),
+  ).toContainText("Waitlisted — no reserved place");
+  const reply = await page.request.get("/api/v1/registration");
+  expect(reply.status()).toBe(200);
+  const receipts = (await reply.json()).receipts;
+  expect(receipts.some((r: any) => r.command || r.result)).toBe(false);
+});

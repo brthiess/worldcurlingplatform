@@ -56,7 +56,7 @@ type Workspace = {
   now: string;
   divisions: Division[];
   entries: Entry[];
-  receipts: { requestId: string; command: unknown }[];
+  receipts: { requestId: string; commandDigest: string }[];
 };
 const initial: RegistrationTerms = {
   mode: "open",
@@ -117,10 +117,15 @@ export function RegistrationWorkbench() {
     async (saved) => {
       const w = await load(),
         v = JSON.parse(saved.body);
+      const bytes = await crypto.subtle.digest(
+        "SHA-256",
+        new TextEncoder().encode(canonicalEntryCommand(v)),
+      );
+      const commandDigest = Array.from(new Uint8Array(bytes), (byte) =>
+        byte.toString(16).padStart(2, "0"),
+      ).join("");
       const found = w.receipts.some(
-        (r) =>
-          r.requestId === v.requestId &&
-          canonicalEntryCommand(r.command) === canonicalEntryCommand(v),
+        (r) => r.requestId === v.requestId && r.commandDigest === commandDigest,
       );
       if (found) setSelected(v.divisionId);
       return found;

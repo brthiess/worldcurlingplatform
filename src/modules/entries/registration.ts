@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { randomUUID, createHash } from "node:crypto";
 import type { PoolClient } from "pg";
 import { pool } from "@/db";
 import {
@@ -80,7 +80,7 @@ export async function registrationWorkspace(userId: string) {
     ).rows;
     const receipts = (
       await c.query(
-        'SELECT request_id AS "requestId",command,result FROM registration_command WHERE actor_id=$1 ORDER BY created_at DESC LIMIT 200',
+        `SELECT rc.request_id AS "requestId",rc.division_id AS "divisionId",rc.entry_id AS "entryId",rc.command FROM registration_command rc JOIN division rd ON rd.id=rc.division_id JOIN event_edition rev ON rev.id=rd.event_id LEFT JOIN event_entry ren ON ren.id=rc.entry_id AND ren.division_id=rd.id WHERE rc.actor_id=$1 AND (EXISTS(SELECT 1 FROM role_grant rg WHERE rg.user_id=$1 AND ((rg.role='administrator' AND rg.event_id IS NULL AND rg.game_id IS NULL) OR (rg.role='organizer' AND rg.event_id=rd.event_id AND rg.game_id IS NULL))) OR (rc.command->>'action'='request' AND rev.published AND rev.admission_status='approved' AND EXISTS(SELECT 1 FROM team_representation pg JOIN season_registration ps ON ps.id=pg.registration_id WHERE pg.user_id=$1 AND pg.revoked_at IS NULL AND 'submit'=ANY(pg.actions) AND ps.id=ren.season_registration_id AND ps.team_id=ren.team_id AND ps.season=rd.entry_season))) ORDER BY rc.created_at DESC LIMIT 200`,
         [userId],
       )
     ).rows;
@@ -101,7 +101,13 @@ export async function registrationWorkspace(userId: string) {
               ),
       })),
       entries,
-      receipts,
+      receipts: receipts.map(({ command, ...association }) => ({
+        ...association,
+        action: command.action,
+        commandDigest: createHash("sha256")
+          .update(canonicalEntryCommand(command))
+          .digest("hex"),
+      })),
     };
   } catch (e) {
     await c.query("ROLLBACK");
@@ -111,6 +117,17 @@ export async function registrationWorkspace(userId: string) {
   }
 }
 
+function registrationReply(
+  result: Record<string, unknown>,
+  canReadPayment: boolean,
+) {
+  if (canReadPayment) return result;
+  return Object.fromEntries(
+    ["divisionId", "entryId", "version", "state", "deadline", "expired"]
+      .filter((key) => Object.hasOwn(result, key))
+      .map((key) => [key, result[key]]),
+  );
+}
 export async function registrationCommand(userId: string, raw: unknown) {
   if (!raw || typeof raw !== "object")
     throw new EntryError("Provide a registration command.");
@@ -175,6 +192,19 @@ export async function registrationCommand(userId: string, raw: unknown) {
         "submit",
       );
     }
+    const canReadPayment =
+      manual ||
+      !!(
+        await c.query(
+          "SELECT pg.id FROM team_representation pg JOIN season_registration ps ON ps.id=pg.registration_id WHERE pg.user_id=$1 AND pg.revoked_at IS NULL AND 'payment'=ANY(pg.actions) AND ps.id=$2 AND ps.team_id=$3 AND ps.season=$4 FOR SHARE OF pg,ps",
+          [
+            userId,
+            entry?.season_registration_id,
+            entry?.team_id,
+            d.entry_season,
+          ],
+        )
+      ).rowCount;
     const old = (
       await c.query(
         "SELECT command,result FROM registration_command WHERE actor_id=$1 AND request_id=$2",
@@ -188,7 +218,10 @@ export async function registrationCommand(userId: string, raw: unknown) {
           409,
         );
       await c.query("COMMIT");
-      return { ...old.result, replayed: true };
+      return {
+        ...registrationReply(old.result, canReadPayment),
+        replayed: true,
+      };
     }
     // Capture time after any lock wait, not transaction-start now().
     const now = (await c.query("SELECT clock_timestamp() AS now")).rows[0]
@@ -369,7 +402,7 @@ export async function registrationCommand(userId: string, raw: unknown) {
       ],
     );
     await c.query("COMMIT");
-    return result;
+    return registrationReply(result, canReadPayment);
   } catch (e) {
     await c.query("ROLLBACK");
     if ((e as { code?: string }).code === "23505")

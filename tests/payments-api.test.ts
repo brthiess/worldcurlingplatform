@@ -1126,3 +1126,155 @@ test("registration summaries use frozen terms and balances rather than revised d
     20000,
   );
 });
+test("revoked organizer sessions cannot read raw registration command receipts from their former edition", async () => {
+  const f = await fixture(),
+    reviewer = await login("reviewer"),
+    grant = randomUUID();
+  await pool.query(
+    "INSERT INTO role_grant(id,user_id,role,event_id) VALUES($1,'demo-reviewer','organizer',$2)",
+    [grant, f.edition],
+  );
+  const command = {
+    action: "request",
+    divisionId: f.division,
+    entryId: f.entries[0],
+    version: 0,
+    expectedFeeVersion: 1,
+    requestId: randomUUID(),
+  };
+  const first = await post(
+    reviewer,
+    "/api/v1/registration",
+    command,
+    "demo-reviewer",
+  );
+  assert.equal(first.status, 200);
+  assert.equal((await first.json()).feeMinor, 12500);
+  await pool.query("DELETE FROM role_grant WHERE id=$1", [grant]);
+  const r = await fetch(base + "/api/v1/registration", {
+    headers: { cookie: reviewer },
+  });
+  assert.equal(r.status, 200);
+  const w = await r.json();
+  assert.equal(
+    w.entries.some((e: any) => e.id === f.entries[0]),
+    false,
+  );
+  assert.equal(
+    w.receipts.some((r: any) => r.requestId === command.requestId),
+    false,
+  );
+  assert.equal(
+    (await post(reviewer, "/api/v1/registration", command, "demo-reviewer"))
+      .status,
+    403,
+  );
+});
+
+test("submit-only representatives receive safe admission replies and digest receipts after payment authority is revoked", async () => {
+  const f = await fixture(),
+    reviewer = await login("reviewer"),
+    grants: string[] = [];
+  for (const [i, entryId] of f.entries.entries()) {
+    const team = randomUUID(),
+      registration = randomUUID(),
+      grant = randomUUID();
+    grants.push(grant);
+    await pool.query(
+      "INSERT INTO team(id,discipline,core_key) VALUES($1,'men_four',$2)",
+      [team, "wcp010-reply:" + team],
+    );
+    await pool.query(
+      "INSERT INTO season_registration(id,team_id,season,version) VALUES($1,$2,'2026-27',1)",
+      [registration, team],
+    );
+    await pool.query(
+      "UPDATE event_entry SET team_id=$2,season_registration_id=$3 WHERE id=$1",
+      [entryId, team, registration],
+    );
+    await pool.query(
+      "INSERT INTO team_representation(id,user_id,registration_id,actions,created_by) VALUES($1,'demo-reviewer',$2,$3,'demo-administrator')",
+      [grant, registration, i === 0 ? ["submit", "payment"] : ["submit"]],
+    );
+  }
+  const command = {
+    action: "request",
+    divisionId: f.division,
+    entryId: f.entries[0],
+    version: 0,
+    expectedFeeVersion: 1,
+    requestId: randomUUID(),
+  };
+  const first = await post(
+    reviewer,
+    "/api/v1/registration",
+    command,
+    "demo-reviewer",
+  );
+  assert.equal(first.status, 200);
+  assert.equal((await first.json()).feeMinor, 12500);
+  await pool.query(
+    "UPDATE team_representation SET revoked_at=clock_timestamp(),revocation_reason='Payment action removed' WHERE id=$1",
+    [grants[0]],
+  );
+  const replacement = randomUUID();
+  await pool.query(
+    "INSERT INTO team_representation(id,user_id,registration_id,actions,created_by) SELECT $1,user_id,registration_id,ARRAY['submit'],created_by FROM team_representation WHERE id=$2",
+    [replacement, grants[0]],
+  );
+  const replay = await post(
+    reviewer,
+    "/api/v1/registration",
+    command,
+    "demo-reviewer",
+  );
+  assert.equal(replay.status, 200);
+  const replayBody = await replay.json();
+  assert.equal(replayBody.replayed, true);
+  for (const key of ["feeMinor", "currency", "paymentState"])
+    assert.equal(Object.hasOwn(replayBody, key), false);
+  const fresh = await post(
+    reviewer,
+    "/api/v1/registration",
+    {
+      action: "request",
+      divisionId: f.division,
+      entryId: f.entries[1],
+      version: 0,
+      expectedFeeVersion: 1,
+    },
+    "demo-reviewer",
+  );
+  assert.equal(fresh.status, 200);
+  const freshBody = await fresh.json();
+  for (const key of ["feeMinor", "currency", "paymentState"])
+    assert.equal(Object.hasOwn(freshBody, key), false);
+  let w = await (
+    await fetch(base + "/api/v1/registration", {
+      headers: { cookie: reviewer },
+    })
+  ).json();
+  const e = w.entries.find((e: any) => e.id === f.entries[0]);
+  assert.equal(e.canReadPayment, false);
+  assert.equal(e.payment, null);
+  const receipt = w.receipts.find(
+    (r: any) => r.requestId === command.requestId,
+  );
+  assert.ok(receipt);
+  assert.match(receipt.commandDigest, /^[0-9a-f]{64}$/);
+  assert.equal(Object.hasOwn(receipt, "command"), false);
+  assert.equal(Object.hasOwn(receipt, "result"), false);
+  await pool.query(
+    "UPDATE team_representation SET revoked_at=clock_timestamp(),revocation_reason='Submit action removed' WHERE id=$1",
+    [replacement],
+  );
+  w = await (
+    await fetch(base + "/api/v1/registration", {
+      headers: { cookie: reviewer },
+    })
+  ).json();
+  assert.equal(
+    w.receipts.some((r: any) => r.requestId === command.requestId),
+    false,
+  );
+});
