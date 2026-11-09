@@ -75,9 +75,11 @@ export function ScoreTable({ game }: { game: PublicGame }) {
 export function ScoresView({
   eventId = "prairie-2026",
   gameId,
+  home = false,
 }: {
   eventId?: string;
   gameId?: string;
+  home?: boolean;
 }) {
   const [data, setData] = useState<PublicEvent | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
@@ -157,6 +159,23 @@ export function ScoresView({
     <main id="main">
       <p className="eyebrow">Competition centre</p>
       <h1>{gameId ? "Game details" : "Scores"}</h1>
+      {home && (
+        <form className="draw-controls" action="/" method="get">
+          <div>
+            <label htmlFor="home-event">Demonstration event</label>
+            <select id="home-event" name="event" defaultValue={eventId}>
+              <option value="prairie-2026">
+                Prairie Open · scoring review
+              </option>
+              <option value="main-triple-2026">
+                Main 16-team triple knockout
+              </option>
+            </select>
+          </div>
+          <button type="submit">Show event scores</button>
+          <a href="/?event=main-triple-2026">Main 16-team triple knockout →</a>
+        </form>
+      )}
       {gameId && (
         <a
           className="back"
@@ -245,7 +264,17 @@ export function ScoresView({
                         {d.name} · scores
                       </a>
                       <span> · Ranking eligibility: {d.rankingStatus}</span>
-                      {d.hasPublishedDraw&&<span> · <a href={`/events/${data.event.id}/bracket?division=${encodeURIComponent(d.id)}`}>Competition bracket / game list</a></span>}
+                      {d.hasPublishedDraw && (
+                        <span>
+                          {" "}
+                          ·{" "}
+                          <a
+                            href={`/events/${data.event.id}/bracket?division=${encodeURIComponent(d.id)}`}
+                          >
+                            Competition bracket / game list
+                          </a>
+                        </span>
+                      )}
                     </li>
                   ))}
                 </ul>
@@ -352,7 +381,10 @@ export function ScoresView({
                 <article className="game-card" key={game.id}>
                   <div className="game-meta">
                     <span>
-                      {game.sheet ? `Sheet ${game.sheet}` : 'Sheet not assigned'} · {game.phase}
+                      {game.sheet
+                        ? `Sheet ${game.sheet}`
+                        : "Sheet not assigned"}{" "}
+                      · {game.phase}
                     </span>
                     <span
                       className={`badge ${game.state === "live" ? "live" : ""}`}
@@ -364,21 +396,25 @@ export function ScoresView({
                           ? "Live · provisional"
                           : game.state === "confirmed"
                             ? "Confirmed result"
-                          : game.drawId ? "Scheduled" : "Not scheduled"}
+                            : game.drawId
+                              ? "Scheduled"
+                              : "Not scheduled"}
                     </span>
                   </div>
                   <ScoreTable game={game} />
                   <div className="game-bottom">
                     <span>
-                      {gameId && !game.drawId ? "Time and sheet not scheduled" : gameId
-                        ? venueTime(
-                            data.draws.find((d) => d.id === game.drawId)!
-                              .startsAt,
-                            data.event.timezone,
-                          )
-                        : game.hammer === null
-                          ? "Hammer not recorded"
-                          : "Hammer shown above"}
+                      {gameId && !game.drawId
+                        ? "Time and sheet not scheduled"
+                        : gameId
+                          ? venueTime(
+                              data.draws.find((d) => d.id === game.drawId)!
+                                .startsAt,
+                              data.event.timezone,
+                            )
+                          : game.hammer === null
+                            ? "Hammer not recorded"
+                            : "Hammer shown above"}
                     </span>
                     {!gameId && (
                       <a href={`/games/${game.id}`}>Game details →</a>
@@ -443,7 +479,7 @@ export function ScoresView({
                 <strong>Next: Draw {next.number}</strong>
                 <span>{venueTime(next.startsAt, data.event.timezone)}</span>
                 <a
-                  href={`?${new URLSearchParams({ ...(data.selectedDivisionId ? { division: data.selectedDivisionId } : {}), draw: next.id })}`}
+                  href={`?${new URLSearchParams({ ...(home ? { event: eventId } : {}), ...(data.selectedDivisionId ? { division: data.selectedDivisionId } : {}), draw: next.id })}`}
                   onClick={(event) => {
                     if (
                       event.metaKey ||
@@ -502,7 +538,17 @@ export function ScoresView({
           )}
         </>
       )}
-      {gameId&&data?.divisions.find(d=>d.id===data.selectedDivisionId)?.hasPublishedDraw&&<p><a href={`/events/${data.event.id}/bracket?division=${encodeURIComponent(data.selectedDivisionId!)}`}>Competition bracket / game list →</a></p>}
+      {gameId &&
+        data?.divisions.find((d) => d.id === data.selectedDivisionId)
+          ?.hasPublishedDraw && (
+          <p>
+            <a
+              href={`/events/${data.event.id}/bracket?division=${encodeURIComponent(data.selectedDivisionId!)}`}
+            >
+              Competition bracket / game list →
+            </a>
+          </p>
+        )}
     </main>
   );
 }

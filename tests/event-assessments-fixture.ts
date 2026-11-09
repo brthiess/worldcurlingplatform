@@ -6,6 +6,7 @@ import {
   type AssessmentEvidence,
 } from "../src/domain/event-assessment-input";
 import { source } from "./ranking-inputs-fixtures";
+import { tripleResults } from "./triple-draws-fixture";
 type Send = (
   path: string,
   body?: unknown,
@@ -24,8 +25,11 @@ export async function assessmentFixture(
     discipline?: "men_four" | "women_four";
     unscheduled?: boolean;
     platformSingle?: boolean;
+    platformTriple?: boolean;
   } = {},
 ) {
+  const platformDraw = options.platformSingle || options.platformTriple,
+    fieldSize = options.platformTriple ? 16 : 8;
   const eventId = randomUUID(),
     divisionId = randomUUID(),
     rulesId = randomUUID();
@@ -55,7 +59,7 @@ export async function assessmentFixture(
     playerLists: string[][] = [],
     seasonIds: string[] = [],
     reviewIds: string[] = [];
-  for (let i = 0; i < 8; i++) {
+  for (let i = 0; i < fieldSize; i++) {
     const id = randomUUID(),
       players = Array.from({ length: 4 }, () => randomUUID());
     entries.push(id);
@@ -133,7 +137,7 @@ export async function assessmentFixture(
     winner: number;
     playoff: boolean;
   }[] = [];
-  if (options.platformSingle) {
+  if (platformDraw) {
     await accepted(send, "/api/v1/registration", {
       action: "open",
       requestId: randomUUID(),
@@ -141,16 +145,17 @@ export async function assessmentFixture(
       version: 0,
       terms: {
         mode: "open",
-        capacity: 8,
+        capacity: fieldSize,
         requirements:
           "Fictional four-player field; ranking evidence remains separate",
         feeMinor: 0,
         currency: "CAD",
         paymentTerms: "No entry fee",
         paymentWindowMinutes: 60,
-        format: "single_knockout",
-        formatNotes:
-          "Eight actual accepted entries; supported seeded single elimination, no bronze",
+        format: options.platformTriple ? "triple_knockout" : "single_knockout",
+        formatNotes: options.platformTriple
+          ? "Sixteen actual accepted entries; exact 2 A / 3 B / 3 C profile with fixed playoffs, no bronze"
+          : "Eight actual accepted entries; supported seeded single elimination, no bronze",
       },
     });
     for (const entryId of entries)
@@ -166,8 +171,11 @@ export async function assessmentFixture(
       requestId: randomUUID(),
       expectedVersion: 0,
       seedEntryIds: entries,
+      ...(options.platformTriple
+        ? { template: "application-tko16-q8-233-v1" }
+        : {}),
       reason:
-        "Fictional actual single-knockout profile; display label deliberately remains legacy.",
+        "Fictional actual published profile; display label deliberately remains legacy.",
     });
     const published = await accepted(
       send,
@@ -177,15 +185,29 @@ export async function assessmentFixture(
         requestId: randomUUID(),
         expectedVersion: 1,
         reason:
-          "Publish independently seeded fictional single-knockout fixture",
+          "Publish independently seeded fictional competition profile",
       },
     );
     await db.query(
       "UPDATE division SET format='Round robin and playoffs' WHERE id=$1",
       [divisionId],
     );
-    for (const g of published.graph.games)
-      games.push({ id: g.id, a: -1, b: -1, winner: -1, playoff: true });
+    if (options.platformTriple) {
+      for (const row of tripleResults) {
+        const g = published.graph.games.find(
+          (g: { key: string }) => g.key === row.key,
+        );
+        games.push({
+          id: g.id,
+          a: row.a - 1,
+          b: row.b - 1,
+          winner: row.winner - 1,
+          playoff: row.key.startsWith("P"),
+        });
+      }
+    } else
+      for (const g of published.graph.games)
+        games.push({ id: g.id, a: -1, b: -1, winner: -1, playoff: true });
   } else {
     for (let i = 0; i < 8; i++)
       games.push({
@@ -203,7 +225,7 @@ export async function assessmentFixture(
   }
   for (const [i, g] of games.entries()) {
     const drawId = randomUUID();
-    if (!options.unscheduled && !options.platformSingle)
+    if (!options.unscheduled && !platformDraw)
       await db.query(
         "INSERT INTO draw_session(id,division_id,number,starts_at,state) VALUES($1,$2,$3,$4,'completed')",
         [
@@ -213,7 +235,7 @@ export async function assessmentFixture(
           `2026-11-${i < 8 ? "20" : "21"}T${String(1 + i).padStart(2, "0")}:00:00Z`,
         ],
       );
-    if (!options.platformSingle)
+    if (!platformDraw)
       await db.query(
         "INSERT INTO game(id,draw_id,sheet,phase,state,entry_a,entry_b,slot_a,slot_b,division_id) VALUES($1,$2,'A',$3,'scheduled',$4,$5,'A','B',$6)",
         [
@@ -225,13 +247,19 @@ export async function assessmentFixture(
           divisionId,
         ],
       );
-    if (options.platformSingle) {
+    if (platformDraw) {
       const actual = (
         await db.query("SELECT entry_a,entry_b FROM game WHERE id=$1", [g.id])
       ).rows[0];
+      const expectedA = g.a,
+        expectedB = g.b;
       g.a = entries.indexOf(actual.entry_a);
       g.b = entries.indexOf(actual.entry_b);
-      g.winner = g.a;
+      if (!options.platformTriple) g.winner = g.a;
+      else if (g.a !== expectedA || g.b !== expectedB)
+        throw new Error(
+          "Published triple assignments disagree with literal independent fixture",
+        );
       if (g.a < 0 || g.b < 0)
         throw new Error(
           "Actual published winner routes did not resolve this game",
@@ -239,7 +267,7 @@ export async function assessmentFixture(
     }
     await accepted(send, `/api/v1/games/${g.id}/scoring`, {
       requestId: randomUUID(),
-      expectedVersion: options.platformSingle
+      expectedVersion: platformDraw
         ? Number(
             (await db.query("SELECT version FROM game WHERE id=$1", [g.id]))
               .rows[0].version,
@@ -250,7 +278,7 @@ export async function assessmentFixture(
     });
     await accepted(send, `/api/v1/games/${g.id}/scoring`, {
       requestId: randomUUID(),
-      expectedVersion: options.platformSingle
+      expectedVersion: platformDraw
         ? Number(
             (await db.query("SELECT version FROM game WHERE id=$1", [g.id]))
               .rows[0].version,
@@ -273,10 +301,14 @@ export async function assessmentFixture(
     sourceDigest: sporting.sourceDigest,
     placements: entries.map((entryId, i) => ({
       entryId,
-      place: [1, 2, 3, 3, 5, 5, 5, 5][i],
+      place: (options.platformTriple
+        ? [2, 5, 3, 5, 3, 9, 9, 5, 9, 9, 9, 9, 5, 9, 9, 1]
+        : [1, 2, 3, 3, 5, 5, 5, 5])[i],
     })),
     rulesReference: "Fictional sporting terms with shared semifinal places",
-    note: "Fictional finished event; shared semifinal places",
+    note: options.platformTriple
+      ? "Fictional triple finalization: semifinal exits share third, quarterfinal exits fifth, all qualification exits share ninth; no unique ninth-through-sixteenth order is inferred."
+      : "Fictional finished event; shared semifinal places",
   });
   const evidence: AssessmentEvidence = {
     rulesId,

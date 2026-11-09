@@ -688,6 +688,68 @@ test("published immutable single-knockout profile overrides a misleading legacy 
     "81/4",
   );
 });
+test("published forty-game triple profile freezes qualification and playoff evidence without a single-knockout reduction", async () => {
+  const cookie = await login(),
+    send = (path: string, body?: unknown) => request(cookie, path, body),
+    f = await assessmentFixture(db, send, { platformTriple: true });
+  const view = await (
+    await send(
+      `/api/v1/event-assessments?division=${f.divisionId}&rules=${f.rulesId}`,
+    )
+  ).json();
+  const wrong = structuredClone(f.evidence);
+  wrong.event.singleKnockout = true;
+  const cmd = {
+    action: "calculate",
+    divisionId: f.divisionId,
+    version: 0,
+    requestId: randomUUID(),
+    sourceDigest: view.review.sourceDigest,
+    evidence: wrong,
+  };
+  assert.equal((await send("/api/v1/event-assessments", cmd)).status, 200);
+  const blocked = (await waitForJob(send, f, "terminal")).selected;
+  assert.equal(blocked.state, "blocked");
+  assert.match(blocked.resultContents, /format\/stages/);
+  assert.equal(
+    (
+      await send("/api/v1/event-assessments", {
+        ...cmd,
+        version: 1,
+        requestId: randomUUID(),
+        evidence: f.evidence,
+      })
+    ).status,
+    200,
+  );
+  const completed = (await waitForJob(send, f)).selected,
+    input = JSON.parse(completed.contents),
+    result = JSON.parse(completed.resultContents).result;
+  assert.equal(
+    input.source.publishedProfile.templateId,
+    "application-tko16-q8-233-v1",
+  );
+  assert.equal(input.source.publishedProfile.templateVersion, 1);
+  assert.equal(
+    input.source.publishedProfile.definition.family,
+    "triple_knockout",
+  );
+  assert.equal(input.source.publishedProfile.nodes.length, 40);
+  assert.equal(input.source.publishedProfile.seeds.length, 16);
+  assert.equal(input.evidence.event.qualificationGameIds.length, 33);
+  assert.equal(input.evidence.event.playoffGameIds.length, 7);
+  // 16 rank-31..46 entries: (16/5)*(24/16)*1 = 24/5, champion *15/2 =36.
+  assert.equal(result.sfm, "24/5");
+  assert.equal(
+    result.awards.find((a: any) => a.entryId === f.entries[15]).points,
+    "36",
+  );
+  assert.equal(
+    result.stages.some((s: any) => s.stage === "single knockout reduction"),
+    false,
+  );
+});
+
 test("an identity change committing during source review invalidates the queued assessment instead of freezing an earlier identified projection", async () => {
   const cookie = await login(),
     send = (path: string, body?: unknown) => request(cookie, path, body),
