@@ -1,0 +1,9 @@
+# Browser authentication rate-window budget
+
+The shared sign-in fixture already retries actual HTTP 429 responses up to three attempts and waits for the server's retry header, bounded to 1–60 seconds plus 250 ms. A default 30-second test could expire during that legitimate wait. The fixture now adds only each observed bounded wait to the outer Playwright test budget. Application and assertion deadlines, retry limits, server throttling and product code are unchanged. A numeric-only attachment records the response, wait and budget.
+
+Verification used pinned Node 20.19.0, production application source `c47220a9c676f7317c468ab2659c2337748d7b0a`, real PostgreSQL and HTTP, and the owned `wcp014acceptance` database. The earlier affected browser scope retained 40 passes and one failure: the default-budget overall empty/input-state case expired during a real 429 with `x-retry-after: 56`. Its complete report and trace remain private under `.runtime/wcp014/acceptance-browser`.
+
+After this fixture-only change, deliberately reaching the real authentication limit and running the unchanged smoke case passed in 57.5 seconds. Its attachment records status 429, server retry 56 seconds, scheduled and elapsed wait 56,250 ms, prior budget 30,000 ms and adjusted budget 86,250 ms. The complete `tests/browser/overall-rankings.spec.ts` then passed all five cases with zero skips (1.2 minutes). This is split verification, not a claim that the earlier 41-case run passed in one execution.
+
+Private complete reports: `.runtime/wcp014/auth-budget-actual-429/report` and `.runtime/wcp014/auth-budget-overall-complete/report`; transcripts are in `.runtime/wcp014/reports/auth-budget-actual-429.txt` and `auth-budget-overall-complete.txt`. Regenerated inherited WCP-034 images were archived privately and restored to accepted Git bytes. No raw reports, credentials or traces are committed.
