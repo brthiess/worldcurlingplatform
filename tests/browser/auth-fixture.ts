@@ -4,6 +4,7 @@ import type {
   APIResponse,
   APIRequestContext,
 } from "@playwright/test";
+import { test } from "@playwright/test";
 export async function authApiWithRateWindow(send: () => Promise<APIResponse>) {
   for (let attempt = 0; attempt < 3; attempt++) {
     const response = await send();
@@ -41,16 +42,29 @@ export async function signInWithRateWindow(page: Page, button: Locator) {
         response.headers()["retry-after"] ??
         60,
     );
-    await new Promise((resolve) =>
-      setTimeout(
-        resolve,
-        Math.min(
-          60000,
-          Math.max(1000, Number.isFinite(seconds) ? seconds * 1000 : 60000),
-        ),
-      ),
-    );
-    await new Promise((resolve) => setTimeout(resolve, 250));
+    const waitMs =
+      Math.min(
+        60000,
+        Math.max(1000, Number.isFinite(seconds) ? seconds * 1000 : 60000),
+      ) + 250;
+    const info = test.info(),
+      priorTestBudgetMs = info.timeout;
+    // Charge only the real bounded authentication backoff separately. Product
+    // assertions and the original application-work budget remain unchanged.
+    if (priorTestBudgetMs > 0) info.setTimeout(priorTestBudgetMs + waitMs);
+    const started = Date.now();
+    await new Promise((resolve) => setTimeout(resolve, waitMs));
+    await info.attach("bounded-authentication-rate-wait", {
+      body: JSON.stringify({
+        status: 429,
+        serverRetryAfterSeconds: seconds,
+        waitMs,
+        elapsedMs: Date.now() - started,
+        priorTestBudgetMs,
+        adjustedTestBudgetMs: info.timeout,
+      }),
+      contentType: "application/json",
+    });
   }
 }
 export function signInApiWithRateWindow(
