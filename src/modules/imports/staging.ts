@@ -70,9 +70,10 @@ export async function stageImport(actor: string, raw: unknown) {
     !/^[a-zA-Z0-9-]{1,80}$/.test(v.id) ||
     typeof v.sourceDigest !== "string" ||
     !/^[a-f0-9]{64}$/.test(v.sourceDigest) ||
-    (v.action === "retry" &&
+    ("requestId" in v &&
       (typeof v.requestId !== "string" ||
         !/^[a-zA-Z0-9-]{1,80}$/.test(v.requestId))) ||
+    (v.action === "retry" && !("requestId" in v)) ||
     Object.keys(v).some(
       (k) => !["id", "action", "sourceDigest", "requestId"].includes(k),
     )
@@ -130,8 +131,10 @@ export async function stageImport(actor: string, raw: unknown) {
           409,
         );
       if (v.action === "stage") {
-        await c.query("COMMIT");
-        return { id: v.id };
+        throw new EntryError(
+          "This job identifier already belongs to a recorded command. Reuse its exact request or choose a new job identifier.",
+          409,
+        );
       }
     } else {
       if (v.action !== "stage")
@@ -242,7 +245,14 @@ export async function importWorkspace(
     ).rows.map((r) => [r.source_key, r.display_name]),
   );
   return {
+    actorId: actor,
     job,
+    receipts: (
+      await pool.query(
+        'SELECT request_id AS "requestId",job_id AS "jobId",actor_id AS "actorId",command_digest AS "commandDigest" FROM import_command WHERE job_id=$1 ORDER BY created_at,request_id',
+        [jobId],
+      )
+    ).rows,
     games: games.map((g) => ({
       ...g,
       entryNames: g.entryIds.map((id: string) => labels[id] ?? id),

@@ -1,6 +1,7 @@
 import { test, expect, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
-import { signInWithRateWindow } from "./auth-fixture";
+import { signInWithRateWindow, signInApiWithRateWindow } from "./auth-fixture";
+import { randomUUID } from "node:crypto";
 import pg from "pg";
 const db = new pg.Pool({ connectionString: process.env.DATABASE_URL });
 test.afterAll(async () => {
@@ -279,4 +280,190 @@ test("failed worker state can be retried and a failed refresh retains the last f
     .getByRole("button", { name: "Refresh import state", exact: true })
     .click();
   await expect(page.locator("main").getByRole("alert")).toHaveCount(0);
+});
+
+test("read-only reconciliation requires the full original import command and current original account", async ({
+  page,
+}, info) => {
+  test.setTimeout(120000);
+  await signIn(page);
+  await page.goto("/admin/imports");
+  await expect(
+    page.getByRole("button", { name: "Stage configured export", exact: true }),
+  ).toBeEnabled();
+  const actorId = (await (await page.request.get("/api/v1/imports")).json())
+      .actorId,
+    key = `wcp-import:${actorId}`,
+    grant = randomUUID();
+  let intercepted = false,
+    writes = 0,
+    allPosts = 0;
+  page.on("request", (r) => {
+    if (r.method() === "POST") {
+      allPosts++;
+      if (new URL(r.url()).pathname.startsWith("/api/v1/")) writes++;
+    }
+  });
+  await page.route("**/api/v1/imports", async (route) => {
+    if (route.request().method() !== "POST" || intercepted) {
+      await route.continue();
+      return;
+    }
+    await route.fetch();
+    intercepted = true;
+    await route.abort("failed");
+  });
+  try {
+    await page
+      .getByRole("button", { name: "Stage configured export", exact: true })
+      .click();
+    await expect(
+      page.getByText(/The command result is not confirmed/),
+    ).toBeVisible();
+    const original = await page.evaluate(
+      (key) => sessionStorage.getItem(key)!,
+      key,
+    );
+    for (const variant of ["action", "path", "body"]) {
+      const changed = JSON.parse(original);
+      if (variant === "action") {
+        const body = JSON.parse(changed.body);
+        body.action = "retry";
+        changed.body = JSON.stringify(body);
+      } else if (variant === "path") changed.path = "/api/v1/overall-rankings";
+      else {
+        const body = JSON.parse(changed.body);
+        body.unrecorded = "changed content";
+        changed.body = JSON.stringify(body);
+      }
+      const bytes = JSON.stringify(changed);
+      await page.evaluate(
+        ([key, value]) => sessionStorage.setItem(key, value),
+        [key, bytes],
+      );
+      await page.reload();
+      await expect(
+        page.getByText(/Unconfirmed command retained/),
+      ).toBeVisible();
+      await page
+        .getByRole("button", {
+          name: "Reconcile recorded import command",
+          exact: true,
+        })
+        .click();
+      await expect(page.locator("main").getByRole("alert")).toContainText(
+        "Recorded state could not confirm the original command",
+      );
+      await expect(
+        page.getByRole("button", {
+          name: "Stage configured export",
+          exact: true,
+        }),
+      ).toBeDisabled();
+      expect(
+        await page.evaluate((key) => sessionStorage.getItem(key), key),
+      ).toBe(bytes);
+      await page.evaluate(
+        ([key, value]) => sessionStorage.setItem(key, value),
+        [key, original],
+      );
+      await page.reload();
+      await expect(
+        page.getByText(/Unconfirmed command retained/),
+      ).toBeVisible();
+    }
+    await db.query(
+      "INSERT INTO role_grant(id,user_id,role,event_id,game_id) VALUES($1,'demo-reviewer','administrator',NULL,NULL)",
+      [grant],
+    );
+    expect(
+      (
+        await page.request.post("/api/auth/sign-out", {
+          headers: { Origin: process.env.BETTER_AUTH_URL! },
+          data: {},
+        })
+      ).status(),
+    ).toBe(200);
+    expect(
+      (
+        await signInApiWithRateWindow(
+          page.request,
+          "reviewer@demo.invalid",
+          process.env.DEMO_PASSWORD,
+        )
+      ).status(),
+    ).toBe(200);
+    await page
+      .getByRole("button", {
+        name: "Reconcile recorded import command",
+        exact: true,
+      })
+      .click();
+    await expect(page.locator("main").getByRole("alert")).toContainText(
+      "Recorded state could not confirm the original command",
+    );
+    expect(await page.evaluate((key) => sessionStorage.getItem(key), key)).toBe(
+      original,
+    );
+    expect(
+      (
+        await page.request.post("/api/auth/sign-out", {
+          headers: { Origin: process.env.BETTER_AUTH_URL! },
+          data: {},
+        })
+      ).status(),
+    ).toBe(200);
+    expect(
+      (
+        await signInApiWithRateWindow(
+          page.request,
+          "administrator@demo.invalid",
+          process.env.DEMO_PASSWORD,
+        )
+      ).status(),
+    ).toBe(200);
+    const equivalent = JSON.parse(original),
+      body = JSON.parse(equivalent.body);
+    equivalent.body = JSON.stringify({
+      sourceDigest: body.sourceDigest,
+      id: body.id,
+      action: body.action,
+    });
+    await page.evaluate(
+      ([key, value]) => sessionStorage.setItem(key, value),
+      [key, JSON.stringify(equivalent)],
+    );
+    await page.reload();
+    await expect(page.getByText(/Unconfirmed command retained/)).toBeVisible();
+    const postsBeforeRecovery = allPosts;
+    await page
+      .getByRole("button", {
+        name: "Reconcile recorded import command",
+        exact: true,
+      })
+      .click();
+    await expect(
+      page.getByText(
+        "The original command was reconciled with recorded history. Review its current status below.",
+        { exact: true },
+      ),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", {
+        name: "Stage configured export",
+        exact: true,
+      }),
+    ).toBeEnabled();
+    expect(await page.evaluate((key) => sessionStorage.getItem(key), key)).toBe(
+      null,
+    );
+    expect(writes).toBe(1);
+    expect(allPosts).toBe(postsBeforeRecovery);
+    await page.screenshot({
+      path: info.outputPath("reconciled-exact-original-through-reads.png"),
+    });
+  } finally {
+    await page.unroute("**/api/v1/imports");
+    await db.query("DELETE FROM role_grant WHERE id=$1", [grant]);
+  }
 });

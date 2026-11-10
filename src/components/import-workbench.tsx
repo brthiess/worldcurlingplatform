@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import { canonicalEntryCommand } from "@/domain/entries";
 import {
   AuthorityRecovery,
   useAuthorityCommand,
@@ -46,7 +47,14 @@ type Catalog = {
   jobs: Job[];
 };
 type Batch = {
+  actorId: string;
   job: Job;
+  receipts: {
+    requestId: string;
+    jobId: string;
+    actorId: string;
+    commandDigest: string;
+  }[];
   games: Game[];
   issues: { sourceKey: string; code: string; detail: string }[];
   records: { key: string; kind: string; lineDigest: string }[];
@@ -97,9 +105,44 @@ export function ImportWorkbench() {
       throw e;
     }
   }
-  async function accepted(saved: RetainedAuthorityCommand) {
+  async function recorded(saved: RetainedAuthorityCommand) {
+    if (saved.path !== "/api/v1/imports") return null;
     const v = JSON.parse(saved.body);
-    await show(v.id);
+    if (typeof v.id !== "string") return null;
+    const b = await get<Batch>(`?job=${encodeURIComponent(v.id)}`);
+    const bytes = await crypto.subtle.digest(
+      "SHA-256",
+      new TextEncoder().encode(canonicalEntryCommand(v)),
+    );
+    const digest = Array.from(new Uint8Array(bytes), (n) =>
+      n.toString(16).padStart(2, "0"),
+    ).join("");
+    if (
+      b.actorId !== saved.actorId ||
+      b.job.actorId !== saved.actorId ||
+      b.job.id !== v.id ||
+      b.job.digest !== v.sourceDigest ||
+      !b.receipts.some(
+        (r) =>
+          r.requestId === (v.requestId ?? v.id) &&
+          r.jobId === v.id &&
+          r.actorId === saved.actorId &&
+          r.commandDigest === digest,
+      )
+    )
+      return null;
+    return b;
+  }
+  async function accepted(saved: RetainedAuthorityCommand) {
+    const b = await recorded(saved);
+    if (!b)
+      throw new Error(
+        "The recorded import does not match the original account and complete command.",
+      );
+    setBatch(b);
+    setRecord(null);
+    setError("");
+    pendingFocus.current = true;
     await load();
   }
   const command = useAuthorityCommand(
@@ -107,19 +150,12 @@ export function ImportWorkbench() {
     catalog?.actorId,
     accepted,
     async (saved) => {
-      const v = JSON.parse(saved.body);
-      const b = await get<Batch>(`?job=${v.id}`);
-      if (
-        b.job.actorId !== saved.actorId ||
-        b.job.digest !== v.sourceDigest ||
-        !b.attempts.some(
-          (a) =>
-            (a.evidence as { requestId?: string }).requestId ===
-            (v.requestId ?? v.id),
-        )
-      )
-        return false;
+      const b = await recorded(saved);
+      if (!b) return false;
       setBatch(b);
+      setRecord(null);
+      setError("");
+      pendingFocus.current = true;
       await load();
       return true;
     },

@@ -67,6 +67,17 @@ test("real consistent export becomes a frozen private review batch through the q
   const r = await req("", command);
   assert.equal(r.status, 200, await r.text());
   const batch = await wait(id);
+  assert.equal(batch.actorId, "demo-administrator");
+  assert.deepEqual(batch.receipts, [
+    {
+      requestId: id,
+      jobId: id,
+      actorId: "demo-administrator",
+      commandDigest: createHash("sha256")
+        .update(JSON.stringify({ action: "stage", id, sourceDigest: before }))
+        .digest("hex"),
+    },
+  ]);
   assert.equal(batch.job.status, "staged", JSON.stringify(batch.job));
   assert.equal(batch.job.digest, before);
   assert.equal(batch.job.uniqueGames, 4);
@@ -420,5 +431,49 @@ test("an exact committed staging receipt acknowledges while its worker still own
   assert.equal(
     done.attempts.filter((a: any) => a.action === "import_stage_queued").length,
     1,
+  );
+});
+
+test("malformed import request IDs leave no job, receipt, audit or queue write", async () => {
+  const sourceDigest = await hash(process.env.CRAWLER_IMPORT_EXPORT!);
+  for (const action of ["stage", "retry"])
+    for (const requestId of [
+      17,
+      null,
+      {},
+      [],
+      "",
+      "has space",
+      "x".repeat(81),
+    ]) {
+      const id = randomUUID();
+      const response = await req("", { action, id, sourceDigest, requestId });
+      assert.equal(
+        response.status,
+        400,
+        `${action} must reject malformed requestId ${JSON.stringify(requestId)}`,
+      );
+      assert.equal((await req(`?job=${id}`)).status, 404);
+      const counts = (
+        await db.query(
+          "SELECT (SELECT count(*)::int FROM import_command WHERE job_id=$1) AS receipts,(SELECT count(*)::int FROM audit_record WHERE resource_id=$1) AS audits,(SELECT count(*)::int FROM pgboss.job WHERE name='historical-import-stage' AND data->>'importId'=$1) AS deliveries",
+          [id],
+        )
+      ).rows[0];
+      assert.deepEqual(counts, { receipts: 0, audits: 0, deliveries: 0 });
+    }
+  const id = randomUUID(),
+    command = { action: "stage", id, sourceDigest, requestId: randomUUID() };
+  assert.equal((await req("", command)).status, 200);
+  assert.equal((await wait(id)).job.status, "staged");
+  assert.equal((await req("", command)).status, 200);
+  assert.equal((await wait(id)).job.attempts, 1);
+  assert.equal(
+    (await req("", { ...command, requestId: randomUUID() })).status,
+    409,
+  );
+  assert.equal(
+    (await req("", { action: "stage", id, sourceDigest })).status,
+    409,
   );
 });
