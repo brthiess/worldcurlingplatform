@@ -4,7 +4,7 @@ number: 34
 title: "Calculate four-player overall WCTRS draft lists"
 parent: WCP-SPEC-001
 type: implementation
-status: in-progress
+status: completed
 labels: [ready-for-agent]
 blocked_by: [WCP-033]
 source_spec_sha256: 045B46988225B6C8C0020B23C8C5D4EAA8E2E1916256148A0FDA26B5DA8673FD
@@ -18,7 +18,7 @@ published: 2026-11-07
 
 **Blocked by:** [33: Calculate four-player event assessments and point awards](33-calculate-four-player-event-assessments-and-point-awards.md).
 
-**Status:** in-progress
+**Status:** completed
 
 ## Parent and scope
 
@@ -31,13 +31,13 @@ published: 2026-11-07
 
 ## Acceptance criteria
 
-- [ ] Apply supported 2026-27 effective checkpoints, counting limits, weights, tie ordering, entitlements and ordinary adjustments without relying on lineage.
-- [ ] Keep core-identity reuse separate from restored point rights and retain frozen run manifests/contribution values.
-- [ ] Show unresolved required inputs/eligibility as calculation blockers; keep nonmaterial biography/unneeded-end-score warnings distinguishable.
-- [ ] **Unit testing:** Work independent expected totals/orderings for normal and meaningful boundary cases, roster/ownership changes, carryover dates, caps/exclusions, exact arithmetic and required ranking ties.
-- [ ] **Database/API verification:** Calculate/retry/replay complete fixtures and reject incomplete ones through admin APIs using persisted awards/inputs; prove no duplicate or mutable contribution shortcuts.
-- [ ] **Frontend quality:** Deliver a readable draft table and subject contribution drill-down with dates, meaningful precision, explanations and clear blocked/ready states.
-- [ ] Record actual verification commands/results and relevant browser/screenshots or API evidence. Report meaningful uncovered branches or limitations; do not claim checks that were not run.
+- [x] Apply supported 2026-27 effective checkpoints, counting limits, weights, tie ordering, entitlements and ordinary adjustments without relying on lineage.
+- [x] Keep core-identity reuse separate from restored point rights and retain frozen run manifests/contribution values.
+- [x] Show unresolved required inputs/eligibility as calculation blockers; keep nonmaterial biography/unneeded-end-score warnings distinguishable.
+- [x] **Unit testing:** Work independent expected totals/orderings for normal and meaningful boundary cases, roster/ownership changes, carryover dates, caps/exclusions, exact arithmetic and required ranking ties.
+- [x] **Database/API verification:** Calculate/retry/replay complete fixtures and reject incomplete ones through admin APIs using persisted awards/inputs; prove no duplicate or mutable contribution shortcuts.
+- [x] **Frontend quality:** Deliver a readable draft table and subject contribution drill-down with dates, meaningful precision, explanations and clear blocked/ready states.
+- [x] Record actual verification commands/results and relevant browser/screenshots or API evidence. Report meaningful uncovered branches or limitations; do not claim checks that were not run.
 
 ## Slice boundary
 
