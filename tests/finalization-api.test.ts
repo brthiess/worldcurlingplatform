@@ -12,6 +12,21 @@ import {
   rulesFixture,
   source as rankingSource,
 } from "./ranking-inputs-fixtures";
+function independentReceiptDigest(value: unknown): string {
+  const sorted = (v: any): any =>
+    Array.isArray(v)
+      ? v.map(sorted)
+      : v !== null && typeof v === "object"
+        ? Object.fromEntries(
+            Object.keys(v)
+              .sort()
+              .map((k) => [k, sorted(v[k])]),
+          )
+        : v;
+  return createHash("sha256")
+    .update(JSON.stringify(sorted(value)))
+    .digest("hex");
+}
 const pool = new pg.Pool({
   connectionString: process.env.DATABASE_URL,
   max: 3,
@@ -334,6 +349,46 @@ test("two divisions finalize independently; ordinary correction marks and replac
   assert.equal((await post(cb)).status, 200);
   const originalA = await read(a.divisionId),
     originalB = await read(b.divisionId);
+  const receiptA = originalA.receipts.find(
+    (r: any) => r.requestId === ca.requestId,
+  );
+  assert.deepEqual(receiptA, {
+    actorId: originalA.actorId,
+    requestId: ca.requestId,
+    divisionId: a.divisionId,
+    version: 1,
+    path: "/api/v1/division-finalizations",
+    commandDigest: independentReceiptDigest(ca),
+  });
+  assert.equal(
+    originalB.receipts.some((r: any) => r.requestId === ca.requestId),
+    false,
+  );
+  assert.equal(
+    (await request(`/api/v1/division-finalizations?division=${a.divisionId}`))
+      .status,
+    401,
+  );
+  assert.equal(
+    (
+      await request(
+        `/api/v1/division-finalizations?division=${a.divisionId}`,
+        await login("scorekeeper"),
+      )
+    ).status,
+    403,
+  );
+  assert.deepEqual(
+    await (
+      await post({
+        ...ca,
+        note: `  ${ca.note}  `,
+        rulesReference: ` ${ca.rulesReference} `,
+        ignored: "not receipt content",
+      })
+    ).json(),
+    first,
+  );
   const frozen = JSON.parse(originalA.selected.contents);
   assert.equal(frozen.source.games[0].result.outcome, "forfeit");
   assert.equal(frozen.source.games[0].result.lineupA.members.length, 4);

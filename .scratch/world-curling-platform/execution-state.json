@@ -33,6 +33,7 @@
     "WCP-032",
     "WCP-033",
     "WCP-034",
+    "WCP-038",
     "WCP-044",
     "WCP-045"
   ],
@@ -56,6 +57,7 @@
     "WCP-027",
     "WCP-032",
     "WCP-033",
+    "WCP-034",
     "WCP-044"
   ],
   "workflow": {
@@ -67,7 +69,7 @@
   "git": {
     "remote": "https://github.com/brthiess/worldcurlingplatform.git",
     "push_as_work_progresses": true,
-    "last_verified_remote_integration_commit": "c83fd9709b7277da59db1c95db1a49431929cf75",
+    "last_verified_remote_integration_commit": "9256352858d040fa813db7d95c58625d043fcb71",
     "integration_branch": "integration/world-curling-platform",
     "worktrees_created": [
       ".worktrees/WCP-001",
@@ -92,11 +94,14 @@
       ".worktrees/WCP-007",
       ".worktrees/WCP-022",
       ".worktrees/WCP-017",
-      ".worktrees/WCP-014"
+      ".worktrees/WCP-014",
+      ".worktrees/WCP-034-fixture-fix",
+      ".worktrees/WCP-038",
+      ".worktrees/WCP-038"
     ],
     "initialized": true,
     "baseline_commit": "f6d6d8d",
-    "remote_ref_verified_at": "2026-11-09T01:54:08.144892+00:00"
+    "remote_ref_verified_at": "2026-11-10T00:19:10.406861+00:00"
   },
   "verification": {
     "policy": "Only completed tickets have reviewed required-check evidence; each record is limited to its ticket scope.",
@@ -177,6 +182,10 @@
         "commit": "693772106297caf4409fb004d2de511deb927383",
         "evidence": "docs/verification/WCP-033-merge.md"
       },
+      "WCP-034": {
+        "commit": "8d5412ac5eb0f77efdd9431e5a51c805d5ce00cc",
+        "evidence": "docs/verification/WCP-034-merge.md"
+      },
       "WCP-044": {
         "commit": "bb8ffe4d9fe5e26e172ec47fbb6a1db58c2cde6d",
         "evidence": "docs/verification/WCP-044.md"
@@ -204,13 +213,14 @@
     "formally_accepted_integration": "11d9e6ce0c4b3bdf9188dc75f74987e4b628b886",
     "pending_source_on_primary": null,
     "max_parallel_children": 3,
-    "accepted_integration_after_resume": "af4e9302cbe3ead63fa6582f33caf6a8e49fb1de"
+    "accepted_integration_after_resume": "8d5412ac5eb0f77efdd9431e5a51c805d5ce00cc",
+    "last_formally_accepted_boundary": "8d5412ac5eb0f77efdd9431e5a51c805d5ce00cc"
   },
-  "updated_at": "2026-11-09T22:51:28.038200+00:00",
+  "updated_at": "2026-11-10T00:19:40.999690+00:00",
   "active_tickets": [
     "WCP-014",
     "WCP-017",
-    "WCP-034"
+    "WCP-038"
   ],
   "frontier": [
     "WCP-011",
@@ -219,7 +229,8 @@
     "WCP-024",
     "WCP-026",
     "WCP-028",
-    "WCP-030"
+    "WCP-030",
+    "WCP-035"
   ],
   "events": [
     {
@@ -589,12 +600,38 @@
       "reason": null,
       "commit": null,
       "evidence": null
+    },
+    {
+      "time": "2026-11-09T23:18:21.497301+00:00",
+      "ticket": "WCP-034",
+      "status": "in-progress",
+      "reason": "Complete107 API run106pass/1fail; concrete orphan ranking-header fixture diagnosed; isolated fresh fixture correction, no acceptance",
+      "commit": "c604334e23c0753dcb0bb8eeb815d2e255d6e191",
+      "evidence": "docs/verification/WCP-034-integration-findings.md"
+    },
+    {
+      "time": "2026-11-10T00:18:34.461867+00:00",
+      "ticket": "WCP-034",
+      "status": "completed",
+      "reason": null,
+      "commit": "8d5412ac5eb0f77efdd9431e5a51c805d5ce00cc",
+      "evidence": "docs/verification/WCP-034-merge.md"
+    },
+    {
+      "time": "2026-11-10T00:19:40.858653+00:00",
+      "ticket": "WCP-038",
+      "status": "in-progress",
+      "reason": null,
+      "commit": null,
+      "evidence": null
     }
   ],
   "research": {
     "import": "complete_read_only_exploration",
     "index": "docs/agents/research-index.md",
-    "wctrs": "complete_bounded_exploration"
+    "wctrs": "complete_bounded_exploration",
+    "publication": "C:/Users/brthi/.codex/visualizations/2026/11/08/01a1bbca-a597-7480-aa34-dc89e3b680c3/publication-preparation-20261109.md",
+    "discipline_followup": "C:/Users/brthi/.codex/visualizations/2026/11/08/01a1bbca-a597-7480-aa34-dc89e3b680c3/wcp026-profile-followup-20261110.md"
   },
   "ticket_assignments": {
     "WCP-003": {
@@ -699,7 +736,17 @@
       "database_prefix": "wcp034",
       "web_port": 3134,
       "news_fixture_port": 3234,
-      "reserved_migration_prefix": "0027"
+      "reserved_migration_prefix": "0027",
+      "fixture_fix": {
+        "worktree": ".worktrees/WCP-034-fixture-fix",
+        "branch": "fix/WCP-034-ranking-fixture",
+        "database_prefix": "wcp034_fixturefix",
+        "web_port": 3154,
+        "news_fixture_port": 3254,
+        "scope": "Correct malformed identity ranking collision fixture via actual staff API; no product schema change expected",
+        "base": "337ca11a9423131f4cdedd0fb99c821ec9720264",
+        "reviewed_patch": "9431190fe5ea6ccb85871a7d7bcae5190ffcf2ed"
+      }
     },
     "WCP-007": {
       "worktree": ".worktrees/WCP-007",
@@ -733,6 +780,15 @@
       "news_fixture_port": 3214,
       "reserved_migration_prefix": "0031",
       "crawler_source_access": "read-only frozen export only"
+    },
+    "WCP-038": {
+      "worktree": ".worktrees/WCP-038",
+      "branch": "codex/WCP-038",
+      "database_prefix": "wcp038",
+      "web_port": 3138,
+      "news_fixture_port": 3238,
+      "reserved_migration_prefix": "0032",
+      "accepted_base": "9256352858d040fa813db7d95c58625d043fcb71"
     }
   },
   "pause": {
@@ -758,5 +814,20 @@
       "WCP-034": "164616aacf3c866a5504be1902a1d3c2b079c9fa"
     },
     "resumed_at": "2026-11-09T22:08:38.860381+00:00"
-  }
+  },
+  "accepted_fixture_patches": [
+    {
+      "commit": "9431190fe5ea6ccb85871a7d7bcae5190ffcf2ed",
+      "branch": "fix/WCP-034-ranking-fixture",
+      "reviewed_at": "2026-11-09T23:37:15.360262+00:00",
+      "scope": "Only tests/identity-corrections.api.test.ts and focused verification documentation; no product/schema acceptance",
+      "evidence": "docs/verification/WCP-034-fixture-fix.md",
+      "allowed_consumers": [
+        "WCP-034",
+        "WCP-017",
+        "WCP-014"
+      ],
+      "full_combined_verification": "WCP-034 accepted after selected107API/85browser;017/014 own source-specific checks and independent integration remain separately required"
+    }
+  ]
 }

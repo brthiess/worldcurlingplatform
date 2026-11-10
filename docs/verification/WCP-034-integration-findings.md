@@ -1,0 +1,13 @@
+# WCP-034 combined verification finding
+
+2026-11-09 UTC: the provisional identity/overall integration is **not accepted**. Primary source merge`c604334e23c0753dcb0bb8eeb815d2e255d6e191` and candidate`337ca11a9423131f4cdedd0fb99c821ec9720264` are retained. The formally accepted boundary remains`0fa404e488861cc64a42435946b952cf8b34fd70`.
+
+The complete17-file PostgreSQL/HTTP run finished106pass/1fail of107, with no skipped cases. The planned85-browser/16-file scope has not started. Domain109, candidate/primary builds/types, fresh27 actual-file hashes/all72-table repeat checks and actual identity→overall staleness/history probe passed; none substitutes for the failed complete API union.
+
+Diagnosis identifies the identity collision fixture at`tests/identity-corrections.api.test.ts:283`: it directly inserts a season`ranking_record` header atversion1 without any ranking revision/audit/receipt. The production API creates these atomically. The subsequent complete-universe ranking read encounters that orphan and correctly cannot find a record/version. All eight starting records created by the overall fixture have valid v1/v2 records and receipts and returnHTTP200; the orphan and full workspace reproduceHTTP404.
+
+Exact orphan`dffc52e9-a703-4843-bfeb-494bf3b149f0`, registration`49d990b1-c43d-496d-92a2-ba4c8094cd7a`, zero revisions/audits. The actual retained identity issue references it as a ranking-subject collision. Failed DB`wcp034_final_20261109_api` remains intact. Complete private evidence: `.runtime/wcp034-review-independent/final-merge-20261109/REVIEW.md`, `api-combined.log`, `fixture-diagnosis.{json,log}` and `fixture-creation-receipts.json`.
+
+A fresh implementer has isolated worktree`.worktrees/WCP-034-fixture-fix`, branch`fix/WCP-034-ranking-fixture`, based on the exact pending candidate only for this integration repair. Replace the malformed stub with a valid draft through the real authorized API and prove it is readable, while retaining every person/team/entry/ranking-subject collision, rollback/history and no-partial-change assertion. Establish the actual red before the fix. Do not mask it with orphan deletion, a narrowed universe, reordered/skipped tests or an application fallback for malformed test data. Preserve red/failed databases; use new owned verification databases as needed.
+
+After the focused fixture correction, the distinct merger must rerun the complete failed107 API union and the required combined browser scope, preserving all earlier failures and source scopes. This is part of the existing034 work, not another published ticket or acceptance. Hosting/domain remain pending; no source crawler changes occurred.

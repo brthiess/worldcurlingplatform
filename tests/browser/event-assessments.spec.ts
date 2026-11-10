@@ -39,6 +39,142 @@ async function choose(page: Page, f: { divisionId: string; rulesId: string }) {
     page.getByRole("heading", { name: "Reviewed inputs" }),
   ).toBeVisible();
 }
+
+test("event reconciliation retains changed409 and wrong-path journals; equivalent original confirms full receipt without any POST", async ({
+  page,
+}, info) => {
+  test.setTimeout(120000);
+  await signIn(page);
+  const f = await createFixture(page),
+    workspaceUrl = `/api/v1/event-assessments?division=${f.divisionId}&rules=${f.rulesId}`,
+    view = await (await page.request.get(workspaceUrl)).json(),
+    body = {
+      action: "calculate",
+      divisionId: f.divisionId,
+      version: 0,
+      sourceDigest: view.review.sourceDigest,
+      requestId: crypto.randomUUID(),
+      evidence: f.evidence,
+      recoveryProbe: { é: 1, Z: [null, true], "😀": "event canonical bytes" },
+    };
+  const created = await page.request.post("/api/v1/event-assessments", {
+    headers: { Origin: process.env.BETTER_AUTH_URL! },
+    data: body,
+  });
+  expect(created.status()).toBe(200);
+  const original = await created.json();
+  let done: any;
+  for (let i = 0; i < 150; i++) {
+    done = (await (await page.request.get(workspaceUrl)).json()).selected;
+    if (done.state === "completed") break;
+    await page.waitForTimeout(100);
+  }
+  expect(done.state).toBe("completed");
+  const conflict = {
+      ...body,
+      evidence: {
+        ...body.evidence,
+        reviewNote:
+          "Different uncommitted event command using the actual same actor/request",
+      },
+    },
+    rejected = await page.request.post("/api/v1/event-assessments", {
+      headers: { Origin: process.env.BETTER_AUTH_URL! },
+      data: conflict,
+    });
+  expect(rejected.status()).toBe(409);
+  const key = `wcp-assessment-command:${view.actorId}`,
+    pending = (value: unknown, path = "/api/v1/event-assessments") => ({
+      actorId: view.actorId,
+      path,
+      body: JSON.stringify(value),
+      message: "Event assessment saved.",
+      acknowledged: false,
+    });
+  await page.goto("/admin/event-assessments");
+  await expect(page.getByLabel("Division", { exact: true })).toBeEnabled();
+  await page.evaluate(
+    ({ key, value }) => sessionStorage.setItem(key, JSON.stringify(value)),
+    { key, value: pending(conflict) },
+  );
+  await page.reload();
+  const posts: string[] = [];
+  page.on("request", (r) => {
+    if (r.method() === "POST")
+      posts.push(`${new URL(r.url()).pathname}:${r.postData() ?? ""}`);
+  });
+  await page
+    .getByRole("button", {
+      name: "Reconcile recorded assessment command",
+      exact: true,
+    })
+    .click();
+  await expect
+    .poll(
+      async () =>
+        (await page
+          .getByText(
+            "The original command was reconciled with recorded history. Review its current status below.",
+            { exact: true },
+          )
+          .isVisible()) ||
+        (await page.getByRole("main").getByRole("alert").isVisible()),
+    )
+    .toBe(true);
+  await page.screenshot({
+    path: info.outputPath("event-conflict-settled.png"),
+  });
+  expect(
+    await page.evaluate((key) => sessionStorage.getItem(key), key),
+  ).not.toBeNull();
+  await expect(page.getByRole("main").getByRole("alert")).toContainText(
+    "Recorded state could not confirm",
+  );
+  expect(posts).toEqual([]);
+  await page.evaluate(
+    ({ key, value }) => sessionStorage.setItem(key, JSON.stringify(value)),
+    { key, value: pending(body, "/api/v1/entry-charges") },
+  );
+  await page.reload();
+  await page
+    .getByRole("button", {
+      name: "Reconcile recorded assessment command",
+      exact: true,
+    })
+    .click();
+  await expect(page.getByRole("main").getByRole("alert")).toContainText(
+    "Recorded state could not confirm",
+  );
+  expect(
+    await page.evaluate((key) => sessionStorage.getItem(key), key),
+  ).not.toBeNull();
+  await page.evaluate(
+    ({ key, value }) => sessionStorage.setItem(key, JSON.stringify(value)),
+    { key, value: pending(Object.fromEntries(Object.entries(body).reverse())) },
+  );
+  await page.reload();
+  await page
+    .getByRole("button", {
+      name: "Reconcile recorded assessment command",
+      exact: true,
+    })
+    .click();
+  await expect(
+    page.getByText(
+      "The original command was reconciled with recorded history. Review its current status below.",
+      { exact: true },
+    ),
+  ).toBeVisible();
+  expect(
+    await page.evaluate((key) => sessionStorage.getItem(key), key),
+  ).toBeNull();
+  expect(posts).toEqual([]);
+  const preserved = (await (await page.request.get(workspaceUrl)).json())
+    .selected;
+  expect(preserved.id).toBe(original.id);
+  expect(preserved.digest).toBe(original.digest);
+  expect(preserved.resultDigest).toBe(done.resultDigest);
+});
 test("staff complete ordinary sourced controls, queue real awards and review responsive exact breakdown/history", async ({
   page,
 }, info) => {
@@ -54,7 +190,9 @@ test("staff complete ordinary sourced controls, queue real awards and review res
     if (message.type() === "error") consoleErrors.push(message.text());
   });
   page.on("requestfailed", (request) => {
-    failedRequests.push(`${request.method()} ${new URL(request.url()).pathname}`);
+    failedRequests.push(
+      `${request.method()} ${new URL(request.url()).pathname}`,
+    );
   });
   page.on("response", (r) => {
     if (r.status() >= 500)

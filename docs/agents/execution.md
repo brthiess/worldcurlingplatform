@@ -4,6 +4,8 @@ Started 2026-11-08 under the user's explicit implementation authorization.
 
 Resumed at the user's explicit request on2026-11-09 (America/Edmonton), from [the preserved pause checkpoint](paused-2026-11-09.md). Continue autonomous unblocked work, required verification and authorized commits/pushes; hosting/domain remain pending. The provisional007 source present at resume has now passed [independent acceptance](../verification/WCP-007-merge.md); published tracker state and coordinator notifications govern later acceptance boundaries. The execution-state resume event records exact source boundaries.
 
+WCP-034 was independently accepted on2026-11-10 UTC at `8d5412ac5eb0f77efdd9431e5a51c805d5ce00cc`; see [the integrated review](../verification/WCP-034-merge.md). Its selected107-case API and85-case browser integration unions passed after the isolated fixture correction. Earlier failed/interrupted/wrong-toolchain evidence remains retained. WCP-014 and WCP-017 remain open until their own final integration reviews; a candidate or pushed checkpoint is not acceptance.
+
 - Workflow: `C:/Users/brthi/.codex/skills/implement-spec/SKILL.md`.
 - Authoritative requirements: `.scratch/world-curling-platform/spec.md`.
 - Task graph: `.scratch/world-curling-platform/tickets.json`; execute published `issues/`, never archived drafts.
@@ -34,3 +36,5 @@ The official Node archive SHA256 is `be72284c7bc62de07d5a9fd0ae196879842c085f11f
 - Generated-only reclamation on2026-11-09 UTC covered inactive accepted WCP-009 and WCP-019 (`node_modules` and `.next`). All four resolved targets were checked inside the workspace, reparse points rejected, and old runtime listener ports confirmed inactive. Source, configuration, immutable data and verification reports remain. Reinstall/build before rerunning there.
 
 - Generated-only reclamation on2026-11-09 UTC also covered inactive accepted WCP-020 and WCP-033 (`node_modules` and `.next`). All four absolute targets were checked inside this workspace with no reparse points, their web ports were inactive, and their owned PostgreSQL databases had no active connections. Source, configuration, immutable data and verification reports remain; reinstall/build before rerunning. The private `generated-cleanup-20261109.txt` records the operation.
+
+- After the isolated ranking fixture repair was reviewed, its stopped WCP-034-fixture-fix worktree's `node_modules` and `.next` were reclaimed. Absolute owned targets, absence of reparse roots, inactive3154 listener and absence of owned Node processes were checked. Source, configuration, all red/green databases and reports remain; runtime reuse requires reinstall/build. Private operation record: `.runtime/resume-20261109/generated-cleanup-20261109.txt`.

@@ -1800,13 +1800,17 @@
       "file": "34-calculate-four-player-overall-wctrs-draft-lists.md",
       "id": "WCP-034",
       "path": "issues/34-calculate-four-player-overall-wctrs-draft-lists.md",
-      "status": "in-progress",
+      "status": "completed",
       "labels": [
         "ready-for-agent"
       ],
       "blocked_by": [
         "WCP-033"
-      ]
+      ],
+      "completion": {
+        "commit": "8d5412ac5eb0f77efdd9431e5a51c805d5ce00cc",
+        "evidence": "docs/verification/WCP-034-merge.md"
+      }
     },
     {
       "n": 35,
@@ -2021,7 +2025,7 @@
       "file": "38-approve-and-publish-complete-dated-wctrs-lists.md",
       "id": "WCP-038",
       "path": "issues/38-approve-and-publish-complete-dated-wctrs-lists.md",
-      "status": "ready-for-agent",
+      "status": "in-progress",
       "labels": [
         "ready-for-agent"
       ],
