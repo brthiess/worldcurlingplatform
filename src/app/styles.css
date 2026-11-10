@@ -1348,3 +1348,38 @@ footer {
 }
 
 [role="tab"][aria-selected="true"] { box-shadow: inset 0 -4px 0 #fff; text-decoration: underline; text-underline-offset: .3rem; }
+
+.publication-page { max-width: 1120px; }
+.publication-filters { display:flex; flex-wrap:wrap; align-items:end; gap:1rem; margin:1.5rem 0; }
+.publication-filters label { flex:1 1 180px; }
+.publication-page select,.publication-page textarea { display:block; width:100%; min-width:0; min-height:44px; margin-top:.4rem; }
+.publication-select { display:block; margin-block:1.5rem; }
+.publication-heading { display:flex; justify-content:space-between; align-items:start; flex-wrap:wrap; gap:1rem; padding-block:1.2rem; border-bottom:2px solid #164c66; }
+.publication-heading h2 { margin:.65rem 0; }
+.ranking-columns,.publication-row { display:grid; grid-template-columns:4.5rem minmax(0,1fr) minmax(7rem,12rem); gap:1rem; }
+.ranking-columns { color:#435560; padding:1rem 0 .5rem; font-size:.85rem; }
+.publication-row { padding:1.25rem 0; border-bottom:1px solid #bfcdd4; font-variant-numeric:tabular-nums; }
+.publication-row h3 { margin:0 0 .65rem; }
+.ranking-position strong { font-size:1.6rem; }
+.publication-row small { display:block; color:#435560; margin-top:.4rem; }
+.ranking-points { text-align:right; overflow-wrap:anywhere; }
+.ranking-position { color:#164c66; }
+.publication-row summary { cursor:pointer; padding:.45rem 0; min-height:44px; }
+.publication-totals { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:.5rem; margin-block:1rem; }
+.publication-totals dd { margin:0; font-weight:600; }
+.publication-contributions { list-style:none; padding:0; }
+.publication-contributions li { margin:.75rem 0; padding:.75rem; background:#eaf0f3; }
+.publication-contributions span { display:block; margin-top:.3rem; }
+.publication-ack { display:flex; align-items:start; gap:.65rem; margin-block:1rem; }
+.publication-ack input { width:20px; height:20px; flex:0 0 20px; margin:.15rem 0 0; }
+.publication-page fieldset { min-width:0; border:0; padding:0; }
+.publication-page textarea { min-height:7rem; }
+.publication-digest { margin-block:1.5rem; overflow-wrap:anywhere; }
+@media(max-width:540px) {
+ .ranking-columns { grid-template-columns:2.5rem minmax(0,1fr) 5.5rem;gap:.5rem; }
+ .publication-row { grid-template-columns:2.5rem minmax(0,1fr);gap:.5rem; }
+ .ranking-points { grid-column:2; text-align:left; }
+ .publication-totals { grid-template-columns:1fr; }
+ .publication-totals dd { margin-bottom:.5rem; }
+ .publication-page .form-card { padding:1rem; }
+}

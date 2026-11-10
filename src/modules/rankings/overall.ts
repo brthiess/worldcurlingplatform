@@ -123,6 +123,49 @@ async function detail(c: PoolClient, id: string) {
     result: JSON.parse(r.resultContents),
   };
 }
+/** Publication consumes the exact frozen run, then independently checks the
+ * present source and producer history. Frozen replay alone is not readiness. */
+export async function overallPublicationCandidate(c: PoolClient, id: string) {
+  const run = await detail(c, id),
+    m = run.manifest;
+  if (
+    freezeContents(m).digest !== run.manifestDigest ||
+    freezeContents(run.result).digest !== run.resultDigest
+  )
+    throw new EntryError(
+      "Frozen draft evidence digest does not match its bytes.",
+      422,
+    );
+  const current = await source(
+    c,
+    run.discipline,
+    run.effectiveDate,
+    m.source.rules.id,
+  );
+  const latest = (
+    await c.query(
+      "SELECT id FROM overall_ranking_run WHERE discipline=$1 AND effective_date=$2 ORDER BY version DESC LIMIT 1",
+      [run.discipline, run.effectiveDate],
+    )
+  ).rows[0];
+  const blockers: string[] = [];
+  if (current.sourceDigest !== m.source.sourceDigest)
+    blockers.push(
+      "Current calculation inputs or eligibility changed. Calculate and review a fresh draft.",
+    );
+  if (latest?.id !== run.id)
+    blockers.push(
+      "A newer draft exists for this effective date. Review the latest exact run.",
+    );
+  if (
+    m.engineIdentity.fingerprint !== loadedIdentity.fingerprint ||
+    m.engineIdentity.node !== loadedIdentity.node
+  )
+    blockers.push(
+      "Review a draft from the current supported engine/source build.",
+    );
+  return { run, blockers };
+}
 export async function overallWorkspace(
   userId: string,
   params: { id?: string; discipline?: string; date?: string; rules?: string },
