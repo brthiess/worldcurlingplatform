@@ -81,6 +81,11 @@ test("staff compare and publish exact contributions, then public selectors, keyb
     if (r.status() >= 500) issues.push(`HTTP${r.status()} ${r.url()}`);
   });
   await select(page, draft.id);
+  const reviewed = await (
+    await page.request.get(
+      `/api/v1/ranking-publications?producer=overall&run=${draft.id}`,
+    )
+  ).json();
   const approve = page.getByRole("button", {
     name: "Approve & publish exact list",
   });
@@ -106,11 +111,41 @@ test("staff compare and publish exact contributions, then public selectors, keyb
       ),
     ).toBe(true);
   }
-  await page.keyboard.press("Enter");
+  const [approvalResponse] = await Promise.all([
+    page.waitForResponse(
+      (r) =>
+        new URL(r.url()).pathname === "/api/v1/ranking-publications" &&
+        r.request().method() === "POST",
+    ),
+    page.keyboard.press("Enter"),
+  ]);
+  expect(approvalResponse.status()).toBe(200);
   const publicLink = page.getByRole("link", {
     name: "Open this exact approved publication",
   });
   await expect(publicLink).toBeVisible();
+  if (reviewed.compared)
+    await expect
+      .soft(
+        page.getByRole("link", {
+          name: "Earlier approved publication",
+          exact: true,
+        }),
+      )
+      .toHaveAttribute("href", `/rankings?publication=${reviewed.compared.id}`);
+  else
+    await expect
+      .soft(
+        page.getByText(
+          "Approved comparison: first publication (no earlier approval).",
+          { exact: true },
+        ),
+      )
+      .toBeVisible();
+  await page.screenshot({
+    path: info.outputPath("approved-frozen-comparison.png"),
+    fullPage: true,
+  });
   const href = await publicLink.getAttribute("href");
   await publicLink.click();
   await expect(
@@ -162,6 +197,68 @@ test("staff compare and publish exact contributions, then public selectors, keyb
   await expect(
     page.getByRole("heading", { name: "Women’s four-player overall" }),
   ).toBeVisible();
+  const current = await (
+    await page.request.get(
+      `/api/v1/overall-rankings?discipline=${f.discipline}&date=2026-11-23&rules=${f.rulesId}`,
+    )
+  ).json();
+  const nextDraftResponse = await page.request.post(
+    "/api/v1/overall-rankings",
+    {
+      headers: { Origin: process.env.BETTER_AUTH_URL! },
+      data: {
+        action: "calculate",
+        discipline: f.discipline,
+        effectiveDate: "2026-11-23",
+        rulesId: f.rulesId,
+        version: current.version,
+        sourceDigest: current.review.sourceDigest,
+        requestId: crypto.randomUUID(),
+        evidence: draft.manifest.evidence,
+      },
+    },
+  );
+  expect(nextDraftResponse.status()).toBe(200);
+  const nextDraft = await nextDraftResponse.json();
+  expect(nextDraft.result.state).toBe("ready");
+  const nextReview = await (
+    await page.request.get(
+      `/api/v1/ranking-publications?producer=overall&run=${nextDraft.id}`,
+    )
+  ).json();
+  const laterResponse = await page.request.post(
+    "/api/v1/ranking-publications",
+    {
+      headers: { Origin: process.env.BETTER_AUTH_URL! },
+      data: {
+        action: "approve",
+        producer: "overall",
+        runId: nextDraft.id,
+        manifestDigest: nextDraft.manifestDigest,
+        resultDigest: nextDraft.resultDigest,
+        version: nextReview.version,
+        previousId: nextReview.previous?.id ?? null,
+        comparedId: nextReview.compared?.id ?? null,
+        acknowledged: nextDraft.result.warnings,
+        note: "Second complete fictional approval solely to verify frozen publication history; no result correction or official endorsement is claimed.",
+        requestId: crypto.randomUUID(),
+      },
+    },
+  );
+  expect(laterResponse.status()).toBe(200);
+  const later = await laterResponse.json();
+  await page.reload();
+  await expect(
+    page.getByRole("status").filter({ hasText: "Historical approval" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: /^Open later replacement version/ }),
+  ).toHaveAttribute("href", `/rankings?publication=${later.id}`);
+  await expect(page.locator(`#subject-${f.seasonIds[0]}`)).toContainText("102");
+  await page.screenshot({
+    path: info.outputPath("public-original-with-later-replacement.png"),
+    fullPage: true,
+  });
   expect(issues).toEqual([]);
 });
 test("public loading, empty, failed refresh and retry preserve the last exact approved list", async ({

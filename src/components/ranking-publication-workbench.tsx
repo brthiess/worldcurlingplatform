@@ -15,7 +15,11 @@ type Publication = {
   effectiveDate: string;
   publicDigest: string;
   privateDigest: string;
-  evidence: { manifestDigest: string; resultDigest: string };
+  evidence: {
+    manifestDigest: string;
+    resultDigest: string;
+    comparedId: string | null;
+  };
   data: PublicRankingList;
 };
 type Workspace = {
@@ -266,11 +270,29 @@ export function RankingPublicationWorkbench() {
                   : "publication time will be recorded on approval"}
               </p>
               <p>
-                Compared with{" "}
-                {workspace.compared
-                  ? `${workspace.compared.effectiveDate} · approved version ${workspace.compared.version}`
-                  : "no earlier approved publication (first list)"}
-                .
+                {workspace.published ? (
+                  workspace.published.evidence.comparedId ? (
+                    <>
+                      Approved comparison:{" "}
+                      <a
+                        href={`/rankings?publication=${workspace.published.evidence.comparedId}`}
+                      >
+                        Earlier approved publication
+                      </a>
+                      .
+                    </>
+                  ) : (
+                    "Approved comparison: first publication (no earlier approval)."
+                  )
+                ) : (
+                  <>
+                    Compared with{" "}
+                    {workspace.compared
+                      ? `${workspace.compared.effectiveDate} · approved version ${workspace.compared.version}`
+                      : "no earlier approved publication (first list)"}
+                    .
+                  </>
+                )}
               </p>
             </div>
           </div>

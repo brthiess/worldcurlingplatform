@@ -66,6 +66,10 @@ export function Rankings() {
       new URLSearchParams(location.search).get("publication") ?? "",
     );
   }, []);
+  const selected = view?.selected;
+  const replacement = selected
+    ? view?.publications.find((p) => p.replacesId === selected.id)
+    : undefined;
   return (
     <main id="main" className="workspace publication-page">
       <p className="eyebrow">WCTRS · approved publications</p>
@@ -182,6 +186,15 @@ export function Rankings() {
                   Link to this exact publication
                 </a>
               </div>
+              {replacement && (
+                <p className="notice" role="status">
+                  Historical approval.{" "}
+                  <a href={`/rankings?publication=${replacement.id}`}>
+                    Open later replacement version {replacement.version}
+                  </a>
+                  . This exact approved list remains unchanged.
+                </p>
+              )}
               <RankingList data={view.selected.data} />
               <details className="publication-digest">
                 <summary>Frozen publication fingerprint</summary>
