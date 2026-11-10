@@ -6,6 +6,7 @@ import {
   assessmentEvidence,
   type AssessmentEvidence,
 } from "@/domain/event-assessment-input";
+import { canonicalJson } from "@/domain/canonical-json";
 import { AssessmentEvidenceEditor } from "./assessment-evidence-editor";
 import type { AssessmentResult } from "@/domain/event-assessments";
 export type Review = {
@@ -18,7 +19,12 @@ export type Review = {
   priorEditions?: { id: string; name: string; starts_on: string }[];
   sourceDigest: string;
   current: {
-    division: { name: string; eventName: string; discipline: string };
+    division: {
+      id: string;
+      name: string;
+      eventName: string;
+      discipline: string;
+    };
     entries: { id: string; name: string }[];
     games: {
       id: string;
@@ -90,7 +96,15 @@ type Workspace = {
     actorId: string;
     requestId: string;
   }[];
-  receipts?: { actorId: string; requestId: string; assessmentId: string }[];
+  receipts?: {
+    actorId: string;
+    requestId: string;
+    assessmentId: string;
+    commandDigest: string;
+    divisionId: string;
+    version: number;
+    path: string;
+  }[];
   selected?: Saved | null;
 };
 const path = "/api/v1/event-assessments";
@@ -227,15 +241,52 @@ export function EventAssessmentsWorkbench() {
         );
     },
     async (pending) => {
+      if (pending.path !== path || pending.actorId !== workspace?.actorId)
+        return false;
       const original = JSON.parse(pending.body),
-        state = await read(
-          `${path}?division=${original.divisionId}&rules=${original.evidence?.rulesId ?? original.rulesId ?? rules}`,
-        );
+        action = original.action ?? "calculate";
+      if (
+        !["calculate", "retry"].includes(action) ||
+        typeof original.divisionId !== "string" ||
+        !Number.isSafeInteger(original.version)
+      )
+        return false;
+      const r = original.evidence?.rulesId ?? original.rulesId ?? rules;
+      const state = await read(
+        `${path}?division=${encodeURIComponent(original.divisionId)}&rules=${encodeURIComponent(r)}`,
+      );
+      if (
+        state.actorId !== pending.actorId ||
+        state.review?.current.division.id !== original.divisionId
+      )
+        return false;
+      const commandDigest = Array.from(
+        new Uint8Array(
+          await crypto.subtle.digest(
+            "SHA-256",
+            new TextEncoder().encode(canonicalJson(original)),
+          ),
+        ),
+      )
+        .map((b) => b.toString(16).padStart(2, "0"))
+        .join("");
       const found = state.receipts?.some(
         (h) =>
-          h.actorId === pending.actorId && h.requestId === original.requestId,
+          h.actorId === pending.actorId &&
+          h.requestId === original.requestId &&
+          h.path === pending.path &&
+          h.divisionId === original.divisionId &&
+          h.commandDigest === commandDigest &&
+          h.version ===
+            (action === "retry" ? original.version : original.version + 1) &&
+          (action !== "retry" || h.assessmentId === original.assessmentId) &&
+          state.history?.some(
+            (a) => a.id === h.assessmentId && a.version === h.version,
+          ),
       );
       if (found) {
+        setDivision(original.divisionId);
+        setRules(r);
         setWorkspace(state);
         setError("");
         setStale(false);

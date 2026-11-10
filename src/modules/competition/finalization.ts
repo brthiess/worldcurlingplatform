@@ -1,3 +1,4 @@
+import { finalizationCommand } from "@/domain/finalization-command";
 import { pool } from "@/db";
 import type { PoolClient } from "pg";
 import { randomUUID } from "node:crypto";
@@ -204,7 +205,15 @@ export async function finalizationWorkspace(
         await c.query("SELECT event_id FROM division WHERE id=$1", [id])
       ).rows[0];
       await authorize(c, userId, event?.event_id ?? "unavailable");
-      const result = await detail(c, id, version);
+      const result = {
+        ...(await detail(c, id, version)),
+        receipts: (
+          await c.query(
+            'SELECT actor_id AS "actorId",request_id AS "requestId",division_id AS "divisionId",version,command_digest AS "commandDigest",\'/api/v1/division-finalizations\' AS path FROM division_finalization WHERE division_id=$1',
+            [id],
+          )
+        ).rows,
+      };
       await c.query("COMMIT");
       return result;
     }
@@ -276,15 +285,7 @@ export async function saveFinalization(userId: string, raw: unknown) {
       event?.event_id ?? null,
     ]);
     await authorize(c, userId, event?.event_id ?? "unavailable");
-    const command = {
-      divisionId: input.divisionId,
-      version: input.version,
-      requestId: input.requestId,
-      sourceDigest: input.sourceDigest,
-      placements: input.placements,
-      note: input.note.trim(),
-      rulesReference: input.rulesReference.trim(),
-    };
+    const command = finalizationCommand(input);
     const commandDigest = freezeContents(command).digest;
     // A saved receipt is still a currently authorized operation. Lock the same
     // scope as a new command before replay, without requiring its old source

@@ -1,3 +1,4 @@
+import { finalizationCommand } from "../src/domain/finalization-command";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
@@ -107,4 +108,32 @@ test("placements cover each entry exactly once and explicitly preserve ties with
       ),
     /tie/i,
   );
+});
+
+test("finalization command receipts whitelist fields, trim only note and rules, and preserve placement order", () => {
+  const input = {
+    divisionId: "d",
+    version: 2,
+    requestId: "r",
+    sourceDigest: "s",
+    placements: [
+      { entryId: "z", place: 2 },
+      { entryId: "a", place: 1 },
+    ],
+    note: "  note  ",
+    rulesReference: "  rules  ",
+    ignored: "not receipt content",
+  };
+  assert.deepEqual(finalizationCommand(input), {
+    divisionId: "d",
+    version: 2,
+    requestId: "r",
+    sourceDigest: "s",
+    placements: [
+      { entryId: "z", place: 2 },
+      { entryId: "a", place: 1 },
+    ],
+    note: "note",
+    rulesReference: "rules",
+  });
 });

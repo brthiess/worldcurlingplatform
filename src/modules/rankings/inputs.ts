@@ -143,6 +143,11 @@ async function detail(c: Reader, id: string, version?: number) {
         : null,
   };
 }
+/** Private overall-list projection: unlike event roster approval, this requires the full current starting-input readiness. */
+export async function overallStartingEvidence(c: Reader, registrationId: string) {
+  const r = await c.query("SELECT id FROM ranking_record WHERE registration_id=$1 FOR SHARE",[registrationId]);
+  return r.rowCount ? detail(c,r.rows[0].id) : null;
+}
 /** Scoped event-roster projection. It grants no starting-entitlement approval. */
 export async function calculationRosterEvidence(
   c: Reader,

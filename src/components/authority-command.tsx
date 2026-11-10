@@ -38,7 +38,7 @@ function valid(value: unknown): value is RetainedAuthorityCommand {
     typeof c.path !== "string" ||
     typeof c.actorId !== "string" ||
     !(
-      /^\/api\/v1\/(approval-delegations|role-grants|team-representation|entries|division-finalizations|event-assessments|registration|identity-corrections|entry-charges|imports)$/.test(
+      /^\/api\/v1\/(approval-delegations|role-grants|team-representation|entries|division-finalizations|event-assessments|overall-rankings|registration|identity-corrections|entry-charges|imports)$/.test(
         c.path,
       ) ||
       /^\/api\/v1\/entries\/[-\w]{1,80}$/.test(c.path) ||
@@ -384,7 +384,12 @@ export function AuthorityRecovery({
               <dd style={{ overflowWrap: "anywhere" }}>
                 {body.requestId ?? body.id}
               </dd>
-              {body.sourceDigest && <><dt>Exact export digest</dt><dd>{body.sourceDigest}</dd></>}
+              {body.sourceDigest && (
+                <>
+                  <dt>Exact export digest</dt>
+                  <dd>{body.sourceDigest}</dd>
+                </>
+              )}
             </dl>
           </details>
           <div className="application-actions">

@@ -153,6 +153,7 @@ export default function Admin() {
           </p>
           <p>
             <a href="/admin/event-assessments">Four-player event assessments</a>
+            <a href="/admin/overall-rankings">Four-player overall drafts</a>
           </p>
           <p><a href="/admin/imports">Historical import staging</a></p>
           <button
