@@ -21,6 +21,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             <a href="/players">Players</a>
             <a href="/teams">Teams</a>
             <a href="/news">News</a>
+            <a href="/search">Search &amp; favorites</a>
             <a href="/account">Your account</a>
             <a href="/admin">Sign in / workspace</a>
           </nav>

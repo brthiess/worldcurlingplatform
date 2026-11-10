@@ -588,7 +588,7 @@ export async function publicTeams(id?: string, q = "") {
   try {
     await c.query("BEGIN ISOLATION LEVEL REPEATABLE READ");
     const teams = await c.query(
-      `SELECT t.id,t.discipline,coalesce((SELECT r.display_name FROM event_lineup_version r WHERE r.team_id=t.id ORDER BY r.created_at DESC LIMIT 1),'Team') AS name FROM team t WHERE ($1::text IS NULL OR t.id=$1) ORDER BY t.id`,
+      `SELECT t.id,t.discipline,coalesce((SELECT v.display_name FROM season_registration sr JOIN season_roster_version v ON v.registration_id=sr.id AND v.version=sr.version WHERE sr.team_id=t.id ORDER BY sr.season DESC,sr.id LIMIT 1),(SELECT en.display_name FROM event_entry en JOIN division d ON d.id=en.division_id JOIN event_edition e ON e.id=d.event_id WHERE en.team_id=t.id AND e.published AND e.admission_status='approved' ORDER BY e.starts_on DESC,en.id LIMIT 1),'Team') AS name FROM team t WHERE ($1::text IS NULL OR t.id=$1) ORDER BY t.id`,
       [id ?? null],
     );
     const result = [];

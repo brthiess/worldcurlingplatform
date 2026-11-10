@@ -1,4 +1,6 @@
 "use client";
+import { PublicLink } from "./public-context";
+import { FavoriteButton } from "./favorites";
 import { POOL_TEMPLATE } from "@/domain/pools";
 import { EventEntryLinks } from "@/components/public-rosters";
 import { GameResultHistory, LineupEvidence } from "./game-result-history";
@@ -39,7 +41,21 @@ export function ScoreTable({ game }: { game: PublicGame }) {
         {(["a", "b"] as const).map((side) => (
           <tr key={side}>
             <th scope="row">
-              {side === "a" ? game.nameA : game.nameB}
+              {(
+                side === "a"
+                  ? (game.teamA ?? game.entryA)
+                  : (game.teamB ?? game.entryB)
+              ) ? (
+                <PublicLink
+                  href={`/${(side === "a" ? game.teamA : game.teamB) ? "teams" : "entries"}/${side === "a" ? (game.teamA ?? game.entryA) : (game.teamB ?? game.entryB)}`}
+                >
+                  {side === "a" ? game.nameA : game.nameB}
+                </PublicLink>
+              ) : side === "a" ? (
+                game.nameA
+              ) : (
+                game.nameB
+              )}
               {game.hammer === side && (
                 <span className="hammer">Hammer · end {game.hammerEnd}</span>
               )}
@@ -148,6 +164,7 @@ export function ScoresView({
     const url = new URL(window.location.href);
     url.searchParams.set("draw", id);
     window.history.pushState({}, "", url);
+    window.dispatchEvent(new Event("wcp:context"));
   }
   const draw = data?.draws.find((d) => d.id === selected);
   const games =
@@ -174,11 +191,13 @@ export function ScoresView({
             </select>
           </div>
           <button type="submit">Show event scores</button>
-          <a href="/?event=main-triple-2026">Main 16-team triple knockout →</a>
+          <PublicLink href="/?event=main-triple-2026">
+            Main 16-team triple knockout →
+          </PublicLink>
         </form>
       )}
       {gameId && (
-        <a
+        <PublicLink
           className="back"
           href={
             data
@@ -187,7 +206,7 @@ export function ScoresView({
           }
         >
           ← Back to scores
-        </a>
+        </PublicLink>
       )}
       {error && (
         <div className="error" role="status">
@@ -220,16 +239,17 @@ export function ScoresView({
               : "Edition details are maintained by the organizing authority."}{" "}
             This is an initial offer, not an official live service.
           </div>
+          <FavoriteButton kind="event" id={data.event.id} />
           <section className="event" aria-label={data.event.name}>
             <div className="event-head">
               <div>
                 <p className="eyebrow">{data.event.division}</p>
                 <h2>
-                  <a
+                  <PublicLink
                     href={`/events/${data.event.id}?${new URLSearchParams({ ...(data.selectedDivisionId ? { division: data.selectedDivisionId } : {}), ...(selected ? { draw: selected } : {}) })}`}
                   >
                     {data.event.name}
-                  </a>
+                  </PublicLink>
                 </h2>
                 <p className="muted">
                   {data.event.venue || "Venue not confirmed"} ·{" "}
@@ -256,26 +276,26 @@ export function ScoresView({
                 <ul className="division-links">
                   {data.divisions.map((d) => (
                     <li key={d.id}>
-                      <a
+                      <PublicLink
                         aria-current={
                           d.id === data.selectedDivisionId ? "page" : undefined
                         }
                         href={`/events/${data.event.id}?division=${encodeURIComponent(d.id)}`}
                       >
                         {d.name} · scores
-                      </a>
+                      </PublicLink>
                       <span> · Ranking eligibility: {d.rankingStatus}</span>
                       {d.hasPublishedDraw && (
                         <span>
                           {" "}
                           ·{" "}
-                          <a
+                          <PublicLink
                             href={`/events/${data.event.id}/bracket?division=${encodeURIComponent(d.id)}`}
                           >
                             {d.drawTemplate === POOL_TEMPLATE
                               ? "Pools and standings"
                               : "Competition bracket / game list"}
-                          </a>
+                          </PublicLink>
                         </span>
                       )}
                     </li>
@@ -364,9 +384,9 @@ export function ScoresView({
                           .filter((g) => g.drawId === d.id)
                           .map((g) => (
                             <li key={g.id}>
-                              <a href={`/games/${g.id}`}>
+                              <PublicLink href={`/games/${g.id}`}>
                                 {g.nameA} vs {g.nameB}
-                              </a>{" "}
+                              </PublicLink>{" "}
                               · Sheet {g.sheet} · {g.state}
                             </li>
                           ))}
@@ -420,7 +440,9 @@ export function ScoresView({
                             : "Hammer shown above"}
                     </span>
                     {!gameId && (
-                      <a href={`/games/${game.id}`}>Game details →</a>
+                      <PublicLink href={`/games/${game.id}`}>
+                        Game details →
+                      </PublicLink>
                     )}
                   </div>
                   {gameId && (
@@ -481,7 +503,7 @@ export function ScoresView({
               <div className="next-draw">
                 <strong>Next: Draw {next.number}</strong>
                 <span>{venueTime(next.startsAt, data.event.timezone)}</span>
-                <a
+                <PublicLink
                   href={`?${new URLSearchParams({ ...(home ? { event: eventId } : {}), ...(data.selectedDivisionId ? { division: data.selectedDivisionId } : {}), draw: next.id })}`}
                   onClick={(event) => {
                     if (
@@ -496,7 +518,7 @@ export function ScoresView({
                   }}
                 >
                   View upcoming games →
-                </a>
+                </PublicLink>
               </div>
             )}
           </section>
@@ -526,11 +548,11 @@ export function ScoresView({
           </div>
           {!gameId && (
             <p>
-              <a
+              <PublicLink
                 href={`/divisions/${data.selectedDivisionId ?? data.divisions[0]?.id}/results`}
               >
                 Final results and revision history →
-              </a>
+              </PublicLink>
             </p>
           )}
           {!gameId && (
@@ -545,14 +567,14 @@ export function ScoresView({
         data?.divisions.find((d) => d.id === data.selectedDivisionId)
           ?.hasPublishedDraw && (
           <p>
-            <a
+            <PublicLink
               href={`/events/${data.event.id}/bracket?division=${encodeURIComponent(data.selectedDivisionId!)}`}
             >
               {data.divisions.find((d) => d.id === data.selectedDivisionId)
                 ?.drawTemplate === POOL_TEMPLATE
                 ? "Pools and standings →"
                 : "Competition bracket / game list →"}
-            </a>
+            </PublicLink>
           </p>
         )}
     </main>
