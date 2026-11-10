@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { RankingList } from "./ranking-list";
 import { useAuthorityCommand, AuthorityRecovery } from "./authority-command";
 import { canonicalJson } from "@/domain/canonical-json";
@@ -16,6 +16,7 @@ type Publication = {
   publicDigest: string;
   privateDigest: string;
   evidence: { manifestDigest: string; resultDigest: string };
+  data: PublicRankingList;
 };
 type Workspace = {
   actorId: string;
@@ -59,9 +60,11 @@ export function RankingPublicationWorkbench() {
     [runId, setRunId] = useState(""),
     [loading, setLoading] = useState(true),
     [error, setError] = useState(""),
+    [dismissedError, setDismissedError] = useState<string | null>(null),
     [stale, setStale] = useState(false),
     [ack, setAck] = useState<string[]>([]),
     [note, setNote] = useState("");
+  const lastRejection = useRef<string | null>(null);
   async function load(id = runId, recovery = false) {
     setLoading(true);
     try {
@@ -73,6 +76,8 @@ export function RankingPublicationWorkbench() {
       setAck([]);
       setError("");
       setStale(false);
+      if (!command.pending && command.error === lastRejection.current)
+        setDismissedError(command.error);
       return next;
     } catch (e) {
       setError((e as Error).message);
@@ -142,7 +147,9 @@ export function RankingPublicationWorkbench() {
       await load(b.runId, true);
       return true;
     },
-    (status) => {
+    (status, message) => {
+      lastRejection.current = message;
+      setDismissedError(null);
       if (status === 409 || status === 422) setStale(true);
     },
   );
@@ -189,7 +196,16 @@ export function RankingPublicationWorkbench() {
         list. Imported observations remain separate; an informational
         acknowledgement never waives calculation or eligibility evidence.
       </p>
-      <AuthorityRecovery state={command} label="publication" />
+      <AuthorityRecovery
+        state={{
+          ...command,
+          error:
+            !command.pending && command.error === dismissedError
+              ? ""
+              : command.error,
+        }}
+        label="publication"
+      />
       {error && (
         <p className="error" role="alert">
           {error}
@@ -238,12 +254,16 @@ export function RankingPublicationWorkbench() {
           <div className="publication-heading">
             <div>
               <span className="status">
-                Private {workspace.result?.state} draft
+                {workspace.published
+                  ? "Published · exact approved history"
+                  : `Private ${workspace.result?.state} draft`}
               </span>
               <h2>{workspace.data.title}</h2>
               <p>
-                Effective {workspace.data.effectiveDate} · publication time will
-                be recorded on approval
+                Effective {workspace.data.effectiveDate} ·{" "}
+                {workspace.published
+                  ? "publication time retained in the approved record"
+                  : "publication time will be recorded on approval"}
               </p>
               <p>
                 Compared with{" "}
@@ -255,22 +275,30 @@ export function RankingPublicationWorkbench() {
             </div>
           </div>
           {blockers.length > 0 && (
-            <div className="error" role="alert">
-              <h3>Publication blocked</h3>
+            <div
+              className={workspace.published ? "notice" : "error"}
+              role={workspace.published ? "status" : "alert"}
+            >
+              <h3>
+                {workspace.published
+                  ? "Current-source differences"
+                  : "Publication blocked"}
+              </h3>
               <ul>
                 {blockers.map((b, i) => (
                   <li key={i}>{b}</li>
                 ))}
               </ul>
               <p>
-                Resolve required evidence and calculate a fresh draft. These
-                issues cannot be acknowledged.
+                {workspace.published
+                  ? "The exact approved snapshot remains unchanged. A new approval requires a fresh complete draft."
+                  : "Resolve required evidence and calculate a fresh draft. These issues cannot be acknowledged."}
               </p>
             </div>
           )}
           <RankingList
-            data={workspace.data}
-            comparison={workspace.comparison}
+            data={workspace.published?.data ?? workspace.data}
+            comparison={workspace.published ? undefined : workspace.comparison}
           />
           {workspace.published ? (
             <p className="notice" role="status">

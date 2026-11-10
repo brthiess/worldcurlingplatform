@@ -11,6 +11,36 @@ import {
 const db = new pg.Pool({ connectionString: process.env.DATABASE_URL, max: 3 });
 const base = process.env.BETTER_AUTH_URL!;
 after(() => db.end());
+test("nonadministrators cannot distinguish a missing private draft through approval", async () => {
+  const login = await authRequest(base + "/api/auth/sign-in/email", {
+    method: "POST",
+    headers: { Origin: base, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      email: "organizer@demo.invalid",
+      password: process.env.DEMO_PASSWORD,
+    }),
+  });
+  assert.equal(login.status, 200);
+  const other = login.headers
+    .getSetCookie()
+    .map((c) => c.split(";")[0])
+    .join("; ");
+  const response = await fetch(base + "/api/v1/ranking-publications", {
+    method: "POST",
+    headers: {
+      cookie: other,
+      Origin: base,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      action: "approve",
+      producer: "overall",
+      runId: randomUUID(),
+      requestId: randomUUID(),
+    }),
+  });
+  assert.equal(response.status, 403);
+});
 let cookie = "";
 async function send(path: string, body?: unknown) {
   if (!cookie) {
@@ -326,7 +356,7 @@ test("complete sourced overall draft can be compared, approved and read as exact
     )
   ).rows[0];
   await db.query(
-    "CREATE FUNCTION wcp038_test_audit_failure() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'controlled038audit failure'; END $$; CREATE TRIGGER wcp038_test_audit_failure BEFORE INSERT ON audit_record FOR EACH ROW WHEN (NEW.action='ranking_publication_approved') EXECUTE FUNCTION wcp038_test_audit_failure()",
+    "CREATE FUNCTION wcp038_test_receipt_failure() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'controlled038receipt failure'; END $$; CREATE TRIGGER wcp038_test_receipt_failure BEFORE INSERT ON ranking_publication_receipt FOR EACH ROW WHEN (NEW.action='approve') EXECUTE FUNCTION wcp038_test_receipt_failure()",
   );
   try {
     assert.equal(
@@ -344,7 +374,7 @@ test("complete sourced overall draft can be compared, approved and read as exact
     );
   } finally {
     await db.query(
-      "DROP TRIGGER wcp038_test_audit_failure ON audit_record; DROP FUNCTION wcp038_test_audit_failure()",
+      "DROP TRIGGER wcp038_test_receipt_failure ON ranking_publication_receipt; DROP FUNCTION wcp038_test_receipt_failure()",
     );
   }
   const raced = await Promise.all([

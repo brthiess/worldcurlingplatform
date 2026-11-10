@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 import pg from "pg";
 import {
@@ -9,7 +9,8 @@ import { signInWithRateWindow } from "./auth-fixture";
 const db = new pg.Pool({ connectionString: process.env.DATABASE_URL, max: 3 });
 test.afterAll(() => db.end());
 test.setTimeout(180000);
-async function ready(page: any) {
+test.use({ actionTimeout: 10000 });
+async function ready(page: Page) {
   await page.goto("/admin");
   await page.getByLabel("Demo persona").selectOption("administrator");
   await page.getByLabel("Demo password").fill(process.env.DEMO_PASSWORD!);
@@ -50,14 +51,14 @@ async function ready(page: any) {
   expect(draft.result.state).toBe("ready");
   return { f, draft };
 }
-async function select(page: any, id: string) {
+async function select(page: Page, id: string) {
   await page.goto("/admin/ranking-publications");
   await page.getByLabel("Calculated draft").selectOption(id);
   await expect(
     page.getByRole("heading", { name: "Approve this exact list" }),
   ).toBeVisible();
 }
-async function fill(page: any) {
+async function fill(page: Page) {
   for (const checkbox of await page.getByRole("checkbox").all())
     await checkbox.check();
   await page
@@ -140,18 +141,20 @@ test("staff compare and publish exact contributions, then public selectors, keyb
     ).toBe(true);
   }
   await page
-    .getByLabel("Discipline", { exact: true })
+    .getByRole("combobox", { name: "Discipline", exact: true })
     .selectOption("mixed_doubles");
   await expect(
     page.getByText(/No approved publication matches these filters/),
   ).toBeVisible();
   await page
-    .getByLabel("Discipline", { exact: true })
+    .getByRole("combobox", { name: "Discipline", exact: true })
     .selectOption("women_four");
   await expect(
     page.getByRole("heading", { name: "Women’s four-player overall" }),
   ).toBeVisible();
-  await page.getByLabel("List", { exact: true }).selectOption("series");
+  await page
+    .getByRole("combobox", { name: "List", exact: true })
+    .selectOption("series");
   await expect(
     page.getByText(/No approved publication matches these filters/),
   ).toBeVisible();
@@ -191,7 +194,7 @@ test("public loading, empty, failed refresh and retry preserve the last exact ap
     }),
   );
   await page
-    .getByLabel("Discipline", { exact: true })
+    .getByRole("combobox", { name: "Discipline", exact: true })
     .selectOption("women_four");
   await expect(page.getByRole("main").getByRole("alert")).toContainText(
     "selection is stale",
@@ -236,6 +239,61 @@ test("uncertain approval retains exact command across reload and reconciles only
   page.on("request", (r) => {
     if (r.method() === "POST") posts.push(r.url());
   });
+  const key = "ranking-publication-command:demo-administrator";
+  const original = JSON.parse(
+    (await page.evaluate((key) => sessionStorage.getItem(key), key))!,
+  );
+  const originalBody = JSON.parse(original.body);
+  for (const [label, journal] of [
+    [
+      "changed-note",
+      {
+        ...original,
+        body: JSON.stringify({
+          ...originalBody,
+          note: "Different approval decision",
+        }),
+      },
+    ],
+    ["wrong-path", { ...original, path: "/api/v1/overall-rankings" }],
+  ] as const) {
+    await page.evaluate(
+      ({ key, journal }) =>
+        sessionStorage.setItem(key, JSON.stringify(journal)),
+      { key, journal },
+    );
+    await page.reload();
+    await page
+      .getByRole("button", {
+        name: "Reconcile recorded publication command",
+        exact: true,
+      })
+      .click();
+    await expect(page.getByRole("main").getByRole("alert")).toContainText(
+      "Recorded state could not confirm",
+    );
+    await expect(
+      page.getByRole("combobox", { name: "Calculated draft", exact: true }),
+    ).toBeDisabled();
+    expect(
+      await page.evaluate((key) => sessionStorage.getItem(key), key),
+    ).not.toBeNull();
+    await page.screenshot({
+      path: info.outputPath(`${label}-journal-locked.png`),
+      fullPage: true,
+    });
+  }
+  const reordered = {
+    ...original,
+    body: JSON.stringify(
+      Object.fromEntries(Object.entries(originalBody).reverse()),
+    ),
+  };
+  await page.evaluate(
+    ({ key, journal }) => sessionStorage.setItem(key, JSON.stringify(journal)),
+    { key, journal: reordered },
+  );
+  await page.reload();
   await page
     .getByRole("button", {
       name: "Reconcile recorded publication command",
@@ -252,6 +310,9 @@ test("uncertain approval retains exact command across reload and reconciles only
     page.getByRole("link", { name: "Open this exact approved publication" }),
   ).toBeVisible();
   expect(posts).toEqual([]);
+  expect(
+    await page.evaluate((key) => sessionStorage.getItem(key), key),
+  ).toBeNull();
 });
 test("current input change makes staff approval stale and blocks a previously ready draft", async ({
   page,
@@ -291,10 +352,74 @@ test("current input change makes staff approval stale and blocks a previously re
     page.getByRole("heading", { name: "Publication blocked" }),
   ).toBeVisible();
   await expect(
+    page.getByText(/^Publication blocked: Current calculation inputs/),
+  ).toHaveCount(0);
+  await expect(
     page.getByRole("button", { name: "Approve & publish exact list" }),
   ).toBeDisabled();
   await page.screenshot({
     path: info.outputPath("staff-blocked.png"),
     fullPage: true,
   });
+  const restored = await page.request.post("/api/v1/ranking-inputs", {
+    headers: { Origin: process.env.BETTER_AUTH_URL! },
+    data: {
+      id: input.id,
+      kind: "season",
+      version: input.version + 1,
+      state: "reviewed",
+      requestId: crypto.randomUUID(),
+      data: input.data,
+    },
+  });
+  expect(restored.status()).toBe(200);
+  const current = await (
+    await page.request.get(
+      `/api/v1/overall-rankings?discipline=${f.discipline}&date=2026-11-23&rules=${f.rulesId}`,
+    )
+  ).json();
+  const fresh = await page.request.post("/api/v1/overall-rankings", {
+    headers: { Origin: process.env.BETTER_AUTH_URL! },
+    data: {
+      action: "calculate",
+      discipline: f.discipline,
+      effectiveDate: "2026-11-23",
+      rulesId: f.rulesId,
+      version: current.version,
+      sourceDigest: current.review.sourceDigest,
+      requestId: crypto.randomUUID(),
+      evidence: overallReviewEvidence(current.review, f),
+    },
+  });
+  expect(fresh.status()).toBe(200);
+  const freshDraft = await fresh.json();
+  expect(freshDraft.result.state).toBe("ready");
+  await page
+    .getByRole("button", {
+      name: "Reload current publication review",
+      exact: true,
+    })
+    .click();
+  await page
+    .getByRole("combobox", { name: "Calculated draft", exact: true })
+    .selectOption(freshDraft.id);
+  await fill(page);
+  const changedAgain = await page.request.post("/api/v1/ranking-inputs", {
+    headers: { Origin: process.env.BETTER_AUTH_URL! },
+    data: {
+      id: input.id,
+      kind: "season",
+      version: input.version + 2,
+      state: "draft",
+      requestId: crypto.randomUUID(),
+      data: input.data,
+    },
+  });
+  expect(changedAgain.status()).toBe(200);
+  await page
+    .getByRole("button", { name: "Approve & publish exact list" })
+    .click();
+  await expect(
+    page.getByText(/^Publication blocked: Current calculation inputs/),
+  ).toBeVisible();
 });

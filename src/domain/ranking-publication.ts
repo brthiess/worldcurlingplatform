@@ -1,6 +1,7 @@
 import { EntryError } from "./entries";
 import { compareRational } from "./overall-rankings";
 import { canonicalJson } from "./canonical-json";
+import { exact } from "./ranking-inputs";
 
 /** Producer-independent publication boundary. Future producers provide these
  * explicit subject/list fields; identity is never inferred from a name. */
@@ -42,6 +43,35 @@ export type PublicRankingList = {
   origin: "calculated";
   rows: PublicRankingRow[];
 };
+export function publicationOutputIssues(data: PublicRankingList) {
+  const issues: string[] = [];
+  if (!data.rows.length)
+    issues.push("A complete list needs at least one ranked subject.");
+  if (new Set(data.rows.map((r) => r.subjectId)).size !== data.rows.length)
+    issues.push("Published subject identifiers must be unique.");
+  if (data.rows.some((r, i) => r.rank !== i + 1))
+    issues.push("Complete ordered ranks are required.");
+  for (const row of data.rows) {
+    if (row.subjectType !== data.list.subjectType)
+      issues.push("Each row must match the explicit list subject type.");
+    if (
+      new Set(row.contributions.map((x) => x.id)).size !==
+      row.contributions.length
+    )
+      issues.push("Contribution identifiers must be unique for each subject.");
+    const counted = row.contributions
+      .filter((x) => x.counted)
+      .reduce((sum, x) => exact.add(sum, x.points), "0");
+    if (
+      compareRational(counted, row.eventTotal) !== 0 ||
+      compareRational(exact.add(row.carryover, row.eventTotal), row.total) !== 0
+    )
+      issues.push(
+        `${row.name}: exact contributions and carryover must reconcile to the output.`,
+      );
+  }
+  return issues;
+}
 export function publicationReadiness(
   result: { state: string; issues: string[]; warnings: string[] },
   acknowledged: string[],

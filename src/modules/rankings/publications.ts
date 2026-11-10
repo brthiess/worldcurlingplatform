@@ -5,6 +5,7 @@ import type { PoolClient } from "pg";
 import { freezeContents } from "@/domain/finalization";
 import {
   publicationReadiness,
+  publicationOutputIssues,
   comparePublication,
   type PublicRankingList,
   type PublicRankingRow,
@@ -98,8 +99,7 @@ async function candidate(c: PoolClient, producer: unknown, id: string) {
         }),
       ),
   };
-  if (!data.rows.length)
-    blockers.push("A complete list needs at least one ranked subject.");
+  if (result.state === "ready") blockers.push(...publicationOutputIssues(data));
   const listKey = freezeContents(data.list).digest;
   const previousRow = (
     await c.query(
@@ -199,6 +199,9 @@ export async function savePublication(userId: string, raw: unknown) {
     held: string[] = [];
   let destroy = false;
   try {
+    // Deny private context discovery before looking up a producer record. The
+    // transaction below rechecks authority after every advisory-lock wait.
+    await staff(c, userId);
     // Fetch only immutable context before lock/snapshot acquisition.
     const run = (
       await c.query(
@@ -440,6 +443,15 @@ export async function publicRankings(params: {
       404,
     );
   const header = ({ contents: _contents, ...r }: (typeof rows)[number]) => r;
+  if (
+    selected &&
+    freezeContents(JSON.parse(selected.contents)).digest !==
+      selected.publicDigest
+  )
+    throw new EntryError(
+      "Frozen public publication does not match its approved fingerprint.",
+      422,
+    );
   return {
     publications: matches.map(header),
     selected: selected

@@ -4,6 +4,7 @@ import {
   publicationReadiness,
   comparePublication,
   pointsLabel,
+  publicationOutputIssues,
 } from "../src/domain/ranking-publication";
 import type { PublicRankingList } from "../src/domain/ranking-publication";
 import { freezeContents } from "../src/domain/finalization";
@@ -40,6 +41,78 @@ test("calculation and eligibility blockers cannot become acknowledgements", () =
         "Eligibility waiver",
       ]),
     /informational/,
+  );
+});
+
+test("generic publication output requires unique stable subjects, complete ranks and reconciling exact contributions", () => {
+  const data: PublicRankingList = {
+    schema: "wcp.public-ranking-list.v1",
+    list: {
+      family: "series",
+      subjectType: "pair",
+      discipline: "mixed_doubles",
+      season: "2026-27",
+      seriesId: "synthetic-series",
+    },
+    title: "Synthetic pair series fixture, not an official calculation",
+    effectiveDate: "2026-11-23",
+    origin: "calculated",
+    rows: [
+      {
+        subjectId: "pair-a",
+        subjectType: "pair",
+        name: "Pair A",
+        href: null,
+        rank: 1,
+        total: "1/2",
+        starting: "1",
+        carryover: "1/3",
+        eventTotal: "1/6",
+        contributions: [
+          {
+            id: "event-a",
+            label: "Synthetic event",
+            date: "2026-11-22",
+            points: "1/6",
+            counted: true,
+            reason: null,
+          },
+        ],
+      },
+    ],
+  };
+  assert.deepEqual(publicationOutputIssues(data), []);
+  assert.match(
+    publicationOutputIssues({
+      ...data,
+      rows: [{ ...data.rows[0], total: "2/3" }],
+    }).join(" "),
+    /reconcile/,
+  );
+  assert.match(
+    publicationOutputIssues({
+      ...data,
+      rows: [data.rows[0], { ...data.rows[0], rank: 2 }],
+    }).join(" "),
+    /unique/,
+  );
+  assert.match(
+    publicationOutputIssues({
+      ...data,
+      rows: [{ ...data.rows[0], rank: 2 }],
+    }).join(" "),
+    /ranks/,
+  );
+  assert.match(
+    publicationOutputIssues({
+      ...data,
+      rows: [{ ...data.rows[0], subjectType: "team" }],
+    }).join(" "),
+    /subject type/,
+  );
+  assert.match(
+    publicationOutputIssues({ ...data, rows: [] }).join(" "),
+    /ranked subject/,
   );
 });
 
