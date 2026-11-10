@@ -1,7 +1,7 @@
 {
   "recorded_date": "2026-11-08",
   "phase": "implementation",
-  "status": "active",
+  "status": "paused",
   "authoritative_spec": ".scratch/world-curling-platform/spec.md",
   "task_graph": ".scratch/world-curling-platform/tickets.json",
   "execution_issues": ".scratch/world-curling-platform/issues/",
@@ -71,7 +71,7 @@
   "git": {
     "remote": "https://github.com/brthiess/worldcurlingplatform.git",
     "push_as_work_progresses": true,
-    "last_verified_remote_integration_commit": "f2bfffe689c58420c03acab17862c67659a824fb",
+    "last_verified_remote_integration_commit": "5ceca3bd8d16798ea489ee27f744d3a08175450a",
     "integration_branch": "integration/world-curling-platform",
     "worktrees_created": [
       ".worktrees/WCP-001",
@@ -105,7 +105,7 @@
     ],
     "initialized": true,
     "baseline_commit": "f6d6d8d",
-    "remote_ref_verified_at": "2026-11-10T01:03:52.405721+00:00"
+    "remote_ref_verified_at": "2026-11-10T01:59:47.626595+00:00"
   },
   "verification": {
     "policy": "Only completed tickets have reviewed required-check evidence; each record is limited to its ticket scope.",
@@ -224,7 +224,7 @@
     "accepted_integration_after_resume": "a224b908f53481aec66710902985217830f52bb5",
     "last_formally_accepted_boundary": "a224b908f53481aec66710902985217830f52bb5"
   },
-  "updated_at": "2026-11-10T01:37:16.154154+00:00",
+  "updated_at": "2026-11-10T01:59:47.626595+00:00",
   "active_tickets": [
     "WCP-014",
     "WCP-026",
@@ -650,6 +650,14 @@
       "reason": null,
       "commit": null,
       "evidence": null
+    },
+    {
+      "time": "2026-11-10T01:59:47.626595+00:00",
+      "ticket": null,
+      "status": "paused",
+      "reason": "Can you pause it when you get a chance. I'll continue tomorrow",
+      "commit": null,
+      "evidence": "docs/agents/paused-2026-11-10.md"
     }
   ],
   "research": {
@@ -828,27 +836,33 @@
   },
   "pause": {
     "requested_by": "user",
-    "requested_at": "2026-11-09T03:42:44.744801+00:00",
-    "reason": "Please pause the work for now when you can. I will continue tomorrow.",
-    "resume_note": "docs/agents/paused-2026-11-09.md",
-    "verified_completed_count": 19,
+    "recorded_at": "2026-11-10T01:59:47.626595+00:00",
+    "reason": "Can you pause it when you get a chance. I'll continue tomorrow",
+    "resume_note": "docs/agents/paused-2026-11-10.md",
+    "verified_completed_count": 22,
     "unfinished_tickets": [
-      "WCP-007",
-      "WCP-017",
-      "WCP-034"
+      "WCP-014",
+      "WCP-026",
+      "WCP-038"
     ],
-    "formally_accepted_integration": "11d9e6ce0c4b3bdf9188dc75f74987e4b628b886",
-    "provisional_primary_checkpoint": "44f48dfacada33d96f8ed0aeaeb71e7fa7856b65",
+    "formally_accepted_product": "a224b908f53481aec66710902985217830f52bb5",
+    "accepted_fixture_boundary": "5ceca3bd8d16798ea489ee27f744d3a08175450a",
     "primary_mutation_lock": "released",
     "agents_running": false,
     "owned_apps_workers_stopped": true,
-    "postgres": "retained idle; loopback55431",
+    "postgres": "Cleanly stopped ownedPG13/loopback55431 afterzero clientbackends; all data retained; unrelated5432untouched",
     "candidate_checkpoints": {
-      "WCP-007": "cc9676903a26e0072b8d46349e23a1cb3102ebb9",
-      "WCP-017": "ac7e6bcd7812c0bb8901a7c1b709e09544bd8631",
-      "WCP-034": "164616aacf3c866a5504be1902a1d3c2b079c9fa"
+      "WCP-014": "47c6581c6580ac765f0b39465ffa07f2d33694ce",
+      "WCP-026": "d74e4f4fef4f3d614dd4c33e077f6abb2b3312d2",
+      "WCP-038": "b5df8ea786b5c6cb48f2b58efda5ea0e4517680a"
     },
-    "resumed_at": "2026-11-09T22:08:38.860381+00:00"
+    "known_unresolved": [
+      "026whole-gameobservedparticipants rejectslegalfive acrossalternate replacement; actualrootred retained",
+      "026fullAPIinterrupted88completedtop-levelpasses, not fullpass; fullstandardbrowserpending",
+      "038final122browserinterrupted56passes/66incomplete; nofinalJSON/HTML",
+      "014readyforfreshdistinctmerger;143API+splitbrowser evidence notacceptance"
+    ],
+    "hosting": "WCP-045 remainsblocked;hosting/domainpending; noautomaticresume"
   },
   "accepted_fixture_patches": [
     {
@@ -872,6 +886,32 @@
       "evidence": "docs/verification/auth-rate-window-budget.md",
       "checks": "Actual429smoke57.5s withnumericattachment; completeoverallfile5/5zero skips; pinnedrootNode20.19 tsc--noEmit passed after retainedsandboxEPERMlaunch",
       "allowed_consumers": "All browser acceptance worktrees; exacttest/doccherry-pick or acceptedintegration merge between runs"
+    }
+  ],
+  "pause_history": [
+    {
+      "requested_by": "user",
+      "requested_at": "2026-11-09T03:42:44.744801+00:00",
+      "reason": "Please pause the work for now when you can. I will continue tomorrow.",
+      "resume_note": "docs/agents/paused-2026-11-09.md",
+      "verified_completed_count": 19,
+      "unfinished_tickets": [
+        "WCP-007",
+        "WCP-017",
+        "WCP-034"
+      ],
+      "formally_accepted_integration": "11d9e6ce0c4b3bdf9188dc75f74987e4b628b886",
+      "provisional_primary_checkpoint": "44f48dfacada33d96f8ed0aeaeb71e7fa7856b65",
+      "primary_mutation_lock": "released",
+      "agents_running": false,
+      "owned_apps_workers_stopped": true,
+      "postgres": "retained idle; loopback55431",
+      "candidate_checkpoints": {
+        "WCP-007": "cc9676903a26e0072b8d46349e23a1cb3102ebb9",
+        "WCP-017": "ac7e6bcd7812c0bb8901a7c1b709e09544bd8631",
+        "WCP-034": "164616aacf3c866a5504be1902a1d3c2b079c9fa"
+      },
+      "resumed_at": "2026-11-09T22:08:38.860381+00:00"
     }
   ]
 }

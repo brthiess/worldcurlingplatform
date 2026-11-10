@@ -1,5 +1,7 @@
 # Implementation execution
 
+**Paused at the user's request on2026-11-09 America/Edmonton /2026-11-10 UTC.** Read [the current pause checkpoint](paused-2026-11-10.md) before any restart. All project app/worker/test processes and the dedicated PostgreSQL55431 instance are stopped; databases, configuration and reports remain.22tickets are completed;014/026/038 remain unaccepted. Resume only at the user's explicit request. The dated execution history below remains preserved.
+
 Started 2026-11-08 under the user's explicit implementation authorization.
 
 Resumed at the user's explicit request on2026-11-09 (America/Edmonton), from [the preserved pause checkpoint](paused-2026-11-09.md). Continue autonomous unblocked work, required verification and authorized commits/pushes; hosting/domain remain pending. The provisional007 source present at resume has now passed [independent acceptance](../verification/WCP-007-merge.md); published tracker state and coordinator notifications govern later acceptance boundaries. The execution-state resume event records exact source boundaries.
