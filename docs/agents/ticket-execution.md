@@ -19,6 +19,10 @@ The integration branch can contain a provisional merger checkpoint or an explici
 
 Browser selectors should target the application region and the intended current-state element. Next also renders an empty route-announcer alert, and immutable history can repeat revision text. Global alert or unqualified revision-text locators have caused retained fixture failures; scope them without suppressing errors or weakening the expected state. Wait for held route handlers to finish before removing them.
 
+A wrapped select can have option text in its label-text lookup while its accessible combobox name remains correct. Inspect the actual accessibility tree and use a scoped `getByRole("combobox", { name, exact: true })` where appropriate; preserve the original failed report before correcting a locator. Keep browser debug snapshots private and redact credential/session fields before displaying excerpts.
+
+Use the shared bounded authentication fixture for actual429 responses. Its numeric-only attachment records the real retry header, bounded wait and outer test-budget adjustment; application/assertion deadlines and retry limits stay unchanged. See `docs/verification/auth-rate-window-budget.md`. Do not disable throttling, skip a required case, or claim an earlier partially failing suite passed. A complete affected-file rerun may supplement explicitly source-provenanced unaffected cases; state split scopes accurately.
+
 ## Environment
 
 Git/npm/Node entry scripts can fail in the Windows sandbox while resolving `C:/Users/brthi`. Reviewed `exec_command` calls with `sandbox_permissions: require_escalated` have worked. Git is 2.20 in that environment (`symbolic-ref --short HEAD`, not `branch --show-current`). Avoid destructive cross-shell operations. Use native PowerShell literal paths and verify workspace containment before recursive deletion/moving.
