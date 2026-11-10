@@ -33,6 +33,7 @@
     "WCP-032",
     "WCP-033",
     "WCP-034",
+    "WCP-038",
     "WCP-044",
     "WCP-045"
   ],
@@ -68,7 +69,7 @@
   "git": {
     "remote": "https://github.com/brthiess/worldcurlingplatform.git",
     "push_as_work_progresses": true,
-    "last_verified_remote_integration_commit": "8d5412ac5eb0f77efdd9431e5a51c805d5ce00cc",
+    "last_verified_remote_integration_commit": "9256352858d040fa813db7d95c58625d043fcb71",
     "integration_branch": "integration/world-curling-platform",
     "worktrees_created": [
       ".worktrees/WCP-001",
@@ -94,7 +95,9 @@
       ".worktrees/WCP-022",
       ".worktrees/WCP-017",
       ".worktrees/WCP-014",
-      ".worktrees/WCP-034-fixture-fix"
+      ".worktrees/WCP-034-fixture-fix",
+      ".worktrees/WCP-038",
+      ".worktrees/WCP-038"
     ],
     "initialized": true,
     "baseline_commit": "f6d6d8d",
@@ -213,10 +216,11 @@
     "accepted_integration_after_resume": "8d5412ac5eb0f77efdd9431e5a51c805d5ce00cc",
     "last_formally_accepted_boundary": "8d5412ac5eb0f77efdd9431e5a51c805d5ce00cc"
   },
-  "updated_at": "2026-11-10T00:19:10.406861+00:00",
+  "updated_at": "2026-11-10T00:19:40.999690+00:00",
   "active_tickets": [
     "WCP-014",
-    "WCP-017"
+    "WCP-017",
+    "WCP-038"
   ],
   "frontier": [
     "WCP-011",
@@ -226,8 +230,7 @@
     "WCP-026",
     "WCP-028",
     "WCP-030",
-    "WCP-035",
-    "WCP-038"
+    "WCP-035"
   ],
   "events": [
     {
@@ -613,6 +616,14 @@
       "reason": null,
       "commit": "8d5412ac5eb0f77efdd9431e5a51c805d5ce00cc",
       "evidence": "docs/verification/WCP-034-merge.md"
+    },
+    {
+      "time": "2026-11-10T00:19:40.858653+00:00",
+      "ticket": "WCP-038",
+      "status": "in-progress",
+      "reason": null,
+      "commit": null,
+      "evidence": null
     }
   ],
   "research": {
@@ -769,6 +780,15 @@
       "news_fixture_port": 3214,
       "reserved_migration_prefix": "0031",
       "crawler_source_access": "read-only frozen export only"
+    },
+    "WCP-038": {
+      "worktree": ".worktrees/WCP-038",
+      "branch": "codex/WCP-038",
+      "database_prefix": "wcp038",
+      "web_port": 3138,
+      "news_fixture_port": 3238,
+      "reserved_migration_prefix": "0032",
+      "accepted_base": "9256352858d040fa813db7d95c58625d043fcb71"
     }
   },
   "pause": {
