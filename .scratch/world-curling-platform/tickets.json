@@ -885,7 +885,7 @@
       "file": "17-connect-event-game-team-and-player-discovery-with-favorites.md",
       "id": "WCP-017",
       "path": "issues/17-connect-event-game-team-and-player-discovery-with-favorites.md",
-      "status": "in-progress",
+      "status": "completed",
       "labels": [
         "ready-for-agent"
       ],
@@ -893,7 +893,11 @@
         "WCP-003",
         "WCP-006",
         "WCP-012"
-      ]
+      ],
+      "completion": {
+        "commit": "a224b908f53481aec66710902985217830f52bb5",
+        "evidence": "docs/verification/WCP-017-merge.md"
+      }
     },
     {
       "n": 18,
@@ -1368,7 +1372,7 @@
       "file": "26-score-mixed-doubles-and-record-required-measurements.md",
       "id": "WCP-026",
       "path": "issues/26-score-mixed-doubles-and-record-required-measurements.md",
-      "status": "ready-for-agent",
+      "status": "in-progress",
       "labels": [
         "ready-for-agent"
       ],

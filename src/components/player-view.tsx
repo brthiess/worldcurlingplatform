@@ -1,4 +1,7 @@
 "use client";
+import { PublicLink, usePublicFilters } from "./public-context";
+import { FavoriteButton } from "./favorites";
+import { PublicActivity } from "./public-activity";
 import { useCallback, useEffect, useState } from "react";
 type Player = {
   id: string;
@@ -10,6 +13,7 @@ type Player = {
   photoUrl: string | null;
 };
 export function PlayerView({ id }: { id?: string }) {
+  const { filters, change } = usePublicFilters();
   const [data, setData] = useState<Player[] | null>(null),
     [error, setError] = useState("");
   const load = useCallback(async () => {
@@ -38,6 +42,18 @@ export function PlayerView({ id }: { id?: string }) {
     <main id="main" className="workspace">
       <p className="eyebrow">Teams &amp; players</p>
       <h1>{id ? (data?.[0]?.name ?? "Player profile") : "Players"}</h1>
+      {!id && (
+        <div className="calendar-filters">
+          <div>
+            <label htmlFor="player-search">Search players</label>
+            <input
+              id="player-search"
+              value={filters.q ?? ""}
+              onChange={(e) => change({ q: e.target.value })}
+            />
+          </div>
+        </div>
+      )}
       {error ? (
         <p role="alert" className="error">
           {error}{" "}
@@ -50,60 +66,75 @@ export function PlayerView({ id }: { id?: string }) {
       ) : !data.length ? (
         <p className="empty">No public player records are available.</p>
       ) : (
-        data.map((p) => (
-          <article className="form-card" key={p.id}>
-            {!id && (
-              <h2>
-                <a href={"/players/" + p.id}>{p.name}</a>
-              </h2>
-            )}
-            {p.origin === "fictional_demo" && (
-              <p className="notice">Fictional demonstration player.</p>
-            )}
-            {p.identityStatus === "provisional" && (
-              <p className="notice">
-                Provisional player identity. Relationship to possible existing
-                records remains unresolved.
-              </p>
-            )}
-            {id && (
-              <>
-                {p.photoUrl ? (
-                  <img
-                    className="player-photo"
-                    src={p.photoUrl}
-                    alt={"Approved photo of " + p.name}
-                  />
-                ) : (
-                  <p className="muted">No approved photo.</p>
-                )}
-                <h2>Biography</h2>
-                <p className="player-biography">
-                  {p.biography || "No biography provided."}
+        data
+          .filter(
+            (p) =>
+              id ||
+              p.name.toLowerCase().includes((filters.q ?? "").toLowerCase()),
+          )
+          .map((p) => (
+            <article className="form-card" key={p.id}>
+              {!id && (
+                <h2>
+                  <PublicLink href={"/players/" + p.id}>{p.name}</PublicLink>
+                </h2>
+              )}
+              <FavoriteButton kind="player" id={p.id} />
+              {p.origin === "fictional_demo" && (
+                <p className="notice">Fictional demonstration player.</p>
+              )}
+              {p.identityStatus === "provisional" && (
+                <p className="notice">
+                  Provisional player identity. Relationship to possible existing
+                  records remains unresolved.
                 </p>
-                <h2>Handedness</h2>
-                <p>
-                  {p.handedness
-                    ? p.handedness === "left"
-                      ? "Left"
-                      : "Right"
-                    : "Not provided"}
-                </p>
-                <p className="muted">
-                  Event roster records describe declared or defaulted lineups;
-                  they do not verify participation in a game.
-                </p>
-              </>
-            )}
-          </article>
-        ))
+              )}
+              {id && (
+                <>
+                  {p.photoUrl ? (
+                    <img
+                      className="player-photo"
+                      src={p.photoUrl}
+                      alt={"Approved photo of " + p.name}
+                    />
+                  ) : (
+                    <p className="muted">No approved photo.</p>
+                  )}
+                  <h2>Biography</h2>
+                  <p className="player-biography">
+                    {p.biography || "No biography provided."}
+                  </p>
+                  <h2>Handedness</h2>
+                  <p>
+                    {p.handedness
+                      ? p.handedness === "left"
+                        ? "Left"
+                        : "Right"
+                      : "Not provided"}
+                  </p>
+                  <p className="muted">
+                    Event roster records describe declared or defaulted lineups;
+                    they do not verify participation in a game.
+                  </p>
+                </>
+              )}
+            </article>
+          ))
       )}
+      {id && <PublicActivity kind="player" id={id} />}
+      {!id &&
+        data &&
+        !data.some((p) =>
+          p.name.toLowerCase().includes((filters.q ?? "").toLowerCase()),
+        ) && <p className="empty">No players match this search.</p>}
       <p>
-        <a href="/account/profile">Claim a player or manage your profile →</a>
+        <PublicLink href="/account/profile">
+          Claim a player or manage your profile →
+        </PublicLink>
       </p>
       {id && (
         <p>
-          <a href="/players">All players →</a>
+          <PublicLink href="/players">All players →</PublicLink>
         </p>
       )}
     </main>

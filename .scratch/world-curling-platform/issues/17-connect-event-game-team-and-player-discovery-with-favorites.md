@@ -4,7 +4,7 @@ number: 17
 title: "Connect event, game, team and player discovery with favorites"
 parent: WCP-SPEC-001
 type: implementation
-status: in-progress
+status: completed
 labels: [ready-for-agent]
 blocked_by: [WCP-003, WCP-006, WCP-012]
 source_spec_sha256: 045B46988225B6C8C0020B23C8C5D4EAA8E2E1916256148A0FDA26B5DA8673FD
@@ -18,7 +18,7 @@ published: 2026-11-07
 
 **Blocked by:** [03: Confirm results and make ordinary auditable corrections](03-confirm-results-and-make-ordinary-auditable-corrections.md); [06: Manually enter teams and resolve core-composition identities](06-manually-enter-teams-and-resolve-core-composition-identities.md); [12: Create accounts, approve player claims and edit profiles](12-create-accounts-approve-player-claims-and-edit-profiles.md).
 
-**Status:** in-progress
+**Status:** completed
 
 ## Parent and scope
 
@@ -31,13 +31,13 @@ published: 2026-11-07
 
 ## Acceptance criteria
 
-- [ ] Complete the public pages around existing persisted data, with calendar/status/discipline filters and stable identity-based links.
-- [ ] Expose current results, next known game, core/alternate season context and known player information without lineage or fabricated participation.
-- [ ] Save favorites locally without account synchronization; preserve filters/draw selection/back navigation during refresh.
-- [ ] **Unit testing:** Test search/filter/read-projection rules, stable context links, favorites serialization and current-versus-archived identity presentation.
-- [ ] **Database/API verification:** Query representative seeded and available imported records through public APIs, verifying privacy and correct identity/date/division scopes.
-- [ ] **Frontend quality:** Browser-check homepage -> event -> game -> team/player navigation, search, empty/error states and favorites at phone/tablet/desktop widths with no dead controls or filler sections.
-- [ ] Record actual verification commands/results and relevant browser/screenshots or API evidence. Report meaningful uncovered branches or limitations; do not claim checks that were not run.
+- [x] Complete the public pages around existing persisted data, with calendar/status/discipline filters and stable identity-based links.
+- [x] Expose current results, next known game, core/alternate season context and known player information without lineage or fabricated participation.
+- [x] Save favorites locally without account synchronization; preserve filters/draw selection/back navigation during refresh.
+- [x] **Unit testing:** Test search/filter/read-projection rules, stable context links, favorites serialization and current-versus-archived identity presentation.
+- [x] **Database/API verification:** Query representative seeded and available imported records through public APIs, verifying privacy and correct identity/date/division scopes.
+- [x] **Frontend quality:** Browser-check homepage -> event -> game -> team/player navigation, search, empty/error states and favorites at phone/tablet/desktop widths with no dead controls or filler sections.
+- [x] Record actual verification commands/results and relevant browser/screenshots or API evidence. Report meaningful uncovered branches or limitations; do not claim checks that were not run.
 
 ## Slice boundary
 
