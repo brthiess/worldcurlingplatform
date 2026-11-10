@@ -1,6 +1,7 @@
 import { PublicLink } from "./public-context";
 import type { PublicGame } from "@/modules/public/scores";
 import type { GameLineup } from "@/modules/scoring/lineups";
+import { SportingEvidenceView } from "./sporting-evidence";
 export function LineupEvidence({
   lineup,
   name,
@@ -86,6 +87,14 @@ export function GameResultHistory({
         </ol>
         <LineupEvidence name={r.result.nameA} lineup={r.result.lineupA} />
         <LineupEvidence name={r.result.nameB} lineup={r.result.lineupB} />
+        {r.result.sporting && (
+          <SportingEvidenceView
+            evidence={r.result.sporting}
+            names={{ a: r.result.nameA, b: r.result.nameB }}
+            ends={r.result.ends}
+            hammers={r.result.endHammer as ("a" | "b" | null)[]}
+          />
+        )}
       </details>
     </div>
   );

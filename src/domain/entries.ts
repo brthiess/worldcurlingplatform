@@ -126,6 +126,14 @@ export function entryInput(value: unknown, discipline: string): EntryInput {
   });
   if (new Set(members.map((m) => m.playerId)).size !== members.length)
     throw new EntryError("List each event member once.");
+  if (
+    discipline === "mixed_doubles" &&
+    (members.some((m) => m.role === "alternate") ||
+      members.filter((m) => m.role !== "coach").length > 2)
+  )
+    throw new EntryError(
+      "Mixed doubles has two event players and no alternate; a recorded pre-game difference does not certify eligibility.",
+    );
   const newPlayers = (v.newPlayers ?? []) as EntryInput["newPlayers"];
   if (!Array.isArray(newPlayers) || newPlayers.length > 20)
     throw new EntryError("Add at most 20 new players.");

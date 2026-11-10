@@ -4,6 +4,7 @@ import { FavoriteButton } from "./favorites";
 import { POOL_TEMPLATE } from "@/domain/pools";
 import { EventEntryLinks } from "@/components/public-rosters";
 import { GameResultHistory, LineupEvidence } from "./game-result-history";
+import { SportingEvidenceView } from "./sporting-evidence";
 import { useEffect, useState, useCallback, useRef } from "react";
 import type { PublicEvent, PublicGame } from "@/modules/public/scores";
 import { scoreCell } from "@/domain/scores";
@@ -473,6 +474,19 @@ export function ScoresView({
                     </details>
                   )}
                   {gameId && <GameResultHistory results={game.results} />}
+                  {gameId && (
+                    <SportingEvidenceView
+                      evidence={game.sporting}
+                      names={{ a: game.nameA, b: game.nameB }}
+                      ends={game.endsA.map((e, i) => ({
+                        state:
+                          e.state as import("@/domain/scoring").End["state"],
+                        a: e.points,
+                        b: game.endsB[i]?.points ?? null,
+                      }))}
+                      hammers={game.endHammer as ("a" | "b" | null)[]}
+                    />
+                  )}
                   {gameId && (
                     <p className="legend">
                       Recorded hammer:{" "}

@@ -4,9 +4,13 @@ import { saveTransition, type SaveState } from "@/domain/save-state";
 import { validateEnd, type End } from "@/domain/scoring";
 import type { Command } from "@/modules/scoring/commands";
 import { ResultEditor } from "./result-editor";
+import { SportingEditor } from "./sporting-editor";
+import type { SportingEvidence } from "@/domain/disciplines";
 import type { GameLineup } from "@/modules/scoring/lineups";
 import type { PublicGame } from "@/modules/public/scores";
 type Game = {
+  discipline: string;
+  sporting?: SportingEvidence;
   id: string;
   entryA: string;
   entryB: string;
@@ -18,7 +22,7 @@ type Game = {
   nameA: string;
   nameB: string;
   sheet: string;
-    drawNumber: number | null;
+  drawNumber: number | null;
   state: string;
   version: number;
   scoringSource: string;
@@ -60,6 +64,7 @@ export function ScoringEditor({ gameId }: { gameId: string }) {
   const key = useRef(""),
     sending = useRef(false);
   const [resultBusy, setResultBusy] = useState(false);
+  const [sportingBusy, setSportingBusy] = useState(false);
   const url = `/api/v1/games/${encodeURIComponent(gameId)}/scoring`;
   async function read() {
     const r = await fetch(url, { cache: "no-store" });
@@ -159,11 +164,20 @@ export function ScoringEditor({ gameId }: { gameId: string }) {
         };
         if (action === "end") {
           command.endNumber = edit.endNumber;
-          command.end = validateEnd({
-            state: edit.state,
-            a: edit.state === "played" && edit.a !== "" ? Number(edit.a) : null,
-            b: edit.state === "played" && edit.b !== "" ? Number(edit.b) : null,
-          });
+          command.end = validateEnd(
+            {
+              state: edit.state,
+              a:
+                edit.state === "played" && edit.a !== ""
+                  ? Number(edit.a)
+                  : null,
+              b:
+                edit.state === "played" && edit.b !== ""
+                  ? Number(edit.b)
+                  : null,
+            },
+            game!.discipline,
+          );
         }
       } catch (e) {
         setError((e as Error).message);
@@ -240,7 +254,8 @@ export function ScoringEditor({ gameId }: { gameId: string }) {
     save === "saving" ||
     save === "uncertain" ||
     save === "conflict" ||
-    resultBusy;
+    resultBusy ||
+    sportingBusy;
   return (
     <main id="main" className="workspace">
       <a href="/admin">← Your workspace</a>
@@ -268,7 +283,18 @@ export function ScoringEditor({ gameId }: { gameId: string }) {
             {game.nameA} vs {game.nameB}
           </h2>
           <p>
-            Game {game.id} · {game.drawNumber===null?'Not scheduled':`Draw ${game.drawNumber}`} · {game.sheet?`Sheet ${game.sheet}`:'Sheet not assigned'} ·{" "}
+            {game.discipline === "mixed_doubles"
+              ? "Mixed doubles · two players · up to 6 points per end"
+              : game.discipline === "women_four"
+                ? "Women’s four-player · up to 8 points per end"
+                : "Men’s four-player · up to 8 points per end"}
+          </p>
+          <p>
+            Game {game.id} ·{" "}
+            {game.drawNumber === null
+              ? "Not scheduled"
+              : `Draw ${game.drawNumber}`}{" "}
+            · {game.sheet ? `Sheet ${game.sheet}` : "Sheet not assigned"} ·{" "}
             {game.state}
           </p>
           <p>
@@ -339,7 +365,9 @@ export function ScoringEditor({ gameId }: { gameId: string }) {
                     {Array.from({ length: 20 }, (_, i) => (
                       <option key={i} value={i + 1}>
                         {i + 1}
-                        {i >= 8 ? " · further end" : ""}
+                        {i >= (game.sporting?.regulationEnds ?? 8)
+                          ? " · further end"
+                          : ""}
                       </option>
                     ))}
                   </select>
@@ -365,7 +393,7 @@ export function ScoringEditor({ gameId }: { gameId: string }) {
                           inputMode="numeric"
                           type="number"
                           min="0"
-                          max="8"
+                          max={game.discipline === "mixed_doubles" ? 6 : 8}
                           step="1"
                           required
                           value={edit.a}
@@ -379,7 +407,7 @@ export function ScoringEditor({ gameId }: { gameId: string }) {
                           inputMode="numeric"
                           type="number"
                           min="0"
-                          max="8"
+                          max={game.discipline === "mixed_doubles" ? 6 : 8}
                           step="1"
                           required
                           value={edit.b}
@@ -436,8 +464,18 @@ export function ScoringEditor({ gameId }: { gameId: string }) {
           </p>
           <ResultEditor
             game={game}
-            disabled={save !== "saved"}
+            disabled={save !== "saved" || sportingBusy}
             onBusy={setResultBusy}
+            onApplied={async () => {
+              const g = await read();
+              setGame(g);
+              setBaseVersion(g.version);
+            }}
+          />
+          <SportingEditor
+            game={game}
+            disabled={save !== "saved" || resultBusy}
+            onBusy={setSportingBusy}
             onApplied={async () => {
               const g = await read();
               setGame(g);

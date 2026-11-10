@@ -7,6 +7,7 @@ import type { PublicGame } from "@/modules/public/scores";
 import type { GameLineup } from "@/modules/scoring/lineups";
 import { GameResultHistory, LineupEvidence } from "./game-result-history";
 type Game = {
+  discipline: string;
   id: string;
   actorId: string;
   entryA: string;
@@ -224,7 +225,7 @@ export function ResultEditor({
       draft.lineups[side] ??
       current?.members
         .filter((m) => m.role !== "coach")
-        .slice(0, 5)
+        .slice(0, game.discipline === "mixed_doubles" ? 2 : 5)
         .map((m) => ({ playerId: m.playerId, position: m.position })) ??
       [];
     return (
@@ -263,7 +264,10 @@ export function ResultEditor({
               ))}
             </select>
             <label>
-              Position {i + 1} · side {side.toUpperCase()}
+              {game.discipline === "mixed_doubles"
+                ? "Delivery role"
+                : "Position"}{" "}
+              {i + 1} · side {side.toUpperCase()}
               <input
                 maxLength={60}
                 value={m.position}
@@ -295,7 +299,7 @@ export function ResultEditor({
             </button>
           </div>
         ))}
-        {rows.length < 5 && (
+        {rows.length < (game.discipline === "mixed_doubles" ? 2 : 5) && (
           <button
             type="button"
             className="secondary"
@@ -460,7 +464,7 @@ export function ResultEditor({
                             type="number"
                             inputMode="numeric"
                             min={0}
-                            max={8}
+                            max={game.discipline === "mixed_doubles" ? 6 : 8}
                             required
                             value={end[side] ?? ""}
                             onChange={(e) =>

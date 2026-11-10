@@ -4,6 +4,7 @@ import { selectDraws, type Score } from "@/domain/scores";
 import { drawEvidenceState } from "@/domain/scheduling";
 import { publicGameIdentityJoins } from "./game-identity";
 export type PublicGame = {
+  sporting?: import("@/domain/disciplines").SportingEvidence;
   lineupA: import("@/modules/scoring/lineups").GameLineup | null;
   lineupB: import("@/modules/scoring/lineups").GameLineup | null;
   results: {
@@ -11,6 +12,7 @@ export type PublicGame = {
     confirmedBy: string;
     createdAt: string;
     result: {
+      sporting?: import("@/domain/disciplines").SportingEvidence;
       endHammer?: (string | null)[];
       correction?: boolean;
       legacyBefore?: {
@@ -209,6 +211,23 @@ async function projectEvent(
         downstreamGameId: String(a.downstreamGameId),
         resultVersion: Number(a.resultVersion),
       }));
+  }
+  const sporting = await connection.execute(
+    sql`SELECT DISTINCT ON (s.game_id) s.game_id,s.evidence FROM game_sporting_version s JOIN game g ON g.id=s.game_id WHERE g.division_id=${row.divisionId} AND s.entry_a=g.entry_a AND s.entry_b=g.entry_b ORDER BY s.game_id,s.version DESC`,
+  );
+  for (const game of games) {
+    const evidence = sporting.rows.find((s) => s.game_id === game.id);
+    if (evidence) {
+      game.sporting = evidence.evidence as PublicGame["sporting"];
+      while (game.endsA.length < (game.sporting?.regulationEnds ?? 8)) {
+        const missing = {
+          state: game.state === "confirmed" ? "unknown" : "upcoming",
+          points: null,
+        };
+        game.endsA.push({ ...missing });
+        game.endsB.push({ ...missing });
+      }
+    }
   }
   for (const game of games)
     if (

@@ -47,7 +47,10 @@ export function commandDecision(
     return existingMatches ? "replay" : "conflict";
   return version === expected ? "apply" : "stale";
 }
-export function validateEnd(value: unknown): End {
+export function validateEnd(value: unknown, discipline = "men_four"): End {
+  if (!["men_four", "women_four", "mixed_doubles"].includes(discipline))
+    throw new Error("Choose a supported discipline");
+  const maximum = discipline === "mixed_doubles" ? 6 : 8;
   const end = value as End;
   if (
     !end ||
@@ -60,12 +63,12 @@ export function validateEnd(value: unknown): End {
       !Number.isInteger(end.b) ||
       end.a! < 0 ||
       end.b! < 0 ||
-      end.a! > 8 ||
-      end.b! > 8 ||
+      end.a! > maximum ||
+      end.b! > maximum ||
       (end.a! > 0 && end.b! > 0)
     )
       throw new Error(
-        "Use whole points from 0 to 8; only one team can score in an end",
+        `Use whole points from 0 to ${maximum}; only one team can score in an end`,
       );
   } else if (end.a !== null || end.b !== null)
     throw new Error("Only played ends have points");

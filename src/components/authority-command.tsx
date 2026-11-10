@@ -42,6 +42,7 @@ function valid(value: unknown): value is RetainedAuthorityCommand {
         c.path,
       ) ||
       /^\/api\/v1\/entries\/[-\w]{1,80}$/.test(c.path) ||
+      /^\/api\/v1\/games\/[-\w]{1,80}\/scoring$/.test(c.path) ||
       /^\/api\/v1\/applications\/[-\w]{1,80}$/.test(c.path)
     ) ||
     typeof c.body !== "string" ||

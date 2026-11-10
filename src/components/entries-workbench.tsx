@@ -63,7 +63,13 @@ type Workspace = {
 export function EntriesWorkbench() {
   const [workspace, setWorkspace] = useState<Workspace | null>(null),
     [players, setPlayers] = useState<
-      { id: string; name: string; identityStatus?: string; origin?: string; contexts?: string[] }[]
+      {
+        id: string;
+        name: string;
+        identityStatus?: string;
+        origin?: string;
+        contexts?: string[];
+      }[]
     >([]),
     [teams, setTeams] = useState<Team[]>([]),
     [loading, setLoading] = useState(true),
@@ -644,9 +650,12 @@ export function EntriesWorkbench() {
                             }}
                           >
                             <option value="core">Regular core</option>
-                            <option value="alternate">
-                              Designated alternate
-                            </option>
+                            {selectedDivision?.discipline !==
+                              "mixed_doubles" && (
+                              <option value="alternate">
+                                Designated alternate
+                              </option>
+                            )}
                             <option value="coach">Coach</option>
                             <option value="substitute">
                               Temporary substitute
@@ -655,7 +664,10 @@ export function EntriesWorkbench() {
                         </div>
                         <div>
                           <label htmlFor={`position-${i}`}>
-                            Position: {r.name}
+                            {selectedDivision?.discipline === "mixed_doubles"
+                              ? "Delivery role (may change by end)"
+                              : "Position"}
+                            : {r.name}
                           </label>
                           <input
                             id={`position-${i}`}
@@ -738,7 +750,9 @@ export function EntriesWorkbench() {
                   onChange={(e) => setNewRole(e.target.value as Row["role"])}
                 >
                   <option value="core">Regular core</option>
-                  <option value="alternate">Designated alternate</option>
+                  {selectedDivision?.discipline !== "mixed_doubles" && (
+                    <option value="alternate">Designated alternate</option>
+                  )}
                   <option value="coach">Coach</option>
                   <option value="substitute">Temporary substitute</option>
                 </select>
@@ -763,7 +777,9 @@ export function EntriesWorkbench() {
                         <li key={p.id}>
                           <span>
                             {p.name} · {p.identityStatus ?? "identified"} ·{" "}
-                            {p.id} · {p.origin ?? "Origin unknown"} · {p.contexts?.join("; ") || "No public event context recorded"}
+                            {p.id} · {p.origin ?? "Origin unknown"} ·{" "}
+                            {p.contexts?.join("; ") ||
+                              "No public event context recorded"}
                           </span>
                           <button
                             type="button"

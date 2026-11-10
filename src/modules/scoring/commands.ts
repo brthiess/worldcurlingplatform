@@ -1,4 +1,9 @@
 import { randomUUID } from "node:crypto";
+import {
+  sportingEvidence,
+  placementHammer,
+  type SportingEvidence,
+} from "@/domain/disciplines";
 import type { PoolClient } from "pg";
 import { pool } from "@/db";
 import { permitted, type Grant } from "@/domain/permissions";
@@ -29,7 +34,8 @@ export class ScoringError extends Error {
 export type Command = {
   requestId: string;
   expectedVersion: number;
-  action: "start" | "end" | "confirm" | "correct" | "lineup";
+  action: "start" | "end" | "confirm" | "correct" | "lineup" | "evidence";
+  sporting?: SportingEvidence;
   hammer: "a" | "b" | null;
   endNumber?: number;
   end?: End;
@@ -50,7 +56,9 @@ export function parseCommand(value: unknown): Command {
     !/^[a-zA-Z0-9-]{1,80}$/.test(c.requestId) ||
     !Number.isSafeInteger(c.expectedVersion) ||
     c.expectedVersion < 0 ||
-    !["start", "end", "confirm", "correct", "lineup"].includes(c.action) ||
+    !["start", "end", "confirm", "correct", "lineup", "evidence"].includes(
+      c.action,
+    ) ||
     ![null, "a", "b"].includes(c.hammer)
   )
     throw new ScoringError(
@@ -63,6 +71,11 @@ export function parseCommand(value: unknown): Command {
     action: c.action,
     hammer: c.hammer,
   };
+  if (c.action === "evidence") {
+    if (!c.sporting || typeof c.sporting !== "object")
+      throw new ScoringError(400, "Provide sporting evidence");
+    return { ...base, sporting: c.sporting };
+  }
   if (c.action === "start") return base;
   if (c.action === "confirm" || c.action === "correct") {
     if (
@@ -112,6 +125,9 @@ export function parseCommand(value: unknown): Command {
       ...(c.action === "correct" ? { ends: c.ends } : {}),
       ...(lineups ? { lineups } : {}),
       ...(c.endHammer ? { endHammer: c.endHammer } : {}),
+      ...(c.action === "correct" && c.sporting !== undefined
+        ? { sporting: c.sporting }
+        : {}),
     };
   }
   if (c.action === "lineup") {
@@ -140,6 +156,12 @@ async function snapshot(client: PoolClient, id: string) {
   ).rows[0];
   if (!g)
     throw new ScoringError(403, "This game is outside your assigned scope");
+  const sporting = (
+    await client.query(
+      "SELECT evidence,version FROM game_sporting_version WHERE game_id=$1 AND entry_a=$2 AND entry_b=$3 ORDER BY version DESC LIMIT 1",
+      [id, g.entryA, g.entryB],
+    )
+  ).rows[0];
   const rows = (
     await client.query(
       "SELECT end_number,side,state,points FROM game_end_score WHERE game_id=$1 ORDER BY end_number",
@@ -152,7 +174,10 @@ async function snapshot(client: PoolClient, id: string) {
       [id],
     )
   ).rows;
-  const count = Math.max(8, ...rows.map((r) => r.end_number));
+  const count = Math.max(
+    sporting?.evidence.regulationEnds ?? 8,
+    ...rows.map((r) => r.end_number),
+  );
   const ends: End[] = normalizeEnds(
     Array.from({ length: count }, (_, i) => {
       const a = rows.find((r) => r.end_number === i + 1 && r.side === "a"),
@@ -189,6 +214,12 @@ async function snapshot(client: PoolClient, id: string) {
   ).rows;
   return {
     ...g,
+    ...(sporting
+      ? {
+          sporting: sporting.evidence as SportingEvidence,
+          sportingVersion: sporting.version,
+        }
+      : {}),
     ...(g.state === "live" && ends.some((e) => e.state === "unknown")
       ? { totalA: null, totalB: null }
       : {}),
@@ -245,6 +276,11 @@ async function saveDifference(
   before: Awaited<ReturnType<typeof snapshot>>,
   auditId: string,
 ) {
+  try {
+    members = lineupDifference(members, before.discipline);
+  } catch (e) {
+    throw new ScoringError(400, (e as Error).message);
+  }
   const lineup = side === "a" ? before.lineupA : before.lineupB;
   if (!lineup)
     throw new ScoringError(
@@ -315,7 +351,7 @@ export async function saveScoring(actorId: string, id: string, input: unknown) {
       ? (
           await client.query("SELECT $1::jsonb=$2::jsonb AS same", [
             previous.command,
-            command,
+            input,
           ])
         ).rows[0].same
       : undefined;
@@ -338,8 +374,68 @@ export async function saveScoring(actorId: string, id: string, input: unknown) {
         409,
         "Scores changed. Reload the accepted game before applying your edit",
       );
-    if (!["men_four", "women_four"].includes(before.discipline))
-      throw new ScoringError(400, "This editor supports four-player games");
+    if (
+      !["men_four", "women_four", "mixed_doubles"].includes(before.discipline)
+    )
+      throw new ScoringError(400, "Choose a supported scoring discipline");
+    if (command.action === "end") {
+      try {
+        command.end = validateEnd(command.end, before.discipline);
+      } catch (e) {
+        throw new ScoringError(400, (e as Error).message);
+      }
+    }
+    let evidence: SportingEvidence | undefined = before.sporting;
+    if (command.sporting !== undefined) {
+      if (before.state === "confirmed" && command.action !== "correct")
+        throw new ScoringError(
+          409,
+          "Use an ordinary result correction for confirmed sporting evidence",
+        );
+      try {
+        evidence = sportingEvidence(command.sporting, before.discipline);
+      } catch (e) {
+        throw new ScoringError(400, (e as Error).message);
+      }
+      if (!before.entryA || !before.entryB)
+        throw new ScoringError(
+          409,
+          "Assign both participants before recording evidence",
+        );
+      const ids = [
+        ...new Set(
+          ["a", "b"].flatMap((side) => [
+            ...evidence!.lsd[side as "a" | "b"].flatMap((p) =>
+              p.playerId ? [p.playerId] : [],
+            ),
+            ...evidence!.participation[side as "a" | "b"].playerIds,
+          ]),
+        ),
+      ];
+      const players = await client.query(
+        "SELECT id FROM player WHERE id=ANY($1::text[]) FOR SHARE",
+        [ids],
+      );
+      if (players.rowCount !== ids.length)
+        throw new ScoringError(400, "Every observed or LSD player must exist");
+      const all = [
+        ...evidence.participation.a.playerIds,
+        ...evidence.participation.b.playerIds,
+      ];
+      if (new Set(all).size !== all.length)
+        throw new ScoringError(
+          400,
+          "A player cannot participate for both sides in this game",
+        );
+      if (
+        before.state !== "scheduled" &&
+        evidence.regulationEnds !== (before.sporting?.regulationEnds ?? 8)
+      )
+        throw new ScoringError(
+          409,
+          "Regulation length must be set before the game starts",
+        );
+    }
     let result: ReturnType<typeof validateResult> | undefined;
     if (command.action === "confirm" || command.action === "correct") {
       try {
@@ -353,6 +449,8 @@ export async function saveScoring(actorId: string, id: string, input: unknown) {
             reason: command.reason!,
             ends: command.action === "correct" ? command.ends! : before.ends,
           },
+          before.discipline,
+          evidence?.regulationEnds ?? 8,
         );
       } catch (e) {
         throw new ScoringError(409, (e as Error).message);
@@ -367,7 +465,7 @@ export async function saveScoring(actorId: string, id: string, input: unknown) {
           "Recorded result participants must be preserved; review the assignment inconsistency",
         );
       result.ends = Array.from(
-        { length: Math.max(8, result.ends.length) },
+        { length: Math.max(evidence?.regulationEnds ?? 8, result.ends.length) },
         (_, i) => result!.ends[i] ?? { state: "unplayed", a: null, b: null },
       );
       for (const side of ["a", "b"] as const)
@@ -402,6 +500,8 @@ export async function saveScoring(actorId: string, id: string, input: unknown) {
             "INSERT INTO game_end_score(game_id,side,end_number,state,points) VALUES($1,$2,$3,$4,$5)",
             [id, side, i + 1, end.state, points],
           );
+    } else if (command.action === "evidence") {
+      // Evidence shares the scoring command's version, current authority, audit and receipt.
     } else if (command.action === "lineup") {
       if (before.state === "confirmed")
         throw new ScoringError(
@@ -448,6 +548,20 @@ export async function saveScoring(actorId: string, id: string, input: unknown) {
       let next: End[];
       try {
         next = applyEnd(before.ends, command.endNumber!, command.end!);
+        if (before.discipline === "mixed_doubles")
+          for (let i = 8; i < next.length; i++) {
+            if (!["played", "unknown"].includes(next[i].state)) continue;
+            const previous = next.slice(0, i),
+              total = scoreTotals(previous);
+            if (
+              previous.some((e) => e.state !== "played") ||
+              total.a === null ||
+              total.a !== total.b
+            )
+              throw Error(
+                "An extra end requires complete tied preceding ends; no end follows a decisive extra end",
+              );
+          }
       } catch (e) {
         throw new ScoringError(409, (e as Error).message);
       }
@@ -473,6 +587,35 @@ export async function saveScoring(actorId: string, id: string, input: unknown) {
           command.hammer,
         ],
       );
+    if (evidence) {
+      const hammers = (
+        await client.query(
+          "SELECT end_number,hammer FROM game_end_hammer WHERE game_id=$1",
+          [id],
+        )
+      ).rows;
+      for (const [i, p] of evidence.placements.entries()) {
+        const h = placementHammer(p),
+          recorded = hammers.find((r) => r.end_number === i + 1)?.hammer;
+        if (h && recorded && h !== recorded)
+          throw new ScoringError(
+            409,
+            "Recorded hammer disagrees with the placement choice; correct both facts together",
+          );
+      }
+    }
+    if (command.sporting !== undefined)
+      await client.query(
+        "INSERT INTO game_sporting_version(game_id,version,entry_a,entry_b,evidence,audit_id) VALUES($1,$2,$3,$4,$5,$6)",
+        [
+          id,
+          before.version + 1,
+          before.entryA,
+          before.entryB,
+          evidence,
+          auditId,
+        ],
+      );
     const changed = await snapshot(client, id),
       totals = scoreTotals(changed.ends);
     await client.query(
@@ -482,12 +625,12 @@ export async function saveScoring(actorId: string, id: string, input: unknown) {
         changed.hammer,
         result
           ? result.totalA
-          : command.action === "lineup"
+          : command.action === "lineup" || command.action === "evidence"
             ? before.totalA
             : totals.a,
         result
           ? result.totalB
-          : command.action === "lineup"
+          : command.action === "lineup" || command.action === "evidence"
             ? before.totalB
             : totals.b,
         changed.hammerEnd,
@@ -506,6 +649,7 @@ export async function saveScoring(actorId: string, id: string, input: unknown) {
           nameB: before.nameB,
           lineupA: after.lineupA,
           lineupB: after.lineupB,
+          ...(evidence ? { sporting: evidence } : {}),
           ...(command.action === "correct" && !before.results.length
             ? {
                 legacyBefore: {
@@ -536,7 +680,9 @@ export async function saveScoring(actorId: string, id: string, input: unknown) {
               ? "result_corrected"
               : command.action === "lineup"
                 ? "game_lineup_recorded"
-                : "end_saved",
+                : command.action === "evidence"
+                  ? "sporting_evidence_recorded"
+                  : "end_saved",
         id,
         command.requestId,
         after.version,
@@ -599,7 +745,7 @@ export async function saveScoring(actorId: string, id: string, input: unknown) {
     }
     await client.query(
       "INSERT INTO scoring_command(game_id,actor_id,request_id,command,response,audit_id) VALUES($1,$2,$3,$4,$5,$6)",
-      [id, actorId, command.requestId, command, response, auditId],
+      [id, actorId, command.requestId, input, response, auditId],
     );
     await client.query("COMMIT");
     return response;
@@ -608,5 +754,35 @@ export async function saveScoring(actorId: string, id: string, input: unknown) {
     throw e;
   } finally {
     client.release();
+  }
+}
+export async function scoringReceipt(
+  actorId: string,
+  id: string,
+  requestId: string,
+) {
+  const c = await pool.connect();
+  try {
+    await c.query("BEGIN");
+    await authorize(c, actorId, id);
+    const row = (
+      await c.query(
+        'SELECT command,response,audit_id AS "auditId" FROM scoring_command WHERE game_id=$1 AND actor_id=$2 AND request_id=$3',
+        [id, actorId, requestId],
+      )
+    ).rows[0];
+    await c.query("COMMIT");
+    return row
+      ? {
+          ...row,
+          actorId,
+          path: `/api/v1/games/${encodeURIComponent(id)}/scoring`,
+        }
+      : null;
+  } catch (e) {
+    await c.query("ROLLBACK");
+    throw e;
+  } finally {
+    c.release();
   }
 }

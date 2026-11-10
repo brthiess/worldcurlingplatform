@@ -7,10 +7,13 @@ export type ResultInput = {
   reason: string;
 };
 export type DifferenceMember = { playerId: string; position: string };
-export function lineupDifference(value: unknown): DifferenceMember[] {
+export function lineupDifference(
+  value: unknown,
+  discipline = "men_four",
+): DifferenceMember[] {
   if (
     !Array.isArray(value) ||
-    value.length > 5 ||
+    value.length > (discipline === "mixed_doubles" ? 2 : 5) ||
     value.some(
       (m) =>
         !m ||
@@ -22,7 +25,9 @@ export function lineupDifference(value: unknown): DifferenceMember[] {
     )
   )
     throw new Error(
-      "Choose up to five known players with plain-text positions",
+      discipline === "mixed_doubles"
+        ? "Choose up to two mixed doubles players"
+        : "Choose up to five known players with plain-text positions",
     );
   if (new Set(value.map((m) => m.playerId)).size !== value.length)
     throw new Error("Choose distinct players");
@@ -50,6 +55,8 @@ export function validateResult(
   action: "confirm" | "correct",
   participants: (string | null)[],
   input: ResultInput,
+  discipline = "men_four",
+  regulationEnds = 8,
 ) {
   if (
     participants.length !== 2 ||
@@ -81,7 +88,7 @@ export function validateResult(
   if (!Array.isArray(input.ends) || input.ends.length > 20)
     throw new Error("Provide up to 20 end scores");
   const ends = input.ends
-    .map(validateEnd)
+    .map((e) => validateEnd(e, discipline))
     .map((e) =>
       e.state === "upcoming"
         ? { state: "unplayed" as const, a: null, b: null }
@@ -94,15 +101,31 @@ export function validateResult(
       throw new Error("Played or unknown ends cannot follow an unplayed end");
   }
   const total = scoreTotals(ends);
+  if (discipline === "mixed_doubles") {
+    for (let i = regulationEnds; i < ends.length; i++) {
+      if (ends[i].state !== "played" && ends[i].state !== "unknown") continue;
+      const prior = scoreTotals(ends.slice(0, i));
+      if (
+        ends.slice(0, i).some((e) => e.state !== "played") ||
+        prior.a === null ||
+        prior.a !== prior.b
+      )
+        throw Error(
+          i === regulationEnds
+            ? "An extra end requires a complete tied regulation score"
+            : "No end may follow a decisive extra end",
+        );
+    }
+  }
   if (input.outcome === "normal") {
     if (
       !ends.some((e) => e.state === "played") ||
       ends.some((e) => e.state === "unknown")
     )
       throw new Error("A normal result needs a complete decisive line score");
-    if (ends.filter((e) => e.state === "played").length < 8)
+    if (ends.filter((e) => e.state === "played").length < regulationEnds)
       throw new Error(
-        "Normal completion requires eight played ends in this four-player profile; use conceded for an early stop",
+        `Normal completion requires ${regulationEnds === 8 ? "eight" : "ten"} played ends in this ${discipline === "mixed_doubles" ? "mixed doubles" : "four-player"} profile; use conceded for an early stop`,
       );
     if (
       total.a === total.b ||
