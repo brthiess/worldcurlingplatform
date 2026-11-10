@@ -65,6 +65,12 @@ for (const width of [360, 768, 1440])
       ),
     ).toBeVisible();
     await expect(
+      review.getByText(
+        "113 retained quality issues. Evidence counts are not unique game counts.",
+        { exact: true },
+      ),
+    ).toBeVisible();
+    await expect(
       review.getByText("Final score only", { exact: true }),
     ).toBeVisible();
     await expect(
@@ -128,6 +134,8 @@ test("actual worker progress is visible, and lost acknowledgement retains the ex
   ).toBeEnabled();
   const lock = await db.connect(),
     key = 140014;
+  const barrierPid = (await lock.query("SELECT pg_backend_pid() AS id")).rows[0]
+    .id;
   await lock.query("SELECT pg_advisory_lock($1)", [key]);
   let id = "",
     name = "",
@@ -162,6 +170,17 @@ test("actual worker progress is visible, and lost acknowledgement retains the ex
     ).toBeDisabled();
     await page.reload();
     await expect(page.getByText(/Unconfirmed command retained/)).toBeVisible();
+    await expect
+      .poll(
+        async () =>
+          !!(
+            await db.query(
+              "SELECT pid FROM pg_stat_activity WHERE datname=current_database() AND wait_event='advisory' AND $1::integer=ANY(pg_blocking_pids(pid))",
+              [barrierPid],
+            )
+          ).rowCount,
+      )
+      .toBe(true);
     await page
       .getByRole("button", { name: "Retry exact import command", exact: true })
       .click();

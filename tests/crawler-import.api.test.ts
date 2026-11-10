@@ -72,6 +72,10 @@ test("real consistent export becomes a frozen private review batch through the q
   assert.equal(batch.job.uniqueGames, 4);
   assert.equal(batch.job.sourceRecords, 44);
   assert.equal(batch.job.evidenceRecords, 50);
+  // Independent frozen-source inventory: 10 unresolved entry cores, 6 unknown
+  // disciplines, 24 people, 21 game issues, 41 missing parser versions, 11 null URLs.
+  assert.equal(batch.job.issueCount, 113);
+  assert.equal(batch.issues.length, 113);
   const frozenLines = (
     await db.query(
       "SELECT source_line FROM import_record WHERE job_id=$1 ORDER BY ordinal",
@@ -322,5 +326,99 @@ test("a frozen batch rejects later appended evidence as well as changed records"
   await assert.rejects(
     db.query("UPDATE import_record SET payload='{}' WHERE job_id=$1", [id]),
     /immutable/i,
+  );
+});
+
+test("an exact committed staging receipt acknowledges while its worker still owns the job row", async () => {
+  const id = randomUUID(),
+    name = "wcp014_receipt_" + id.replaceAll("-", ""),
+    key = 140114,
+    lock = await db.connect(),
+    barrierPid = (await lock.query("SELECT pg_backend_pid() AS id")).rows[0].id,
+    command = {
+      action: "stage",
+      id,
+      sourceDigest: await hash(process.env.CRAWLER_IMPORT_EXPORT!),
+    };
+  let pending: Promise<Response> | undefined;
+  await lock.query("SELECT pg_advisory_lock($1)", [key]);
+  await db.query(
+    `CREATE FUNCTION ${name}() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.job_id='${id}' AND NEW.kind='game' THEN PERFORM pg_advisory_xact_lock(${key}); END IF; RETURN NEW; END $$; CREATE TRIGGER ${name} BEFORE INSERT ON import_record FOR EACH ROW EXECUTE FUNCTION ${name}()`,
+  );
+  try {
+    assert.equal((await req("", command)).status, 200);
+    let blocked = false;
+    for (let i = 0; i < 100; i++) {
+      blocked = !!(
+        await db.query(
+          "SELECT pid FROM pg_stat_activity WHERE datname=current_database() AND wait_event='advisory' AND $1::integer=ANY(pg_blocking_pids(pid))",
+          [barrierPid],
+        )
+      ).rowCount;
+      if (blocked) break;
+      await new Promise((r) => setTimeout(r, 100));
+    }
+    assert.equal(
+      blocked,
+      true,
+      "The real worker must be blocked behind the fixture barrier",
+    );
+    const probe = await db.connect();
+    try {
+      await probe.query("BEGIN");
+      await assert.rejects(
+        probe.query("SELECT id FROM import_job WHERE id=$1 FOR UPDATE NOWAIT", [
+          id,
+        ]),
+        /could not obtain lock/,
+      );
+    } finally {
+      await probe.query("ROLLBACK");
+      probe.release();
+    }
+    pending = req("", command);
+    const response = await Promise.race([
+      pending,
+      new Promise<null>((r) => setTimeout(() => r(null), 2000)),
+    ]);
+    assert.notEqual(
+      response,
+      null,
+      "A durable receipt acknowledgement must not wait for the worker's mutable job-row lock",
+    );
+    assert.equal(response!.status, 200);
+    assert.equal((await response!.json()).id, id);
+    assert.equal(
+      (await (await req(`?job=${id}`)).json()).job.status,
+      "running",
+    );
+    assert.equal(
+      (await req("", { ...command, sourceDigest: "0".repeat(64) })).status,
+      409,
+    );
+    const otherId = randomUUID();
+    assert.equal(
+      (await req("", { ...command, id: otherId, requestId: id })).status,
+      409,
+    );
+    assert.equal((await req(`?job=${otherId}`)).status, 404);
+    assert.equal((await req("", command, "organizer")).status, 403);
+  } finally {
+    await lock.query("SELECT pg_advisory_unlock_all()");
+    lock.release();
+    if (pending) {
+      const response = await pending;
+      if (!response.bodyUsed) await response.arrayBuffer();
+    }
+    await db.query(
+      `DROP TRIGGER ${name} ON import_record; DROP FUNCTION ${name}()`,
+    );
+  }
+  const done = await wait(id);
+  assert.equal(done.job.status, "staged");
+  assert.equal(done.job.attempts, 1);
+  assert.equal(
+    done.attempts.filter((a: any) => a.action === "import_stage_queued").length,
+    1,
   );
 });

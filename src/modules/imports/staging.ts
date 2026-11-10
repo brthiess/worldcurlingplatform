@@ -90,19 +90,19 @@ export async function stageImport(actor: string, raw: unknown) {
     await c.query("SELECT pg_advisory_xact_lock(hashtextextended($1,0))", [
       `import:${v.id}`,
     ]);
-    const existing = (
-      await c.query("SELECT * FROM import_job WHERE id=$1 FOR UPDATE", [v.id])
-    ).rows[0];
     const requestId = v.requestId ?? v.id,
       commandDigest = sha(canonicalEntryCommand(v));
     const receipt = (
-      await c.query("SELECT * FROM import_command WHERE request_id=$1", [
-        requestId,
-      ])
+      await c.query(
+        "SELECT r.*,j.actor_id AS job_actor_id,j.digest AS job_digest FROM import_command r JOIN import_job j ON j.id=r.job_id WHERE r.request_id=$1",
+        [requestId],
+      )
     ).rows[0];
     if (receipt) {
       if (
         receipt.actor_id !== actor ||
+        receipt.job_actor_id !== actor ||
+        receipt.job_digest !== v.sourceDigest ||
         receipt.command_digest !== commandDigest ||
         receipt.job_id !== v.id
       )
@@ -113,6 +113,11 @@ export async function stageImport(actor: string, raw: unknown) {
       await c.query("COMMIT");
       return { id: v.id };
     }
+    // Only a new command needs mutable job state. An immutable receipt can be
+    // acknowledged while the worker holds this row throughout its staging transaction.
+    const existing = (
+      await c.query("SELECT * FROM import_job WHERE id=$1 FOR UPDATE", [v.id])
+    ).rows[0];
     if (existing) {
       if (existing.actor_id !== actor || existing.digest !== v.sourceDigest)
         throw new EntryError(
