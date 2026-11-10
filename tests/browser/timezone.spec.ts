@@ -9,3 +9,12 @@ test("last successful refresh uses the explicit venue clock even in a Tokyo brow
     "Nov 8, 1:00 p.m. CST",
   );
 });
+test("calendar fetch completion uses an explicit UTC refresh label in a Tokyo browser", async ({
+  page,
+}) => {
+  await page.clock.setFixedTime(new Date("2026-11-09T22:00:00Z"));
+  await page.goto("/events?q=Main");
+  await expect(
+    page.getByText("Last refreshed 2026-11-09 22:00:00 UTC", { exact: true }),
+  ).toBeVisible();
+});

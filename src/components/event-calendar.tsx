@@ -1,39 +1,43 @@
 "use client";
 import { useEffect, useState } from "react";
 import { disciplines } from "@/domain/applications";
+import { filterEvents } from "@/domain/discovery";
+import { PublicLink, usePublicFilters } from "./public-context";
+import { FavoriteButton } from "./favorites";
 type CalendarEvent = {
   id: string;
   name: string;
+  seriesName: string;
+  location: string;
   startsOn: string;
   endsOn: string;
-  location: string;
   origin: string;
+  status: string;
   registrationStatus: string;
-  seriesName: string;
   divisions: {
     id: string;
     name: string;
     discipline: string;
     rankingStatus: string;
+    status: string;
   }[];
 };
 export function EventCalendar() {
+  const { filters: f, change } = usePublicFilters();
   const [events, setEvents] = useState<CalendarEvent[] | null>(null),
     [error, setError] = useState(""),
     [loading, setLoading] = useState(true),
-    [search, setSearch] = useState(""),
-    [discipline, setDiscipline] = useState(""),
-    [from, setFrom] = useState(""),
-    [to, setTo] = useState(""),
-    [location, setLocation] = useState("");
+    [updated, setUpdated] = useState("");
   async function load() {
     setLoading(true);
     try {
       const r = await fetch("/api/v1/public/calendar", { cache: "no-store" });
       if (!r.ok) throw new Error("The event calendar could not be refreshed.");
-      const data = await r.json();
-      setEvents(data.events);
+      setEvents((await r.json()).events);
       setError("");
+      setUpdated(
+        new Date().toISOString().replace("T", " ").slice(0, 19) + " UTC",
+      );
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -42,25 +46,19 @@ export function EventCalendar() {
   }
   useEffect(() => {
     void load();
+    const timer = setInterval(() => void load(), 8000);
+    return () => clearInterval(timer);
   }, []);
-  const dateError = !!from && !!to && from > to;
-  const shown = (events ?? []).filter(
-    (e) =>
-      (!search ||
-        `${e.name} ${e.seriesName} ${e.location}`
-          .toLowerCase()
-          .includes(search.toLowerCase())) &&
-      (!discipline || e.divisions.some((d) => d.discipline === discipline)) &&
-      (!location || e.location === location) &&
-      (!from || e.endsOn >= from) &&
-      (!to || e.startsOn <= to),
-  );
+  const dateError = !!f.from && !!f.to && f.from > f.to;
+  const shown = filterEvents(events ?? [], f);
   return (
     <main id="main">
-      <p className="eyebrow">Competition calendar</p>
+      <p className="eyebrow">Competition calendar and archive</p>
       <h1>Events</h1>
       <p className="muted">
         Admitted editions, with separate division and registration states.
+        Status follows recorded play; elapsed time alone does not establish a
+        live or completed competition.
       </p>
       {error && (
         <p className="error" role="status">
@@ -76,8 +74,8 @@ export function EventCalendar() {
           <label htmlFor="event-search">Search events</label>
           <input
             id="event-search"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            value={f.q ?? ""}
+            onChange={(e) => change({ q: e.target.value })}
             placeholder="Edition, series or city"
           />
         </div>
@@ -85,8 +83,10 @@ export function EventCalendar() {
           <label htmlFor="event-discipline">Discipline</label>
           <select
             id="event-discipline"
-            value={discipline}
-            onChange={(e) => setDiscipline(e.target.value)}
+            value={f.discipline ?? ""}
+            onChange={(e) =>
+              change({ discipline: e.target.value, division: "" })
+            }
           >
             <option value="">All disciplines</option>
             {Object.entries(disciplines).map(([id, label]) => (
@@ -97,11 +97,30 @@ export function EventCalendar() {
           </select>
         </div>
         <div>
+          <label htmlFor="event-division">Division</label>
+          <select
+            id="event-division"
+            value={f.division ?? ""}
+            onChange={(e) => change({ division: e.target.value })}
+          >
+            <option value="">All divisions</option>
+            {(events ?? []).flatMap((e) =>
+              e.divisions
+                .filter((d) => !f.discipline || d.discipline === f.discipline)
+                .map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {e.name} · {d.name}
+                  </option>
+                )),
+            )}
+          </select>
+        </div>
+        <div>
           <label htmlFor="event-location">Location</label>
           <select
             id="event-location"
-            value={location}
-            onChange={(e) => setLocation(e.target.value)}
+            value={f.location ?? ""}
+            onChange={(e) => change({ location: e.target.value })}
           >
             <option value="">All locations</option>
             {[...new Set((events ?? []).map((e) => e.location))]
@@ -112,12 +131,26 @@ export function EventCalendar() {
           </select>
         </div>
         <div>
+          <label htmlFor="event-status">Competition status</label>
+          <select
+            id="event-status"
+            value={f.status ?? ""}
+            onChange={(e) => change({ status: e.target.value })}
+          >
+            <option value="">All statuses</option>
+            <option value="live">Live</option>
+            <option value="upcoming">Upcoming</option>
+            <option value="completed">Completed</option>
+            <option value="unknown">Not established</option>
+          </select>
+        </div>
+        <div>
           <label htmlFor="event-from">From date</label>
           <input
             id="event-from"
             type="date"
-            value={from}
-            onChange={(e) => setFrom(e.target.value)}
+            value={f.from ?? ""}
+            onChange={(e) => change({ from: e.target.value })}
           />
         </div>
         <div>
@@ -125,20 +158,24 @@ export function EventCalendar() {
           <input
             id="event-to"
             type="date"
-            value={to}
-            onChange={(e) => setTo(e.target.value)}
+            value={f.to ?? ""}
+            onChange={(e) => change({ to: e.target.value })}
           />
         </div>
         <button
           className="secondary"
           type="button"
-          onClick={() => {
-            setSearch("");
-            setDiscipline("");
-            setFrom("");
-            setTo("");
-            setLocation("");
-          }}
+          onClick={() =>
+            change({
+              q: "",
+              discipline: "",
+              division: "",
+              location: "",
+              from: "",
+              to: "",
+              status: "",
+            })
+          }
         >
           Clear filters
         </button>
@@ -148,7 +185,7 @@ export function EventCalendar() {
           Through date must be on or after the from date.
         </p>
       )}
-      {loading && (
+      {loading && !events && (
         <p role="status" className="loading">
           Loading admitted editions…
         </p>
@@ -172,35 +209,43 @@ export function EventCalendar() {
                       : e.origin === "historical_import"
                         ? "Imported historical record"
                         : "Newly operated event"}{" "}
-                    · Admitted
+                    ·{" "}
+                    {e.status === "unknown"
+                      ? "Competition status not established"
+                      : e.status}
                   </p>
                   <h2>
-                    <a href={`/events/${e.id}`}>{e.name}</a>
+                    <PublicLink href={`/events/${e.id}`}>{e.name}</PublicLink>
                   </h2>
                   <p>
                     {e.location} · {e.seriesName}
                   </p>
                   <p className="muted">Registration: {e.registrationStatus}</p>
+                  <FavoriteButton kind="event" id={e.id} />
                   <ul className="division-links">
-                    {e.divisions.map((d) => (
-                      <li key={d.id}>
-                        <a
-                          href={`/events/${e.id}?division=${encodeURIComponent(d.id)}`}
-                        >
-                          {d.name}
-                        </a>
-                        <span>
-                          {" "}
-                          ·{" "}
-                          {
-                            disciplines[
-                              d.discipline as keyof typeof disciplines
-                            ]
-                          }{" "}
-                          · Ranking: {d.rankingStatus}
-                        </span>
-                      </li>
-                    ))}
+                    {e.divisions
+                      .filter(
+                        (d) =>
+                          (!f.discipline || d.discipline === f.discipline) &&
+                          (!f.division || d.id === f.division),
+                      )
+                      .map((d) => (
+                        <li key={d.id}>
+                          <PublicLink href={`/events/${e.id}?division=${d.id}`}>
+                            {d.name}
+                          </PublicLink>
+                          <span>
+                            {" "}
+                            ·{" "}
+                            {
+                              disciplines[
+                                d.discipline as keyof typeof disciplines
+                              ]
+                            }{" "}
+                            · Ranking: {d.rankingStatus}
+                          </span>
+                        </li>
+                      ))}
                   </ul>
                 </div>
               </li>
@@ -209,6 +254,23 @@ export function EventCalendar() {
           {!shown.length && (
             <p className="empty">No admitted editions match these filters.</p>
           )}
+          {!events.some((e) => e.origin === "historical_import") && (
+            <p className="muted">
+              No imported historical editions are available in this database.
+            </p>
+          )}
+          <div className="refresh">
+            <span role="status">
+              {error ? "Stale calendar" : `Last refreshed ${updated}`}
+            </span>
+            <button
+              className="secondary"
+              onClick={() => void load()}
+              aria-disabled={loading}
+            >
+              {loading ? "Refreshing…" : "Refresh calendar"}
+            </button>
+          </div>
         </>
       )}
     </main>
