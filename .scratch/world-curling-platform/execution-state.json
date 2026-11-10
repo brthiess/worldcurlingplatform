@@ -211,7 +211,7 @@
     "from_checkpoint": "d667c4f717d7a5045ed1313e41e5502169135e60",
     "from_note": "docs/agents/paused-2026-11-09.md",
     "formally_accepted_integration": "11d9e6ce0c4b3bdf9188dc75f74987e4b628b886",
-    "pending_source_on_primary": null,
+    "pending_source_on_primary": "WCP-017 provisional; combined checks complete; coordinator acceptance pending",
     "max_parallel_children": 3,
     "accepted_integration_after_resume": "8d5412ac5eb0f77efdd9431e5a51c805d5ce00cc",
     "last_formally_accepted_boundary": "8d5412ac5eb0f77efdd9431e5a51c805d5ce00cc"
