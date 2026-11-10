@@ -224,7 +224,7 @@
     "accepted_integration_after_resume": "a224b908f53481aec66710902985217830f52bb5",
     "last_formally_accepted_boundary": "a224b908f53481aec66710902985217830f52bb5"
   },
-  "updated_at": "2026-11-10T01:04:33.079981+00:00",
+  "updated_at": "2026-11-10T01:37:16.154154+00:00",
   "active_tickets": [
     "WCP-014",
     "WCP-026",
@@ -863,6 +863,15 @@
         "WCP-014"
       ],
       "full_combined_verification": "WCP-034 accepted after selected107API/85browser;017/014 own source-specific checks and independent integration remain separately required"
+    },
+    {
+      "commit": "18a00099d43c4fd14675f91059e739ad5c3b0567",
+      "integrated_commit": "918d72cdce3c6a77087597882cb69ba4151b64f0",
+      "reviewed_at": "2026-11-10T01:37:16.154154+00:00",
+      "scope": "Only tests/browser/auth-fixture.ts and redacted verification note; boundedactual429wait budget; no pending014 productsource",
+      "evidence": "docs/verification/auth-rate-window-budget.md",
+      "checks": "Actual429smoke57.5s withnumericattachment; completeoverallfile5/5zero skips; pinnedrootNode20.19 tsc--noEmit passed after retainedsandboxEPERMlaunch",
+      "allowed_consumers": "All browser acceptance worktrees; exacttest/doccherry-pick or acceptedintegration merge between runs"
     }
   ]
 }
